@@ -204,6 +204,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         getFrequencyData,
       }}
     >
+      {/* Always rendered here, not inside PlayerBar — PlayerBar is
+         auth-gated and mounts asynchronously after the session check
+         resolves, which meant this ref didn't exist yet when the
+         time-tracking effect above first ran, and (with an empty
+         dependency array) never got a second chance to attach. */}
+      <audio ref={audioRef} className="hidden" />
       {children}
     </PlayerContext.Provider>
   );

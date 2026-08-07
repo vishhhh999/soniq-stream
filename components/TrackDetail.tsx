@@ -123,11 +123,31 @@ export default function TrackDetail({
         detectBPM(track.fileUrl).catch(() => ({ bpm: 0, confidence: 0 })),
         detectKey(track.fileUrl).catch(() => ({ key: "", confidence: 0 })),
       ]);
-      if (bpmResult.bpm > 0) setBpm(bpmResult.bpm);
-      if (keyResult.key) setKey(keyResult.key);
-      if (bpmResult.bpm === 0 && !keyResult.key) {
-        alert("Couldn't analyze this file. If it was uploaded before R2 CORS was configured for GET requests, that's very likely why — check the bucket's CORS policy.");
+      const patch: Record<string, unknown> = {};
+      if (bpmResult.bpm > 0) {
+        setBpm(bpmResult.bpm);
+        patch.bpm = bpmResult.bpm;
+        patch.bpmConfidence = bpmResult.confidence;
       }
+      if (keyResult.key) {
+        setKey(keyResult.key);
+        patch.key = keyResult.key;
+      }
+      if (Object.keys(patch).length === 0) {
+        alert("Couldn't analyze this file. If it was uploaded before R2 CORS was configured for GET requests, that's very likely why — check the bucket's CORS policy.");
+        return;
+      }
+      // Previously this only updated local form state — if you closed the
+      // panel without separately clicking "Save changes" at the bottom, the
+      // detected values were lost and looked like detection "didn't work."
+      // Persist immediately instead, matching every other auto-save field.
+      await fetch(`/api/tracks/${track.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
     } finally {
       setDetecting(false);
     }
@@ -258,7 +278,6 @@ export default function TrackDetail({
               track={track}
               initialLyrics={(track as any).lyrics ?? ""}
               initialSynced={(track as any).lyricsSynced ?? null}
-              onSaved={onSaved}
             />
           </div>
 

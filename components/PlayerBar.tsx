@@ -20,6 +20,7 @@ export default function PlayerBar() {
   const [brokenTrack, setBrokenTrack] = useState<{ id: string; title: string } | null>(null);
   const [showQueue, setShowQueue] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
+  const [showVolume, setShowVolume] = useState(false);
   const triedFallbackRef = useRef(false);
 
   useEffect(() => {
@@ -34,7 +35,6 @@ export default function PlayerBar() {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
     const onError = () => {
       if (!current) return;
       if (!triedFallbackRef.current) {
@@ -61,6 +61,10 @@ export default function PlayerBar() {
     if (audioRef.current) audioRef.current.volume = muted ? 0 : volume;
   }, [volume, muted]);
 
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.loop = loopOn;
+  }, [loopOn]);
+
   const fmt = (s: number) => {
     if (!s || Number.isNaN(s)) return "0:00";
     const m = Math.floor(s / 60);
@@ -73,11 +77,11 @@ export default function PlayerBar() {
   const hasQueueContext = queue.length > 1;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50">
+    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[min(900px,calc(100vw-2rem))]">
       {showLyrics && current && <LyricsView track={current} onClose={() => setShowLyrics(false)} />}
 
       {brokenTrack && (
-        <div className="bg-error/15 border-t border-error/40 px-6 py-2 flex items-center justify-between gap-4">
+        <div className="mb-2 bg-error/15 border border-error/40 rounded-lg px-4 py-2 flex items-center justify-between gap-4">
           <span className="text-xs text-error">
             Couldn&apos;t load &ldquo;{brokenTrack.title}&rdquo; — the file may have been deleted from storage.
           </span>
@@ -98,7 +102,7 @@ export default function PlayerBar() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
-            className="absolute bottom-full right-6 mb-2 w-80 max-h-96 overflow-y-auto bg-elevated border border-border rounded-lg shadow-lg"
+            className="absolute bottom-full right-0 mb-2 w-80 max-h-96 overflow-y-auto bg-elevated border border-border rounded-lg shadow-xl"
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border sticky top-0 bg-elevated">
               <span className="text-xs uppercase tracking-wide text-tertiary">Queue</span>
@@ -129,13 +133,15 @@ export default function PlayerBar() {
         )}
       </AnimatePresence>
 
-      <div className="h-20 bg-elevated border-t border-border flex items-center px-6 gap-5">
-        <audio ref={audioRef} loop={loopOn} />
-
-        <div className="w-56 min-w-0 flex items-center gap-3 shrink-0">
+      {/* Floating rounded pill, not edge-to-edge — bounded width with real
+         padding so nothing (the volume slider especially) has a chance to
+         clip past the container edge the way it did in the full-width bar. */}
+      <div className="h-16 bg-elevated/95 backdrop-blur border border-border rounded-full flex items-center px-5 gap-4 shadow-xl">
+        <div className="w-44 min-w-0 flex items-center gap-2.5 shrink-0">
           <VinylArt
             coverUrl={current?.albumCoverUrl}
             spinning={isPlaying}
+            size={40}
             gradientFrom={gradient?.from}
             gradientTo={gradient?.to}
           />
@@ -149,24 +155,24 @@ export default function PlayerBar() {
                 transition={{ duration: 0.2 }}
                 className="min-w-0"
               >
-                <p className="text-sm font-medium text-primary truncate">{current.title}</p>
-                <p className="text-xs text-secondary truncate">{current.artist || "Unknown"}</p>
+                <p className="text-xs font-medium text-primary truncate">{current.title}</p>
+                <p className="text-[11px] text-secondary truncate">{current.artist || "Unknown"}</p>
               </motion.div>
             ) : (
-              <p className="text-sm text-tertiary">Nothing playing</p>
+              <p className="text-xs text-tertiary">Nothing playing</p>
             )}
           </AnimatePresence>
         </div>
 
-        <div className="flex items-center gap-3.5 text-secondary shrink-0">
+        <div className="flex items-center gap-2.5 text-secondary shrink-0">
           <Shuffle
-            size={16}
+            size={14}
             strokeWidth={1.5}
             onClick={toggleShuffle}
             className={`cursor-pointer transition-colors ${shuffleOn ? "text-primary" : "hover:text-primary"}`}
           />
           <SkipBack
-            size={18}
+            size={16}
             strokeWidth={1.5}
             onClick={previous}
             className={`transition-colors ${hasQueueContext || currentTime > 3 ? "cursor-pointer hover:text-primary" : "opacity-30"}`}
@@ -174,18 +180,18 @@ export default function PlayerBar() {
           <button
             onClick={toggle}
             disabled={!current}
-            className="w-9 h-9 rounded-full bg-accent text-canvas flex items-center justify-center disabled:opacity-30 hover:bg-accent-strong transition-colors"
+            className="w-8 h-8 rounded-full bg-accent text-canvas flex items-center justify-center disabled:opacity-30 hover:bg-accent-strong transition-colors shrink-0"
           >
-            {isPlaying ? <Pause size={16} strokeWidth={2} /> : <Play size={16} strokeWidth={2} className="ml-0.5" />}
+            {isPlaying ? <Pause size={14} strokeWidth={2} /> : <Play size={14} strokeWidth={2} className="ml-0.5" />}
           </button>
           <SkipForward
-            size={18}
+            size={16}
             strokeWidth={1.5}
             onClick={next}
             className={`transition-colors ${queueIndex < queue.length - 1 ? "cursor-pointer hover:text-primary" : "opacity-30"}`}
           />
           <Repeat
-            size={16}
+            size={14}
             strokeWidth={1.5}
             onClick={() => setLoopOn((v) => !v)}
             className={`cursor-pointer transition-colors ${loopOn ? "text-primary" : "hover:text-primary"}`}
@@ -205,7 +211,7 @@ export default function PlayerBar() {
           <div className="flex-1" />
         )}
 
-        <span className="text-xs text-tertiary tabular-nums shrink-0 whitespace-nowrap">
+        <span className="text-[11px] text-tertiary tabular-nums shrink-0 whitespace-nowrap">
           {fmt(currentTime)} / {fmt(duration)}
         </span>
 
@@ -215,42 +221,58 @@ export default function PlayerBar() {
           className={`shrink-0 transition-colors disabled:opacity-30 ${showLyrics ? "text-primary" : "text-secondary hover:text-primary"}`}
           title="Lyrics"
         >
-          <Mic2 size={16} strokeWidth={1.5} />
+          <Mic2 size={14} strokeWidth={1.5} />
         </button>
 
         <button
           onClick={() => setShowQueue((v) => !v)}
           className={`shrink-0 transition-colors ${showQueue ? "text-primary" : "text-secondary hover:text-primary"}`}
         >
-          <ListMusic size={16} strokeWidth={1.5} />
+          <ListMusic size={14} strokeWidth={1.5} />
         </button>
 
-        <div className="flex items-center gap-2 w-24 shrink-0">
-          <button onClick={() => setMuted((m) => !m)} className="text-secondary hover:text-primary transition-colors shrink-0">
-            <VolIcon size={16} strokeWidth={1.5} />
+        {/* Volume as a popover, not an always-visible inline slider — the
+           inline slider had no reliably bounded width and would clip past
+           the (previously edge-to-edge) bar's edge. A popover has its own
+           contained box, so it can never spill outside the player. */}
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setShowVolume((v) => !v)}
+            className="text-secondary hover:text-primary transition-colors"
+          >
+            <VolIcon size={14} strokeWidth={1.5} />
           </button>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={muted ? 0 : volume}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              setVolume(v);
-              if (v > 0) setMuted(false);
-            }}
-            className="flex-1 accent-[var(--accent)] cursor-pointer"
-          />
+          <AnimatePresence>
+            {showVolume && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className="absolute bottom-full right-0 mb-2 bg-elevated border border-border rounded-lg shadow-xl p-3 w-32"
+              >
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={muted ? 0 : volume}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    setVolume(v);
+                    if (v > 0) setMuted(false);
+                  }}
+                  className="w-full accent-[var(--accent)] cursor-pointer"
+                />
+                <button
+                  onClick={() => setMuted((m) => !m)}
+                  className="text-[11px] text-tertiary hover:text-primary mt-1"
+                >
+                  {muted ? "Unmute" : "Mute"}
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-
-        {(current?.bpm || current?.key) && (
-          <span className="text-xs text-tertiary border-l border-border pl-5 tabular-nums shrink-0 whitespace-nowrap">
-            {current?.bpm ? `${Math.round(current.bpm)} BPM` : ""}
-            {current?.bpm && current?.key ? " · " : ""}
-            {current?.key || ""}
-          </span>
-        )}
       </div>
     </div>
   );

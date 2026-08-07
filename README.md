@@ -66,7 +66,7 @@ AUTH_SECRET=...                # openssl rand -hex 32
 AUTH_TRUST_HOST=true
 GOOGLE_CLIENT_ID=...           # optional
 GOOGLE_CLIENT_SECRET=...       # optional
-ALLOWED_EMAILS=you@gmail.com   # required if using Google sign-in
+ALLOWED_EMAILS=you@gmail.com   # optional — controls both Google sign-in AND email/password signup; unset = open
 R2_ACCOUNT_ID=...
 R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
@@ -130,6 +130,55 @@ and no explanation when it declined to create a second account. Still
 single-account by design (no open registration) — that part hasn't
 changed, only the messaging around it.
 
+
+## This round: player rebuild, lyrics/BPM persistence bugs, open signup
+
+**Fixed a real timing bug behind the permanent 0:00/0:00.** The
+`currentTime`/`duration`-tracking effect in `PlayerProvider` ran once on
+mount with an empty dependency array — but the actual `<audio>` element
+lived inside `PlayerBar`, which only mounts *after* the auth session check
+resolves. The effect found `audioRef.current` null, attached nothing, and
+(with no dependency to re-trigger it) never got a second chance. Fixed by
+moving the `<audio>` element itself into `PlayerProvider`, so it exists
+the instant the app loads regardless of auth timing.
+
+**Player rebuilt as a floating pill**, not a bar stretching edge to edge —
+matches the reference you sent. This also fixes the volume slider clipping
+outside the page: it's a bounded popover now, not an inline slider with no
+real width constraint on the previous full-width layout.
+
+**Waveform was rendering as blobs, not bars — real CSS bug, not a design
+choice.** Each bar used `flex-1` (auto width) with `rounded-full`. On a
+wide player, most bars ended up wider than tall, and `rounded-full` on a
+wide-short shape renders as a horizontal pill, not a vertical bar. Fixed:
+fixed 2px bar width, small radius, plus a single accent playhead line at
+the current position instead of a played/unplayed color split across every
+bar — closer to what you referenced.
+
+**Lyrics: the actual bug was `LyricsEditor`'s completion callback wired to
+the wrong function.** It called `TrackDetail`'s own `onSaved`, which was
+built to close the entire panel after the main "Save changes" button — so
+finishing a sync (or even just saving the raw text) closed the whole
+drawer immediately, before you could see or confirm anything. That's
+exactly "the dialog closed without me pressing save." Fixed: lyrics now
+confirm locally ("Saved" / "Synced") without touching the parent panel at
+all, matching how title/artist auto-save already worked.
+
+**BPM/key re-detect had the same class of bug** — the button only updated
+local form fields, never actually called the save API. If you closed the
+panel without separately clicking "Save changes" below, detected values
+were silently lost. Now persists immediately on detection.
+
+**Signup is open now, not restricted to one account.** Gated by the same
+`ALLOWED_EMAILS` allowlist already used for Google sign-in if it's set —
+if it's not set, signup is unrestricted. This is a real security tradeoff,
+stated plainly: set `ALLOWED_EMAILS` if you want this locked to specific
+people, leave it unset if you want it open. `/setup` no longer pre-checks
+or blocks; any restriction now surfaces as a normal form error on submit.
+
+**Removed the BPM/key display from the player bar** — redundant clutter,
+still visible in the track panel where it's actually useful.
+
 ## Explicitly deferred — not started, not partial
 
 Lyrics + sync (was on this list) is done — see above. What remains, still
@@ -142,6 +191,9 @@ real standalone features, still not rushed together:
   moderation)
 
 ## What's verified this round (real runs against real Postgres)
+- Multi-account signup: two independent accounts created, duplicate email
+  correctly rejected (409), both accounts confirmed able to log in
+  separately — tested against real Postgres, not just code review
 - Lyrics save/load round-trip: raw text and the synced `jsonb` array both
   confirmed persisting and returning correctly (as a real array, not a
   stringified blob) via direct API calls against real Postgres
@@ -149,8 +201,8 @@ real standalone features, still not rushed together:
   makes the synced view actually highlight the right line — tested against
   8 known timestamp/position pairs before trusting it in the UI
 - Full production build compiles clean with the new schema columns,
-  `LyricsEditor`, `LyricsView`, and the `PlayerProvider` refactor for
-  centralized time tracking
+  `LyricsEditor`, `LyricsView`, the `PlayerProvider` refactor, and the
+  floating-pill player rebuild
 
 ## What's NOT verified
 - The actual tap-to-sync UX in a real browser — timing accuracy depends on
@@ -159,6 +211,10 @@ real standalone features, still not rushed together:
 - Auto-scroll behavior in `LyricsView` during real playback — the
   `scrollIntoView` call is standard and should work, but hasn't been
   watched scroll in an actual browser
+- The visual result of the player/waveform rebuild — the bugs (blob-shaped
+  bars, permanent 0:00/0:00, volume clipping) are diagnosed and fixed at
+  the code level with clear reasoning for each, but only your browser can
+  confirm it actually looks like the reference now
 
 ## Not built yet
 - **3D vinyl browser**, **comments** — see "Explicitly deferred" above

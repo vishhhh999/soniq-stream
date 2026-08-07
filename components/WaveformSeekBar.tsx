@@ -14,27 +14,36 @@ export default function WaveformSeekBar({
   duration: number;
   onSeek: (time: number) => void;
 }) {
-  const bars = useMemo(() => waveformBars(trackId), [trackId]);
-  const playedRatio = duration ? progress / duration : 0;
+  const bars = useMemo(() => waveformBars(trackId, 60), [trackId]);
+  const playedRatio = duration ? Math.min(1, progress / duration) : 0;
 
   return (
     <div className="relative flex-1 h-8 flex items-center group">
-      <div className="flex items-center gap-[2px] w-full h-full">
-        {bars.map((h, i) => {
-          const barPosition = i / bars.length;
-          const isPlayed = barPosition <= playedRatio;
-          return (
-            <div
-              key={i}
-              className="flex-1 rounded-full transition-colors"
-              style={{
-                height: `${h * 100}%`,
-                backgroundColor: isPlayed ? "var(--accent)" : "var(--border-strong)",
-              }}
-            />
-          );
-        })}
+      {/* Thin vertical bars, fixed width — previously used flex-1 width with
+         rounded-full, which made each bar wider than tall and rendered as
+         horizontal pills/blobs instead of a waveform. Fixed width + small
+         radius keeps them as actual bars regardless of container size. */}
+      <div className="flex items-center gap-[2px] w-full h-full justify-between">
+        {bars.map((h, i) => (
+          <div
+            key={i}
+            className="rounded-[1px] shrink-0"
+            style={{
+              width: "2px",
+              height: `${h * 100}%`,
+              backgroundColor: "var(--border-strong)",
+            }}
+          />
+        ))}
       </div>
+
+      {/* Single playhead line at the current position, not a played/unplayed
+         color split across every bar — closer to the reference. */}
+      <div
+        className="absolute top-0 bottom-0 w-[2px] bg-accent pointer-events-none rounded-full"
+        style={{ left: `${playedRatio * 100}%` }}
+      />
+
       <input
         type="range"
         min={0}

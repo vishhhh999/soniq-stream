@@ -1,45 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function SetupPage() {
-  const [checking, setChecking] = useState(true);
-  const [checkError, setCheckError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [alreadySetUp, setAlreadySetUp] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    fetch("/api/setup")
-      .then((r) => {
-        if (!r.ok) throw new Error(`Server returned ${r.status}`);
-        return r.json();
-      })
-      .then((d) => {
-        if (!d.needsSetup) {
-          // Previously this silently redirected to /login with zero
-          // explanation — landing here and getting instantly bounced with
-          // no message reads exactly like "there's no signup," which was
-          // the actual source of confusion, not a missing feature.
-          setAlreadySetUp(true);
-          setChecking(false);
-        } else {
-          setChecking(false);
-        }
-      })
-      .catch((e) => {
-        console.error("Setup check failed:", e);
-        setCheckError(
-          "Couldn't reach the server. This usually means the database schema is out of date — check DATABASE_URL and that `npm run db:push` has been run against production."
-        );
-        setChecking(false);
-      });
-  }, [router]);
-
+  // Previously this pre-checked whether an account existed and blocked the
+  // form entirely if so ("Sign up only runs once"). Signup is no longer
+  // restricted to a single account, so there's nothing to pre-check —
+  // any actual restriction (the ALLOWED_EMAILS allowlist, if configured)
+  // is enforced server-side on submit and surfaces as a normal form error.
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -58,43 +33,11 @@ export default function SetupPage() {
     }
   };
 
-  if (checking) return null;
-
-  if (checkError) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-canvas px-6">
-        <div className="max-w-sm w-full text-center">
-          <h1 className="text-2xl font-display font-bold text-primary tracking-tight mb-4">SONIQ</h1>
-          <p className="text-sm text-error">{checkError}</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (alreadySetUp) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-canvas px-6">
-        <div className="max-w-sm w-full text-center">
-          <h1 className="text-2xl font-display font-bold text-primary tracking-tight mb-3">SONIQ</h1>
-          <p className="text-secondary text-sm mb-6">
-            An account already exists for this library. Sign up only runs once, for the first account.
-          </p>
-          <a
-            href="/login"
-            className="inline-block bg-accent text-canvas text-sm font-medium px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
-          >
-            Go to sign in
-          </a>
-        </div>
-      </main>
-    );
-  }
-
   return (
     <main className="min-h-screen flex items-center justify-center bg-canvas px-6">
       <form onSubmit={submit} className="max-w-xs w-full">
         <h1 className="text-2xl font-display font-bold text-primary tracking-tight mb-1">SONIQ</h1>
-        <p className="text-secondary text-sm mb-8">Create your account — this only happens once.</p>
+        <p className="text-secondary text-sm mb-8">Create an account.</p>
 
         <input
           type="email"
@@ -124,6 +67,13 @@ export default function SetupPage() {
         >
           {busy ? "Creating..." : "Create account"}
         </button>
+
+        <p className="text-center text-xs text-tertiary mt-6">
+          Already have an account?{" "}
+          <a href="/login" className="text-secondary hover:text-primary underline">
+            Sign in
+          </a>
+        </p>
       </form>
     </main>
   );

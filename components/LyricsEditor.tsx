@@ -9,12 +9,10 @@ export default function LyricsEditor({
   track,
   initialLyrics,
   initialSynced,
-  onSaved,
 }: {
   track: Track;
   initialLyrics: string;
   initialSynced: SyncedLine[] | null;
-  onSaved: () => void;
 }) {
   const { audioRef, play } = usePlayer();
   const [text, setText] = useState(initialLyrics);
@@ -22,7 +20,14 @@ export default function LyricsEditor({
   const [syncLines, setSyncLines] = useState<string[]>([]);
   const [captured, setCaptured] = useState<SyncedLine[]>([]);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [isSynced, setIsSynced] = useState(!!initialSynced && initialSynced.length > 0);
 
+  // Previously this called the parent TrackDetail's `onSaved`, which was
+  // built to close the ENTIRE panel after the main "Save changes" button —
+  // meaning finishing a sync (or even just saving the text) closed the
+  // whole drawer with no warning. Lyrics now confirm locally instead,
+  // exactly like the title/artist auto-save fields already do.
   const saveText = async () => {
     setSaving(true);
     await fetch(`/api/tracks/${track.id}`, {
@@ -31,7 +36,8 @@ export default function LyricsEditor({
       body: JSON.stringify({ lyrics: text }),
     });
     setSaving(false);
-    onSaved();
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
   };
 
   const startSync = () => {
@@ -40,7 +46,7 @@ export default function LyricsEditor({
     setSyncLines(parsedLines);
     setCaptured([]);
     setSyncing(true);
-    play(track); // restarts this track from the beginning of the queue context
+    play(track);
     if (audioRef.current) audioRef.current.currentTime = 0;
   };
 
@@ -62,7 +68,7 @@ export default function LyricsEditor({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lyricsSynced: lines }),
     });
-    onSaved();
+    setIsSynced(true);
   };
 
   const cancelSync = () => {
@@ -93,7 +99,7 @@ export default function LyricsEditor({
           </button>
         </div>
         <p className="text-xs text-tertiary">
-          Play the track and tap the button in time with each line as it starts. Finishes automatically after the last line.
+          Play the track and tap the button in time with each line as it starts. Finishes automatically after the last line — this panel stays open, it won't close on you.
         </p>
       </div>
     );
@@ -108,7 +114,7 @@ export default function LyricsEditor({
         placeholder="Paste or type the lyrics — one line per line."
         className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-primary focus:border-border-strong outline-none resize-none font-mono"
       />
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <button
           onClick={saveText}
           disabled={saving || text === initialLyrics}
@@ -122,14 +128,15 @@ export default function LyricsEditor({
           className="flex items-center gap-2 text-sm bg-accent text-canvas rounded-md px-4 py-2 hover:bg-accent-strong transition-colors disabled:opacity-40"
         >
           <Play size={13} strokeWidth={2} />
-          {initialSynced ? "Re-sync timing" : "Sync timing"}
+          {isSynced ? "Re-sync timing" : "Sync timing"}
         </button>
-        {initialSynced && (
+        {isSynced && (
           <span className="text-xs text-tertiary flex items-center gap-1">
             <Check size={12} strokeWidth={2} className="text-accent" />
             Synced
           </span>
         )}
+        {saved && <span className="text-xs text-tertiary">Saved</span>}
       </div>
     </div>
   );
