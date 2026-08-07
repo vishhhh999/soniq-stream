@@ -12,6 +12,7 @@ import TrackRowGroup from "@/components/TrackRow";
 import AlbumCard, { Album } from "@/components/AlbumCard";
 import NewAlbumModal from "@/components/NewAlbumModal";
 import { groupVersions } from "@/lib/groupVersions";
+import { fetchArray } from "@/lib/apiFetch";
 import type { Track } from "@/components/PlayerProvider";
 
 export default function Home() {
@@ -21,8 +22,8 @@ export default function Home() {
   const [showNewAlbum, setShowNewAlbum] = useState(false);
 
   const load = () => {
-    fetch("/api/tracks").then((r) => r.json()).then(setTracks);
-    fetch("/api/albums").then((r) => r.json()).then(setAlbums);
+    fetchArray<Track>("/api/tracks").then(setTracks);
+    fetchArray<Album>("/api/albums").then(setAlbums);
   };
 
   useEffect(() => {

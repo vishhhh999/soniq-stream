@@ -11,6 +11,7 @@ import TrackDetail from "@/components/TrackDetail";
 import SortableTrackRow from "@/components/SortableTrackRow";
 import ShareModal from "@/components/ShareModal";
 import { groupVersions } from "@/lib/groupVersions";
+import { fetchArray } from "@/lib/apiFetch";
 import type { Track } from "@/components/PlayerProvider";
 
 export default function AlbumPage({ params }: { params: { id: string } }) {
@@ -29,8 +30,8 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
 
   const load = () => {
     Promise.all([
-      fetch("/api/albums").then((r) => r.json()),
-      fetch("/api/tracks").then((r) => r.json()),
+      fetchArray<any>("/api/albums"),
+      fetchArray<any>("/api/tracks"),
     ]).then(([allAlbums, allTracks]) => {
       const a = allAlbums.find((x: any) => x.id === params.id);
       setAlbum(a);
