@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Link2, Check, Download, Trash2 } from "lucide-react";
 import type { Track } from "./PlayerProvider";
+import { detectBPM } from "@/lib/bpm";
+import { detectKey } from "@/lib/key";
 
 const EXPIRY_OPTIONS = [
   { label: "7 days", value: 7 },
@@ -36,6 +38,9 @@ export default function TrackDetail({
   const [allowDownload, setAllowDownload] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let ws: any;
@@ -74,6 +79,18 @@ export default function TrackDetail({
     return () => ws?.destroy();
   }, [track.fileUrl]);
 
+  const saveField = async (fields: Record<string, unknown>) => {
+    setSaving(true);
+    await fetch(`/api/tracks/${track.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    });
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+
   const saveChanges = async () => {
     const region = wsRef.current?.plugins?.[0]?.getRegions?.()?.[0];
     await fetch(`/api/tracks/${track.id}`, {
@@ -96,6 +113,23 @@ export default function TrackDetail({
     setDeleting(true);
     await fetch(`/api/tracks/${track.id}`, { method: "DELETE" });
     onDeleted();
+  };
+
+  const runDetection = async () => {
+    setDetecting(true);
+    try {
+      const [bpmResult, keyResult] = await Promise.all([
+        detectBPM(track.fileUrl).catch(() => ({ bpm: 0, confidence: 0 })),
+        detectKey(track.fileUrl).catch(() => ({ key: "", confidence: 0 })),
+      ]);
+      if (bpmResult.bpm > 0) setBpm(bpmResult.bpm);
+      if (keyResult.key) setKey(keyResult.key);
+      if (bpmResult.bpm === 0 && !keyResult.key) {
+        alert("Couldn't analyze this file. If it was uploaded before R2 CORS was configured for GET requests, that's very likely why — check the bucket's CORS policy.");
+      }
+    } finally {
+      setDetecting(false);
+    }
   };
 
   const createShare = async () => {
@@ -133,14 +167,28 @@ export default function TrackDetail({
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              onBlur={() => {
+                const trimmed = title.trim();
+                if (trimmed && trimmed !== track.title) saveField({ title: trimmed });
+                else if (!trimmed) setTitle(track.title);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
               className="text-md font-medium text-primary bg-transparent border-b border-transparent hover:border-border focus:border-border-strong outline-none w-full truncate"
             />
             <input
               value={artist}
               onChange={(e) => setArtist(e.target.value)}
+              onBlur={() => {
+                const trimmed = artist.trim();
+                if (trimmed !== (track.artist || "")) saveField({ artist: trimmed || null });
+              }}
+              onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
               placeholder="Unknown artist"
               className="text-sm text-secondary bg-transparent border-b border-transparent hover:border-border focus:border-border-strong outline-none w-full truncate"
             />
+            {(saving || saved) && (
+              <p className="text-xs text-tertiary">{saving ? "Saving..." : "Saved"}</p>
+            )}
           </div>
           <button onClick={onClose} className="text-tertiary hover:text-primary transition-colors shrink-0">
             <X size={18} strokeWidth={1.5} />
@@ -176,6 +224,20 @@ export default function TrackDetail({
               />
               {track.key != null && <p className="text-xs text-tertiary mt-1">Auto-detected — correct if off.</p>}
             </div>
+          </div>
+
+          <div>
+            <button
+              onClick={runDetection}
+              disabled={detecting}
+              className="text-xs text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong hover:text-primary transition-colors disabled:opacity-50"
+            >
+              {detecting ? "Analyzing..." : "Re-detect BPM & key"}
+            </button>
+            <p className="text-xs text-tertiary mt-1.5">
+              Tracks uploaded before storage access was fully configured may have missed
+              auto-detection — use this to run it now.
+            </p>
           </div>
 
           <div>

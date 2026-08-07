@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, Disc3, Pencil, Share2, ImagePlus } from "lucide-react";
+import { ArrowLeft, Disc3, Pencil, Share2, ImagePlus, Trash2 } from "lucide-react";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import UploadButton from "@/components/UploadButton";
 import TrackDetail from "@/components/TrackDetail";
-import TrackRowGroup from "@/components/TrackRow";
+import SortableTrackRow from "@/components/SortableTrackRow";
 import ShareModal from "@/components/ShareModal";
 import { groupVersions } from "@/lib/groupVersions";
 import type { Track } from "@/components/PlayerProvider";
@@ -20,7 +22,10 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   const [nameDraft, setNameDraft] = useState("");
   const [showShare, setShowShare] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const load = () => {
     Promise.all([
@@ -45,6 +50,33 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
 
   const groups = groupVersions(tracks as any);
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = groups.findIndex((g) => g.latest.id === active.id);
+    const newIndex = groups.findIndex((g) => g.latest.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(groups, oldIndex, newIndex);
+    // Optimistic UI update — reorder locally immediately, then persist.
+    // groupVersions() is derived from `tracks`, so we reorder the underlying
+    // track list to match rather than the derived groups directly.
+    const reorderedIds = reordered.map((g) => g.latest.id);
+    setTracks((prev) => {
+      const byId = new Map(prev.map((t) => [t.id, t]));
+      const primaryOrdered = reorderedIds.map((id) => byId.get(id)!).filter(Boolean);
+      const others = prev.filter((t) => !reorderedIds.includes(t.id));
+      return [...primaryOrdered, ...others];
+    });
+
+    await fetch("/api/tracks/reorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trackIds: reorderedIds }),
+    });
+  };
+
   const saveNameEdit = async () => {
     if (nameDraft.trim() && nameDraft.trim() !== album?.name) {
       await fetch(`/api/albums/${params.id}`, {
@@ -55,6 +87,11 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
       load();
     }
     setEditingName(false);
+  };
+
+  const handleDeleteAlbum = async () => {
+    await fetch(`/api/albums/${params.id}`, { method: "DELETE" });
+    router.push("/");
   };
 
   const replaceCover = async (file: File) => {
@@ -74,8 +111,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
       });
       load();
     } catch {
-      // cover replace failure isn't critical enough to block the page — the
-      // old cover just stays in place
+      // cover replace failure isn't critical enough to block the page
     }
     setUploadingCover(false);
   };
@@ -155,6 +191,27 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
           <Share2 size={15} strokeWidth={1.5} />
           Share
         </button>
+
+        {!confirmingDelete ? (
+          <button
+            onClick={() => setConfirmingDelete(true)}
+            className="flex items-center gap-2 text-sm text-error border border-error/40 rounded-md px-4 py-2 hover:bg-error/10 transition-colors"
+          >
+            <Trash2 size={15} strokeWidth={1.5} />
+            Delete
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-secondary">Delete album? Tracks move to Unsorted.</span>
+            <button onClick={handleDeleteAlbum} className="text-error border border-error/40 rounded-md px-3 py-1.5 hover:bg-error/10 transition-colors">
+              Yes, delete
+            </button>
+            <button onClick={() => setConfirmingDelete(false)} className="text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong transition-colors">
+              Cancel
+            </button>
+          </div>
+        )}
+
         <UploadButton onUploaded={load} albumId={params.id} label="Add tracks" />
       </div>
 
@@ -163,18 +220,27 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
           <p className="text-secondary text-base">No tracks in this album yet.</p>
         </div>
       ) : (
-        <div className="space-y-1">
-          {groups.map((g, i) => (
-            <motion.div
-              key={g.key}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: Math.min(i * 0.03, 0.3), duration: 0.25 }}
-            >
-              <TrackRowGroup group={g} onOpenDetail={setDetailTrack} />
-            </motion.div>
-          ))}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={groups.map((g) => g.latest.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-1">
+              {groups.map((g, i) => (
+                <motion.div
+                  key={g.key}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(i * 0.03, 0.3), duration: 0.25 }}
+                >
+                  <SortableTrackRow
+                    group={g}
+                    onOpenDetail={setDetailTrack}
+                    queueTracks={groups.map((gr) => gr.latest)}
+                    queueIndex={i}
+                  />
+                </motion.div>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {detailTrack && (

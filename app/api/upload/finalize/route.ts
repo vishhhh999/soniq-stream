@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
       pitchShift: 0,
       versionGroupId,
       versionNumber,
+      sortOrder: -Date.now(), // newest upload always sorts first, see schema comment
       createdAt: new Date(),
     };
 

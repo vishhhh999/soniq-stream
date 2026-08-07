@@ -98,7 +98,12 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i * 0.03, 0.3), duration: 0.25 }}
               >
-                <TrackRowGroup group={g} onOpenDetail={setDetailTrack} />
+                <TrackRowGroup
+                group={g}
+                onOpenDetail={setDetailTrack}
+                queueTracks={groups.map((gr) => gr.latest)}
+                queueIndex={i}
+              />
               </motion.div>
             ))}
           </div>

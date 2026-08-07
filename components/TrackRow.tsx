@@ -11,12 +11,16 @@ function Row({
   track,
   onOpenDetail,
   versionBadge,
+  queueTracks,
+  queueIndex,
 }: {
   track: Track;
   onOpenDetail: (t: Track) => void;
   versionBadge?: number;
+  queueTracks: Track[];
+  queueIndex: number;
 }) {
-  const { current, isPlaying, play, toggle } = usePlayer();
+  const { current, isPlaying, playQueue, toggle } = usePlayer();
   const isCurrent = current?.id === track.id;
 
   const fmt = (s?: number | null) => {
@@ -28,7 +32,10 @@ function Row({
 
   const handlePlay = () => {
     if (isCurrent) toggle();
-    else play(track);
+    // Play with the full visible list as queue context — this is what
+    // makes skip forward/back and auto-advance-on-end actually mean
+    // something, instead of the buttons doing nothing at all.
+    else playQueue(queueTracks, queueIndex);
   };
 
   return (
@@ -75,7 +82,17 @@ function Row({
   );
 }
 
-export default function TrackRowGroup({ group, onOpenDetail }: { group: TrackGroup; onOpenDetail: (t: Track) => void }) {
+export default function TrackRowGroup({
+  group,
+  onOpenDetail,
+  queueTracks,
+  queueIndex,
+}: {
+  group: TrackGroup;
+  onOpenDetail: (t: Track) => void;
+  queueTracks: Track[];
+  queueIndex: number;
+}) {
   const [expanded, setExpanded] = useState(false);
   const hasVersions = group.olderVersions.length > 0;
 
@@ -83,7 +100,13 @@ export default function TrackRowGroup({ group, onOpenDetail }: { group: TrackGro
     <div>
       <div className="flex items-center">
         <div className="flex-1 min-w-0">
-          <Row track={group.latest} onOpenDetail={onOpenDetail} versionBadge={group.latest.versionNumber ?? undefined} />
+          <Row
+            track={group.latest}
+            onOpenDetail={onOpenDetail}
+            versionBadge={group.latest.versionNumber ?? undefined}
+            queueTracks={queueTracks}
+            queueIndex={queueIndex}
+          />
         </div>
         {hasVersions && (
           <button
@@ -106,7 +129,9 @@ export default function TrackRowGroup({ group, onOpenDetail }: { group: TrackGro
             className="overflow-hidden pl-8 border-l border-border ml-8"
           >
             {group.olderVersions.map((v) => (
-              <Row key={v.id} track={v} onOpenDetail={onOpenDetail} versionBadge={v.versionNumber ?? undefined} />
+              // Older versions play standalone, not part of the main queue —
+              // they're a deliberate deviation from the main track list.
+              <Row key={v.id} track={v} onOpenDetail={onOpenDetail} versionBadge={v.versionNumber ?? undefined} queueTracks={[v]} queueIndex={0} />
             ))}
           </motion.div>
         )}

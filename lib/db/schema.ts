@@ -48,6 +48,13 @@ export const tracks = pgTable("tracks", {
   // duplicated. versionNumber increments within the group.
   versionGroupId: text("version_group_id"),
   versionNumber: integer("version_number").default(1),
+  // Default sort position for a newly uploaded track: negative "now" in ms,
+  // so newer uploads (more negative) always sort first ascending — matches
+  // "newest at top" by default. A manual drag-reorder reassigns small
+  // sequential integers (0,1,2...) to the reordered list, which are far
+  // less negative than any -Date.now() value, so future uploads still
+  // float to the top above whatever order was manually set.
+  sortOrder: real("sort_order"),
   createdAt: timestamp("created_at").notNull(),
 });
 

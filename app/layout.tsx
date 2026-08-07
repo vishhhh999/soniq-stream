@@ -5,8 +5,7 @@ import AuthSessionProvider from "@/components/AuthSessionProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { PlayerProvider } from "@/components/PlayerProvider";
 import { AmbientProvider } from "@/components/AmbientProvider";
-import AmbientBackground from "@/components/AmbientBackground";
-import PlayerBar from "@/components/PlayerBar";
+import AuthedPlayerShell from "@/components/AuthedPlayerShell";
 
 const interTight = Inter_Tight({ subsets: ["latin"], variable: "--font-inter-tight" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-display" });
@@ -24,9 +23,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ThemeProvider>
             <AmbientProvider>
               <PlayerProvider>
-                <AmbientBackground />
+                <AuthedPlayerShell />
                 <div className="relative z-10 min-h-screen pb-24">{children}</div>
-                <PlayerBar />
               </PlayerProvider>
             </AmbientProvider>
           </ThemeProvider>

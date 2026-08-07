@@ -77,92 +77,110 @@ R2_PUBLIC_URL=https://pub-xxxxxxxx.r2.dev
 `APP_PASSWORD` / `APP_SECRET` from earlier versions are gone — safe to
 delete from Vercel if still present.
 
-## This round: functional gap-closing batch
+## This round: real player, bug batch, drag-reorder
 
-Fixed, in order of how much they were blocking real use:
+**Player rebuilt with a real queue.** Skip forward/back buttons existed
+before this round but had zero `onClick` handlers — pure decoration. Now
+`PlayerProvider` has an actual queue: `playQueue()`, `next()`, `previous()`,
+shuffle (fair Fisher-Yates shuffle, not just "pick random"), and
+auto-advance when a track ends. Clicking a track anywhere in a list plays
+it with that list as queue context, so skip navigation means something.
+Also added: a queue drawer to see and jump to upcoming tracks, and a
+waveform-style seek bar — **stylized, deterministic per-track bars, not
+real amplitude data** (true waveform analysis per track wasn't worth the
+cost for a visual flourish; the drag-to-seek behavior underneath is real).
 
-- **Draggable seek bar.** Was a click-only custom div — you could jump to a
-  point in the track but not drag through it. Now a native range input,
-  actually draggable.
-- **Track rename, delete, download.** Backend already supported rename
-  (PATCH already allowed `title`) and delete already existed — this round
-  wired both into the UI, added a confirm step on delete, a download link,
-  and made delete also clean up the R2 object instead of just the DB row.
-- **Album editing** — rename (click the album title) and cover replacement
-  (hover the cover, click to swap) via a new `PATCH /api/albums/[id]`
-  route that didn't exist before.
-- **Album sharing, actually fixed, not just added.** The share button and
-  API already accepted an `albumId`, but the *resolve* endpoint
-  (`/api/share/[token]`) only ever handled `trackId` and 404'd immediately
-  otherwise — so album shares silently never worked despite looking
-  functional. Fixed, and verified end-to-end: create an album share,
-  resolve the token, get back the album + its full track list.
-- **Notes/description field** — the `notes` column already existed in the
-  schema from earlier rounds but had no UI; now exposed as a text area on
-  each track (mix notes, context, whatever's worth remembering about that
-  version).
-- **Orphaned-file handling.** Deleting a file directly from the R2 bucket
-  (outside the app) used to leave a track that silently failed to play
-  forever with no indication why. Now, once both playback attempts
-  genuinely fail, a banner appears with "Remove from library."
-- **Bigger album art** — capped at 4 columns instead of 5 within the wider
-  layout, larger gaps, bumped typography to match.
-- **Font swapped again** — Bricolage Grotesque out, JetBrains Mono in for
-  display/headlines (kept Inter Tight for body — full mono body text at
-  length hurts readability more than it looks premium). Verified against
-  this Next.js version's real available font list before using it, same
-  check that caught a wrong guess last round.
-- **Ambient gradient now actually reacts to the beat**, not just smoothed
-  amplitude. Added a real onset detector: tracks a rolling average of bass
-  energy, treats a sudden spike above it as a "hit," and pulses the
-  gradient with a sharp rise and ~250ms decay — tested against a synthetic
-  120bpm kick pattern before shipping (19 of 20 expected hits correctly
-  detected at the right timestamps, only missing the very first due to an
-  expected cold-start gap with no history yet to compare against).
+**Album delete.** Tracks inside move to Unsorted rather than being
+destroyed — no undo exists anywhere in this app, so silently deleting
+someone's audio files because they wanted to remove an album grouping
+felt like the wrong default.
+
+**Player bar no longer shows before you're signed in.** Was rendering
+unconditionally in the root layout, including on `/login`. Now gated
+behind an actual session check.
+
+**Found the real reason BPM wasn't showing for some tracks.**
+`lib/bpm.ts` uses a plain `fetch()` to pull the file for decoding — unlike
+`<audio>` tags (which have a CORS fallback), a raw `fetch()` to a
+cross-origin URL just fails outright without proper CORS, no recovery
+path. Any track uploaded before your R2 CORS fix landed is permanently
+stuck at `bpm: null` with no way to retry. Added a manual "Re-detect BPM &
+key" button in the track panel so existing tracks aren't stuck forever.
+
+**Rename now actually feels like it saves.** Title and artist previously
+required scrolling down and clicking a separate "Save changes" button,
+inconsistent with how album rename already auto-saved on blur — and the
+panel closed immediately after saving with zero visible confirmation, so
+even a successful save looked like nothing happened. Title/artist now
+auto-save on blur (same pattern as album name) with a brief inline
+"Saving.../Saved" indicator.
+
+**Drag-and-reorder — the deferred feature tackled this round.** New
+`sort_order` column: a fresh upload gets `-Date.now()` (very negative, so
+it sorts first ascending — "newest at top" by default). Dragging a track
+reassigns sequential integers (0, 1, 2...) to the reordered list — small
+non-negative numbers that always sort *after* any `-Date.now()`-based
+default, meaning a brand new upload still floats to the very top even
+after you've manually reordered everything else. Verified against real
+Postgres: default newest-first order, a manual reorder taking effect, and
+a simulated new upload after that reorder still landing at position one.
+Pre-existing tracks get backfilled with an equivalent `sort_order` derived
+from their `created_at`, so nothing already in your library jumps around
+when this migration runs.
+
+**On "no signup option, only login" — this is intentional, not a bug.**
+Earlier in this project you specifically asked for real accounts instead
+of an open-registration system, given this holds your own private files.
+`/setup` creates the one account on first run and then locks — that's the
+signup flow, it just doesn't live at `/login` because there's deliberately
+no ongoing open registration after the first account exists. If you want
+this to work differently, say so directly rather than it being "fixed"
+into open signup, which would be a real step backward for a personal
+library.
 
 ## Explicitly deferred — not started, not partial
 
-These are real standalone features, not omissions:
+These remain real standalone features, not omissions. Doing them properly,
+one at a time, verified — not a rushed pass:
 - **3D floating vinyl library browser** — a genuinely different navigation
-  paradigm from the current list/grid view, worth building as its own
-  focused piece of work
+  paradigm from the current list/grid, its own focused piece of work
 - **Lyrics + sync editor** (tap-to-sync timing, Apple Music-style synced
   display)
 - **Comments** (for sharing a mix with a collaborator who wants to leave
-  feedback)
-- **Drag-and-reorder** for tracks within an album — needs a schema change
-  (sort-order column) and a drag library; scoped out to keep this round
-  bounded rather than half-built
+  feedback — including from the public share page, which has real design
+  implications worth doing carefully: who can post, spam surface area,
+  moderation)
 
 ## What's verified this round (real runs against real Postgres)
-- Album rename, track rename + notes, album share creation AND resolution
-  (the part that was actually broken), track delete with confirmed removal
-  — all tested end-to-end via real HTTP requests against a live server and
-  real database, not just code review
-- Beat-onset detector tested against a synthetic 120bpm signal with known
-  correct timing before trusting it
-- Full production build compiles clean with the new font, routes, and
-  components; server stayed healthy through the entire test sequence above
+- Reorder logic: default newest-first order, a manual drag-reorder
+  persisting via the real API, and a simulated new upload after that
+  reorder correctly landing above everything else — all confirmed against
+  actual rows in the database, not just code review
+- Album delete: tracks confirmed to survive with `albumId` set to null
+  (moved to Unsorted), not destroyed; album row itself confirmed gone
+- Full production build compiles clean with the queue system, waveform
+  seek bar, dnd-kit drag-and-drop, and all new routes; login → album
+  creation → delete → reorder sequence run end-to-end against a live
+  server without the process crashing
 
 ## What's NOT verified
-- Volume slider dragging — the code is a standard native range input and
-  looks structurally correct; if it's still not draggable after this
-  round, that needs a live look in your actual browser rather than another
-  blind guess at the cause
-- Cover-replace flow on the album page, against real R2 (same presign/PUT
-  pattern already proven elsewhere, but only your deploy proves this
-  specific wiring)
+- The actual drag interaction in a real browser (mouse/touch drag physics,
+  dnd-kit's visual drag overlay) — the underlying reorder API and sort
+  logic are proven, but the pointer-drag UX itself needs your eyes
+- Queue/skip/shuffle behavior in a real browser session — the state logic
+  in `PlayerProvider` is straightforward React state, but multi-track
+  playback sequencing over real audio files is the kind of thing worth
+  actually clicking through yourself
 
 ## Not built yet
-- **Lyrics + synced display** — explicitly scoped out of this round by
-  request, to be built properly as its own feature rather than rushed
-  alongside everything else. Needs: a lyrics editor, a tap-to-sync timing
-  mode (à la Musixmatch/Apple Music), and a synced playback display.
+- **Lyrics + synced display**, **comments**, **3D vinyl browser** — see
+  "Explicitly deferred" above
 - Pitch shift — schema field + UI exist, no playback engine wired in
 - Trim/loop region — visual only, doesn't gate playback yet
 - Folder UI — API exists, no frontend (albums are the primary structure)
 
 ## Local setup
+
 ```bash
 npm install
 ```

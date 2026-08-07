@@ -61,12 +61,15 @@ async function main() {
       pitch_shift REAL DEFAULT 0,
       version_group_id TEXT,
       version_number INTEGER DEFAULT 1,
+      sort_order REAL,
       created_at TIMESTAMP NOT NULL
     );
   `;
   // Additive migration for databases created before version grouping existed
   await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS version_group_id TEXT;`;
   await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS version_number INTEGER DEFAULT 1;`;
+  await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS sort_order REAL;`;
+  await sql`UPDATE tracks SET sort_order = -EXTRACT(EPOCH FROM created_at) * 1000 WHERE sort_order IS NULL;`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS share_links (
