@@ -77,104 +77,65 @@ R2_PUBLIC_URL=https://pub-xxxxxxxx.r2.dev
 `APP_PASSWORD` / `APP_SECRET` from earlier versions are gone — safe to
 delete from Vercel if still present.
 
-## This round: real player, bug batch, drag-reorder
+## This round: lyrics + sync
 
-**Player rebuilt with a real queue.** Skip forward/back buttons existed
-before this round but had zero `onClick` handlers — pure decoration. Now
-`PlayerProvider` has an actual queue: `playQueue()`, `next()`, `previous()`,
-shuffle (fair Fisher-Yates shuffle, not just "pick random"), and
-auto-advance when a track ends. Clicking a track anywhere in a list plays
-it with that list as queue context, so skip navigation means something.
-Also added: a queue drawer to see and jump to upcoming tracks, and a
-waveform-style seek bar — **stylized, deterministic per-track bars, not
-real amplitude data** (true waveform analysis per track wasn't worth the
-cost for a visual flourish; the drag-to-seek behavior underneath is real).
+**Lyrics editor + tap-to-sync timing, Apple-Music-style synced display.**
+Paste or type lyrics yourself (this app never generates, fetches, or
+supplies lyrics content — it only stores and displays what you enter,
+same as any note-taking field). Two pieces:
 
-**Album delete.** Tracks inside move to Unsorted rather than being
-destroyed — no undo exists anywhere in this app, so silently deleting
-someone's audio files because they wanted to remove an album grouping
-felt like the wrong default.
+- **`LyricsEditor`** (in the track panel): a plain textarea for the raw
+  text, plus a "Sync timing" flow — plays the track from the start, shows
+  one line at a time, and captures the real playback timestamp each time
+  you tap "this line starts now." Finishes automatically after the last
+  line, saves as an array of `{ time, text }` pairs.
+- **`LyricsView`** (opened via the mic icon in the player bar): full-screen
+  overlay showing the synced lyrics, current line enlarged and highlighted,
+  others dimmed, auto-scrolling to keep pace with playback. Falls back to
+  plain unsynced text if you've saved lyrics but haven't run the sync flow
+  yet, and to a clear empty state if there's nothing at all.
 
-**Player bar no longer shows before you're signed in.** Was rendering
-unconditionally in the root layout, including on `/login`. Now gated
-behind an actual session check.
+**Storage:** two new columns on `tracks` — `lyrics` (raw text) and
+`lyrics_synced` (Postgres `jsonb`, an array of timestamp/line pairs).
 
-**Found the real reason BPM wasn't showing for some tracks.**
-`lib/bpm.ts` uses a plain `fetch()` to pull the file for decoding — unlike
-`<audio>` tags (which have a CORS fallback), a raw `fetch()` to a
-cross-origin URL just fails outright without proper CORS, no recovery
-path. Any track uploaded before your R2 CORS fix landed is permanently
-stuck at `bpm: null` with no way to retry. Added a manual "Re-detect BPM &
-key" button in the track panel so existing tracks aren't stuck forever.
-
-**Rename now actually feels like it saves.** Title and artist previously
-required scrolling down and clicking a separate "Save changes" button,
-inconsistent with how album rename already auto-saved on blur — and the
-panel closed immediately after saving with zero visible confirmation, so
-even a successful save looked like nothing happened. Title/artist now
-auto-save on blur (same pattern as album name) with a brief inline
-"Saving.../Saved" indicator.
-
-**Drag-and-reorder — the deferred feature tackled this round.** New
-`sort_order` column: a fresh upload gets `-Date.now()` (very negative, so
-it sorts first ascending — "newest at top" by default). Dragging a track
-reassigns sequential integers (0, 1, 2...) to the reordered list — small
-non-negative numbers that always sort *after* any `-Date.now()`-based
-default, meaning a brand new upload still floats to the very top even
-after you've manually reordered everything else. Verified against real
-Postgres: default newest-first order, a manual reorder taking effect, and
-a simulated new upload after that reorder still landing at position one.
-Pre-existing tracks get backfilled with an equivalent `sort_order` derived
-from their `created_at`, so nothing already in your library jumps around
-when this migration runs.
-
-**On "no signup option, only login" — this is intentional, not a bug.**
-Earlier in this project you specifically asked for real accounts instead
-of an open-registration system, given this holds your own private files.
-`/setup` creates the one account on first run and then locks — that's the
-signup flow, it just doesn't live at `/login` because there's deliberately
-no ongoing open registration after the first account exists. If you want
-this to work differently, say so directly rather than it being "fixed"
-into open signup, which would be a real step backward for a personal
-library.
+**Also refactored while building this:** `currentTime`/`duration` tracking
+moved from `PlayerBar`'s local state into `PlayerProvider` itself, so
+`LyricsView` (and anything else added later) can read playback position
+without duplicating audio event listeners. This removed a small amount of
+duplicate state, not a behavior change.
 
 ## Explicitly deferred — not started, not partial
 
-These remain real standalone features, not omissions. Doing them properly,
-one at a time, verified — not a rushed pass:
+Lyrics + sync (was on this list) is done — see above. What remains, still
+real standalone features, still not rushed together:
 - **3D floating vinyl library browser** — a genuinely different navigation
-  paradigm from the current list/grid, its own focused piece of work
-- **Lyrics + sync editor** (tap-to-sync timing, Apple Music-style synced
-  display)
+  paradigm from the current list/grid, immediately next
 - **Comments** (for sharing a mix with a collaborator who wants to leave
   feedback — including from the public share page, which has real design
   implications worth doing carefully: who can post, spam surface area,
   moderation)
 
 ## What's verified this round (real runs against real Postgres)
-- Reorder logic: default newest-first order, a manual drag-reorder
-  persisting via the real API, and a simulated new upload after that
-  reorder correctly landing above everything else — all confirmed against
-  actual rows in the database, not just code review
-- Album delete: tracks confirmed to survive with `albumId` set to null
-  (moved to Unsorted), not destroyed; album row itself confirmed gone
-- Full production build compiles clean with the queue system, waveform
-  seek bar, dnd-kit drag-and-drop, and all new routes; login → album
-  creation → delete → reorder sequence run end-to-end against a live
-  server without the process crashing
+- Lyrics save/load round-trip: raw text and the synced `jsonb` array both
+  confirmed persisting and returning correctly (as a real array, not a
+  stringified blob) via direct API calls against real Postgres
+- The line-matching algorithm (`getCurrentLineIndex`) — the core of what
+  makes the synced view actually highlight the right line — tested against
+  8 known timestamp/position pairs before trusting it in the UI
+- Full production build compiles clean with the new schema columns,
+  `LyricsEditor`, `LyricsView`, and the `PlayerProvider` refactor for
+  centralized time tracking
 
 ## What's NOT verified
-- The actual drag interaction in a real browser (mouse/touch drag physics,
-  dnd-kit's visual drag overlay) — the underlying reorder API and sort
-  logic are proven, but the pointer-drag UX itself needs your eyes
-- Queue/skip/shuffle behavior in a real browser session — the state logic
-  in `PlayerProvider` is straightforward React state, but multi-track
-  playback sequencing over real audio files is the kind of thing worth
-  actually clicking through yourself
+- The actual tap-to-sync UX in a real browser — timing accuracy depends on
+  how quickly the button registers your tap relative to the audio, which
+  is exactly the kind of thing that needs a real session, not a curl test
+- Auto-scroll behavior in `LyricsView` during real playback — the
+  `scrollIntoView` call is standard and should work, but hasn't been
+  watched scroll in an actual browser
 
 ## Not built yet
-- **Lyrics + synced display**, **comments**, **3D vinyl browser** — see
-  "Explicitly deferred" above
+- **3D vinyl browser**, **comments** — see "Explicitly deferred" above
 - Pitch shift — schema field + UI exist, no playback engine wired in
 - Trim/loop region — visual only, doesn't gate playback yet
 - Folder UI — API exists, no frontend (albums are the primary structure)

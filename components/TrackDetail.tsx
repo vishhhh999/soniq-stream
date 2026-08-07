@@ -6,6 +6,7 @@ import { X, Link2, Check, Download, Trash2 } from "lucide-react";
 import type { Track } from "./PlayerProvider";
 import { detectBPM } from "@/lib/bpm";
 import { detectKey } from "@/lib/key";
+import LyricsEditor from "./LyricsEditor";
 
 const EXPIRY_OPTIONS = [
   { label: "7 days", value: 7 },
@@ -248,6 +249,16 @@ export default function TrackDetail({
               rows={3}
               placeholder="Mix notes, context, anything worth remembering about this version..."
               className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-primary focus:border-border-strong outline-none resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs uppercase tracking-wide text-tertiary mb-2 block">Lyrics</label>
+            <LyricsEditor
+              track={track}
+              initialLyrics={(track as any).lyrics ?? ""}
+              initialSynced={(track as any).lyricsSynced ?? null}
+              onSaved={onSaved}
             />
           </div>
 

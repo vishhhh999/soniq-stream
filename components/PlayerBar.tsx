@@ -1,22 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, ListMusic, Volume2, Volume1, VolumeX, X } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, ListMusic, Volume2, Volume1, VolumeX, X, Mic2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlayer } from "./PlayerProvider";
 import VinylArt from "./VinylArt";
 import WaveformSeekBar from "./WaveformSeekBar";
+import LyricsView from "./LyricsView";
 import { gradientFromSeed } from "@/lib/gradient";
 
 export default function PlayerBar() {
-  const { current, isPlaying, audioRef, toggle, next, previous, queue, queueIndex, shuffleOn, toggleShuffle, jumpToQueueIndex } = usePlayer();
-  const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const {
+    current, isPlaying, currentTime, duration, audioRef, toggle, next, previous,
+    queue, queueIndex, shuffleOn, toggleShuffle, jumpToQueueIndex,
+  } = usePlayer();
   const [loopOn, setLoopOn] = useState(false);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [brokenTrack, setBrokenTrack] = useState<{ id: string; title: string } | null>(null);
   const [showQueue, setShowQueue] = useState(false);
+  const [showLyrics, setShowLyrics] = useState(false);
   const triedFallbackRef = useRef(false);
 
   useEffect(() => {
@@ -43,17 +46,8 @@ export default function PlayerBar() {
       }
       setBrokenTrack({ id: current.id, title: current.title });
     };
-    const onTime = () => setProgress(audio.currentTime);
-    const onMeta = () => setDuration(audio.duration || 0);
-
     audio.addEventListener("error", onError);
-    audio.addEventListener("timeupdate", onTime);
-    audio.addEventListener("loadedmetadata", onMeta);
-    return () => {
-      audio.removeEventListener("error", onError);
-      audio.removeEventListener("timeupdate", onTime);
-      audio.removeEventListener("loadedmetadata", onMeta);
-    };
+    return () => audio.removeEventListener("error", onError);
   }, [current]);
 
   const removeBrokenTrack = async () => {
@@ -80,6 +74,8 @@ export default function PlayerBar() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50">
+      {showLyrics && current && <LyricsView track={current} onClose={() => setShowLyrics(false)} />}
+
       {brokenTrack && (
         <div className="bg-error/15 border-t border-error/40 px-6 py-2 flex items-center justify-between gap-4">
           <span className="text-xs text-error">
@@ -173,7 +169,7 @@ export default function PlayerBar() {
             size={18}
             strokeWidth={1.5}
             onClick={previous}
-            className={`transition-colors ${hasQueueContext || (audioRef.current?.currentTime ?? 0) > 3 ? "cursor-pointer hover:text-primary" : "opacity-30"}`}
+            className={`transition-colors ${hasQueueContext || currentTime > 3 ? "cursor-pointer hover:text-primary" : "opacity-30"}`}
           />
           <button
             onClick={toggle}
@@ -199,10 +195,9 @@ export default function PlayerBar() {
         {current ? (
           <WaveformSeekBar
             trackId={current.id}
-            progress={progress}
+            progress={currentTime}
             duration={duration}
             onSeek={(v) => {
-              setProgress(v);
               if (audioRef.current) audioRef.current.currentTime = v;
             }}
           />
@@ -211,8 +206,17 @@ export default function PlayerBar() {
         )}
 
         <span className="text-xs text-tertiary tabular-nums shrink-0 whitespace-nowrap">
-          {fmt(progress)} / {fmt(duration)}
+          {fmt(currentTime)} / {fmt(duration)}
         </span>
+
+        <button
+          onClick={() => setShowLyrics((v) => !v)}
+          disabled={!current}
+          className={`shrink-0 transition-colors disabled:opacity-30 ${showLyrics ? "text-primary" : "text-secondary hover:text-primary"}`}
+          title="Lyrics"
+        >
+          <Mic2 size={16} strokeWidth={1.5} />
+        </button>
 
         <button
           onClick={() => setShowQueue((v) => !v)}

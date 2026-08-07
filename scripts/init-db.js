@@ -70,6 +70,8 @@ async function main() {
   await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS version_number INTEGER DEFAULT 1;`;
   await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS sort_order REAL;`;
   await sql`UPDATE tracks SET sort_order = -EXTRACT(EPOCH FROM created_at) * 1000 WHERE sort_order IS NULL;`;
+  await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS lyrics TEXT;`;
+  await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS lyrics_synced JSONB;`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS share_links (

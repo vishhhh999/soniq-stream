@@ -17,6 +17,8 @@ export type Track = {
 type PlayerState = {
   current: Track | null;
   isPlaying: boolean;
+  currentTime: number;
+  duration: number;
   audioRef: React.RefObject<HTMLAudioElement>;
   queue: Track[];
   queueIndex: number;
@@ -46,6 +48,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [current, setCurrent] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [queue, setQueue] = useState<Track[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
   const [shuffleOn, setShuffleOn] = useState(false);
@@ -170,6 +174,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     return () => audio.removeEventListener("ended", onEnded);
   }, [next]);
 
+  // Centralized time tracking — was previously duplicated in PlayerBar's own
+  // local state, which meant no other component (like a lyrics view) could
+  // read playback position without re-wiring its own listener.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onTime = () => setCurrentTime(audio.currentTime);
+    const onMeta = () => setDuration(audio.duration || 0);
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("loadedmetadata", onMeta);
+    return () => {
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("loadedmetadata", onMeta);
+    };
+  }, []);
+
   const getFrequencyData = useCallback(() => {
     if (!analyserRef.current || !dataArrayRef.current) return null;
     analyserRef.current.getByteFrequencyData(dataArrayRef.current as Uint8Array<ArrayBuffer>);
@@ -179,7 +199,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   return (
     <PlayerContext.Provider
       value={{
-        current, isPlaying, audioRef, queue, queueIndex, shuffleOn,
+        current, isPlaying, currentTime, duration, audioRef, queue, queueIndex, shuffleOn,
         play, playQueue, toggle, next, previous, toggleShuffle, jumpToQueueIndex,
         getFrequencyData,
       }}
