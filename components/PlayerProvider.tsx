@@ -30,6 +30,7 @@ type PlayerState = {
   previous: () => void;
   toggleShuffle: () => void;
   jumpToQueueIndex: (i: number) => void;
+  reorderQueue: (newOrder: Track[]) => void;
   getFrequencyData: () => Uint8Array | null;
 };
 
@@ -109,6 +110,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setCurrent(queue[i]);
     setIsPlaying(true);
   }, [queue]);
+
+  // Drag-reorder within the queue — a runtime/session concept, doesn't
+  // persist to the database like album track order does. The currently
+  // playing track's index is re-derived by id after reordering, so
+  // skip-forward/back stay correct relative to its new position.
+  const reorderQueue = useCallback((newOrder: Track[]) => {
+    setQueue(newOrder);
+    if (current) {
+      const newIndex = newOrder.findIndex((t) => t.id === current.id);
+      if (newIndex !== -1) setQueueIndex(newIndex);
+    }
+  }, [current]);
 
   const next = useCallback(() => {
     if (queue.length === 0) return;
@@ -200,7 +213,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     <PlayerContext.Provider
       value={{
         current, isPlaying, currentTime, duration, audioRef, queue, queueIndex, shuffleOn,
-        play, playQueue, toggle, next, previous, toggleShuffle, jumpToQueueIndex,
+        play, playQueue, toggle, next, previous, toggleShuffle, jumpToQueueIndex, reorderQueue,
         getFrequencyData,
       }}
     >

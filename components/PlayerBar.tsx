@@ -3,16 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, ListMusic, Volume2, Volume1, VolumeX, X, Mic2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { usePlayer } from "./PlayerProvider";
 import VinylArt from "./VinylArt";
 import WaveformSeekBar from "./WaveformSeekBar";
 import LyricsView from "./LyricsView";
+import SortableQueueItem from "./SortableQueueItem";
 import { gradientFromSeed } from "@/lib/gradient";
 
 export default function PlayerBar() {
   const {
     current, isPlaying, currentTime, duration, audioRef, toggle, next, previous,
-    queue, queueIndex, shuffleOn, toggleShuffle, jumpToQueueIndex,
+    queue, queueIndex, shuffleOn, toggleShuffle, jumpToQueueIndex, reorderQueue,
   } = usePlayer();
   const [loopOn, setLoopOn] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -23,6 +26,17 @@ export default function PlayerBar() {
   const [showVolume, setShowVolume] = useState(false);
   const triedFallbackRef = useRef(false);
   const lastTrackIdRef = useRef<string | null>(null);
+  const queueSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const handleQueueDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const ids = queue.map((t, i) => `${t.id}-${i}`);
+    const oldIndex = ids.indexOf(active.id as string);
+    const newIndex = ids.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+    reorderQueue(arrayMove(queue, oldIndex, newIndex));
+  };
 
   useEffect(() => {
     if (!audioRef.current || !current) return;
@@ -122,21 +136,13 @@ export default function PlayerBar() {
             {queue.length === 0 ? (
               <p className="text-sm text-tertiary px-4 py-6 text-center">Nothing queued.</p>
             ) : (
-              queue.map((t, i) => (
-                <button
-                  key={`${t.id}-${i}`}
-                  onClick={() => jumpToQueueIndex(i)}
-                  className={`w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-surface transition-colors ${
-                    i === queueIndex ? "bg-surface" : ""
-                  }`}
-                >
-                  <span className="text-xs text-tertiary tabular-nums w-5 shrink-0">{i + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className={`text-sm truncate ${i === queueIndex ? "text-primary font-medium" : "text-primary"}`}>{t.title}</p>
-                    <p className="text-xs text-secondary truncate">{t.artist || "Unknown"}</p>
-                  </div>
-                </button>
-              ))
+              <DndContext sensors={queueSensors} collisionDetection={closestCenter} onDragEnd={handleQueueDragEnd}>
+                <SortableContext items={queue.map((t, i) => `${t.id}-${i}`)} strategy={verticalListSortingStrategy}>
+                  {queue.map((t, i) => (
+                    <SortableQueueItem key={`${t.id}-${i}`} track={t} index={i} isCurrent={i === queueIndex} onSelect={() => jumpToQueueIndex(i)} />
+                  ))}
+                </SortableContext>
+              </DndContext>
             )}
           </motion.div>
         )}

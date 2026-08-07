@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Pencil } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
@@ -13,13 +14,15 @@ export default function LyricsView({ track, onClose }: { track: Track; onClose: 
   const [loading, setLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const activeLineRef = useRef<HTMLParagraphElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     setLoading(true);
     fetch(`/api/tracks/${track.id}`)
       .then((r) => r.json())
       .then((full) => {
-        // full.lyricsSynced is stored as jsonb — already an array, not a string
         if (Array.isArray(full.lyricsSynced) && full.lyricsSynced.length > 0) {
           setLines(full.lyricsSynced);
           setRawText(null);
@@ -40,7 +43,9 @@ export default function LyricsView({ track, onClose }: { track: Track; onClose: 
     activeLineRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [activeIndex]);
 
-  return (
+  if (!mounted) return null;
+
+  const content = (
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -97,4 +102,6 @@ export default function LyricsView({ track, onClose }: { track: Track; onClose: 
       </motion.div>
     </AnimatePresence>
   );
+
+  return createPortal(content, document.body);
 }
