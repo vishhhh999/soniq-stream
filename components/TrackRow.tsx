@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause, MoreHorizontal, ChevronDown } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
+import PlayingIndicator from "./PlayingIndicator";
 import type { TrackGroup } from "@/lib/groupVersions";
 
 function Row({
@@ -52,8 +53,9 @@ function Row({
       </button>
 
       <div className="min-w-0 flex-1 flex items-center gap-2">
+        {isCurrent && isPlaying && <PlayingIndicator />}
         <div className="min-w-0">
-          <p className={`text-sm truncate ${isCurrent ? "text-accent" : "text-primary"}`}>{track.title}</p>
+          <p className={`text-sm truncate ${isCurrent ? "text-primary font-medium" : "text-primary"}`}>{track.title}</p>
           <p className="text-xs text-secondary truncate">{track.artist || "Unknown artist"}</p>
         </div>
         {versionBadge && versionBadge > 1 && (

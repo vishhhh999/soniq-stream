@@ -16,7 +16,7 @@ export default function TrackDetail({ track, onClose, onSaved }: { track: Track;
   const waveformRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<any>(null);
   const [bpm, setBpm] = useState(track.bpm ?? "");
-  const [key, setKey] = useState("");
+  const [key, setKey] = useState(track.key ?? "");
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [expiryDays, setExpiryDays] = useState(30);
@@ -141,6 +141,7 @@ export default function TrackDetail({ track, onClose, onSaved }: { track: Track;
                 className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-primary focus:border-border-strong outline-none"
                 placeholder="e.g. A minor"
               />
+              {track.key != null && <p className="text-xs text-tertiary mt-1">Auto-detected — correct if off.</p>}
             </div>
           </div>
 

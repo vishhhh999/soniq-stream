@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, Space_Grotesk } from "next/font/google";
+import { Bricolage_Grotesque, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import AuthSessionProvider from "@/components/AuthSessionProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -8,8 +8,8 @@ import { AmbientProvider } from "@/components/AmbientProvider";
 import AmbientBackground from "@/components/AmbientBackground";
 import PlayerBar from "@/components/PlayerBar";
 
-const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" });
-const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk" });
+const interTight = Inter_Tight({ subsets: ["latin"], variable: "--font-inter-tight" });
+const bricolage = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage" });
 
 export const metadata: Metadata = {
   title: "SONIQ — your tracks, organized",
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${dmSans.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
+      <body className={`${interTight.variable} ${bricolage.variable} font-sans antialiased`}>
         <AuthSessionProvider>
           <ThemeProvider>
             <AmbientProvider>

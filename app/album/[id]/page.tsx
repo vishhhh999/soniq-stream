@@ -17,10 +17,17 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   const [detailTrack, setDetailTrack] = useState<Track | null>(null);
 
   const load = () => {
-    fetch("/api/albums").then((r) => r.json()).then((all) => setAlbum(all.find((a: any) => a.id === params.id)));
-    fetch("/api/tracks")
-      .then((r) => r.json())
-      .then((all) => setTracks(all.filter((t: any) => t.albumId === params.id)));
+    Promise.all([
+      fetch("/api/albums").then((r) => r.json()),
+      fetch("/api/tracks").then((r) => r.json()),
+    ]).then(([allAlbums, allTracks]) => {
+      const a = allAlbums.find((x: any) => x.id === params.id);
+      setAlbum(a);
+      const scoped = allTracks
+        .filter((t: any) => t.albumId === params.id)
+        .map((t: any) => ({ ...t, albumCoverUrl: a?.coverUrl || null }));
+      setTracks(scoped);
+    });
   };
 
   useEffect(() => {
@@ -30,7 +37,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   const groups = groupVersions(tracks as any);
 
   return (
-    <main className="max-w-4xl mx-auto px-6 pt-16">
+    <main className="max-w-[1600px] mx-auto px-8 lg:px-16 pt-16">
       <button
         onClick={() => router.push("/")}
         className="flex items-center gap-2 text-sm text-secondary hover:text-primary transition-colors mb-10"

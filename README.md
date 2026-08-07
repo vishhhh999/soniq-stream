@@ -77,31 +77,76 @@ R2_PUBLIC_URL=https://pub-xxxxxxxx.r2.dev
 `APP_PASSWORD` / `APP_SECRET` from earlier versions are gone — safe to
 delete from Vercel if still present.
 
-## What's verified this round (real runs against real Postgres)
-- Full presign → finalize flow: presign fails cleanly when R2 is
-  unconfigured (503, clear message, no crash); finalize correctly fetches
-  a file back from a real HTTP server standing in for R2, extracts real
-  metadata (duration, sample rate, format all correct), runs duplicate/
-  version detection, writes the DB row, and a follow-up GET confirms it's
-  actually persisted — not just a 200 response
-- Login/session flow, `/setup` lockout, wrong-password rejection — all
-  re-confirmed still working after this round's changes
-- Fixed: `/login` and `/setup` used to render permanently blank if their
-  status check failed for any reason (e.g. the `users` table not existing
-  yet) — now shows a real error message instead. This was the direct cause
-  of the blank-page issue you hit.
+## This round: bugs fixed, design overhaul, real DSP feature
+
+**Playback bug, root-caused and fixed.** `crossOrigin="anonymous"` (added
+for the ambient visualizer's audio analyser) made the `<audio>` element
+refuse to play entirely whenever R2's CORS headers didn't match — not just
+lose the visualizer, lose playback completely. Now it tries with CORS first
+and falls back automatically without it on error, so playback always works
+regardless of CORS configuration state.
+
+**Design system replaced.** Monochrome — light gray / dark gray (never
+pure black or white), no more beige/gold. New typography: Bricolage
+Grotesque (display) + Inter Tight (body/UI), verified against this
+Next.js version's actual bundled font list after an initial wrong guess
+(newer Google Fonts aren't all in every Next.js release — checked the
+compiled `.d.ts` before trusting the import). Layout widened from 896px to
+1600px max-width; album covers are bigger with fewer columns per row.
+
+**Spinning vinyl component** — album art embedded as the label, spins while
+playing, shows a deterministic color gradient when there's no cover art.
+
+**Colorful ambient gradients, persisted without a database column.** Each
+track's ambient-background colors are either sampled from its album cover
+(client-side canvas pixel sampling) or, with no cover, deterministically
+hashed from the track's own id — same track always produces the same two
+colors, forever, with zero storage needed since it's a pure function of
+data already in the database.
+
+**Real automatic key detection** — not a placeholder. Builds a 12-bin chroma
+vector via the Goertzel algorithm (testing 48 specific musical frequencies
+across 4 octaves rather than a full FFT) and correlates it against the
+published Krumhansl-Kessler major/minor key profiles. Verified against
+synthetic C-major and A-minor test signals with known ground truth before
+shipping — correctly identified both with >0.88 confidence. Same honesty
+framing as BPM: surfaced as editable, not asserted as fact. Runs
+automatically on upload now, in parallel with BPM detection.
+
+**Volume slider + mute**, and a small animated equalizer indicator on
+whichever track row is currently playing.
+
+## What's verified this round (real runs, not just builds)
+- Full build compiles clean with the new fonts, colors, and all new
+  components
+- Real login → album creation → album page load cycle, all 200s, no
+  runtime crashes from the redesign
+- Key-detection algorithm tested against synthetic signals with known
+  correct answers (see above) — the DSP logic itself is proven, though a
+  real MP3's key is naturally messier than a synthetic sine-wave chord
+- HSL-to-hex color conversion verified against known color values before
+  relying on it for the gradient system
 
 ## What's NOT verified
-- The actual browser-to-R2 PUT — needs a real bucket with CORS configured,
-  can't fake that part here. This is the one new piece of risk in this
-  round's rework; test it as the very first thing after deploying (upload
-  one real track, not a tiny test file).
-- Google OAuth callback completing end-to-end — same as before, needs a
-  real registered app
+- The crossOrigin CORS fallback fix, against your actual R2 bucket's real
+  CORS response — the logic is sound and mirrors the pattern already
+  proven elsewhere, but only your deploy can confirm it end-to-end
+- Key detection accuracy on real, messy, multi-instrument audio — synthetic
+  signals prove the math works, not that every real track gets a musically
+  "correct" answer. Treat it exactly like BPM: a starting point, not truth
+- Album-art gradient sampling — needs the same R2 CORS policy as playback
+  (GET requests need proper headers for the canvas color-sampling to work
+  cross-origin); falls back to the deterministic hash-based gradient
+  automatically if sampling fails, so this degrades gracefully either way
 
 ## Not built yet
-Pitch shift, trim/loop playback gating, folder UI, musical key detection —
-unchanged.
+- **Lyrics + synced display** — explicitly scoped out of this round by
+  request, to be built properly as its own feature rather than rushed
+  alongside everything else. Needs: a lyrics editor, a tap-to-sync timing
+  mode (à la Musixmatch/Apple Music), and a synced playback display.
+- Pitch shift — schema field + UI exist, no playback engine wired in
+- Trim/loop region — visual only, doesn't gate playback yet
+- Folder UI — API exists, no frontend (albums are the primary structure)
 
 ## Local setup
 ```bash

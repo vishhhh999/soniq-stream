@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Plus, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { detectBPM } from "@/lib/bpm";
+import { detectKey } from "@/lib/key";
 
 export default function UploadButton({
   onUploaded,
@@ -77,18 +78,29 @@ export default function UploadButton({
         const track = await finalizeRes.json();
         onUploaded();
 
-        setLabel(`Estimating BPM for ${file.name}...`);
+        setLabel(`Analyzing ${file.name} (BPM & key)...`);
         try {
-          const { bpm, confidence } = await detectBPM(track.fileUrl);
-          if (bpm > 0) {
+          const [bpmResult, keyResult] = await Promise.all([
+            detectBPM(track.fileUrl).catch(() => ({ bpm: 0, confidence: 0 })),
+            detectKey(track.fileUrl).catch(() => ({ key: "", confidence: 0 })),
+          ]);
+          const patch: Record<string, unknown> = {};
+          if (bpmResult.bpm > 0) {
+            patch.bpm = bpmResult.bpm;
+            patch.bpmConfidence = bpmResult.confidence;
+          }
+          if (keyResult.key) {
+            patch.key = keyResult.key;
+          }
+          if (Object.keys(patch).length > 0) {
             await fetch(`/api/tracks/${track.id}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ bpm, bpmConfidence: confidence }),
+              body: JSON.stringify(patch),
             });
           }
         } catch {
-          // decode failed (unsupported format edge case) — track stays without BPM, editable manually
+          // decode failed (unsupported format edge case) — track stays without BPM/key, editable manually
         }
         onUploaded();
       } catch (e: any) {

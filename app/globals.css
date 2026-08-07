@@ -3,39 +3,40 @@
 @tailwind utilities;
 
 :root {
-  /* LIGHT — warm paper, not clinical white. Designed as its own system, not an inverted dark theme. */
-  --bg-base: #f7f4ee;
-  --bg-surface: #fefdfb;
+  /* LIGHT — light gray, not clinical white. */
+  --bg-base: #eeeeee;
+  --bg-surface: #f6f6f6;
   --bg-elevated: #ffffff;
-  --border: #e6e0d2;
-  --border-strong: #d1c7b0;
+  --border: #dcdcdc;
+  --border-strong: #b8b8b8;
 
-  --text-primary: #1a1712;
-  --text-secondary: #6e6656;
-  --text-tertiary: #a89f8c;
+  --text-primary: #161616;
+  --text-secondary: #5c5c5c;
+  --text-tertiary: #8f8f8f;
 
-  --accent: #9c7b42;        /* deepened gold — #c8b99a fails contrast on light bg */
-  --accent-strong: #7a5f30;
+  --accent: #161616;
+  --accent-strong: #000000;
 
-  --error: #c1443a;
+  --error: #d64545;
   --success: #3f8f5f;
 }
 
 .dark {
-  --bg-base: #0e0e0e;
-  --bg-surface: #151515;
-  --bg-elevated: #1c1c1c;
-  --border: #2a2a2a;
-  --border-strong: #3d3d3d;
+  /* DARK — really dark gray, deliberately not pure black. */
+  --bg-base: #121212;
+  --bg-surface: #1a1a1a;
+  --bg-elevated: #212121;
+  --border: #2e2e2e;
+  --border-strong: #454545;
 
-  --text-primary: #f0ece4;
-  --text-secondary: #9a9489;
-  --text-tertiary: #5c5751;
+  --text-primary: #f2f2f2;
+  --text-secondary: #a3a3a3;
+  --text-tertiary: #6b6b6b;
 
-  --accent: #c8b99a;
-  --accent-strong: #ddd0b5;
+  --accent: #f2f2f2;
+  --accent-strong: #ffffff;
 
-  --error: #eb5757;
+  --error: #ff6b6b;
   --success: #6fcf97;
 }
 
@@ -62,7 +63,15 @@ body {
   color: var(--bg-base);
 }
 
-/* wavesurfer container needs explicit sizing, not a Tailwind concern */
 .waveform-container wave {
   overflow: hidden !important;
+}
+
+/* vinyl record spin */
+@keyframes vinyl-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.vinyl-spinning {
+  animation: vinyl-spin 3s linear infinite;
 }

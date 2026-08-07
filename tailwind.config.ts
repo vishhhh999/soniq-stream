@@ -19,8 +19,8 @@ export default {
         error: "var(--error)",
       },
       fontFamily: {
-        sans: ["var(--font-dm-sans)", "sans-serif"],
-        display: ["var(--font-space-grotesk)", "sans-serif"],
+        sans: ["var(--font-inter-tight)", "sans-serif"],
+        display: ["var(--font-bricolage)", "sans-serif"],
       },
       fontSize: {
         xs: ["11px", "1.4"],

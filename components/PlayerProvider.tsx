@@ -9,6 +9,9 @@ export type Track = {
   fileUrl: string;
   durationSec?: number | null;
   bpm?: number | null;
+  key?: string | null;
+  albumId?: string | null;
+  albumCoverUrl?: string | null;
 };
 
 type PlayerState = {

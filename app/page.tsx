@@ -34,7 +34,7 @@ export default function Home() {
   const countInAlbum = (albumId: string) => tracks.filter((t: any) => t.albumId === albumId).length;
 
   return (
-    <main className="max-w-4xl mx-auto px-6 pt-16">
+    <main className="max-w-[1600px] mx-auto px-8 lg:px-16 pt-16">
       <header className="flex items-end justify-between mb-16">
         <div>
           <h1 className="text-3xl font-display font-bold text-primary tracking-tight">SONIQ</h1>
@@ -61,7 +61,7 @@ export default function Home() {
       {albums.length > 0 && (
         <section className="mb-16">
           <h2 className="text-xs uppercase tracking-wide text-tertiary mb-5">Albums</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-8">
             {albums.map((a, i) => (
               <motion.div
                 key={a.id}
