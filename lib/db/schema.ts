@@ -1,50 +1,49 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, real, timestamp, boolean } from "drizzle-orm/pg-core";
 
-// Folders are self-nesting (folder_id points to parent). Albums live inside folders.
-export const folders = sqliteTable("folders", {
+export const folders = pgTable("folders", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   parentId: text("parent_id"),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  createdAt: timestamp("created_at").notNull(),
 });
 
-export const albums = sqliteTable("albums", {
+export const albums = pgTable("albums", {
   id: text("id").primaryKey(),
   folderId: text("folder_id"),
   name: text("name").notNull(),
   coverUrl: text("cover_url"),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  createdAt: timestamp("created_at").notNull(),
 });
 
-export const tracks = sqliteTable("tracks", {
+export const tracks = pgTable("tracks", {
   id: text("id").primaryKey(),
   albumId: text("album_id"),
-  folderId: text("folder_id"), // tracks can live loose in a folder, not just an album
+  folderId: text("folder_id"),
   title: text("title").notNull(),
   artist: text("artist"),
   fileUrl: text("file_url").notNull(),
   fileSize: integer("file_size"),
-  format: text("format"), // mp3, wav, flac
+  format: text("format"),
   durationSec: real("duration_sec"),
   sampleRate: integer("sample_rate"),
   bitrate: integer("bitrate"),
   channels: integer("channels"),
-  bpm: real("bpm"), // estimated, editable
-  bpmConfidence: real("bpm_confidence"), // 0-1, from detection algorithm
-  key: text("key"), // manual entry, v1 doesn't auto-detect
+  bpm: real("bpm"),
+  bpmConfidence: real("bpm_confidence"),
+  key: text("key"),
   notes: text("notes"),
-  trimStart: real("trim_start"), // seconds, for saved trim region
+  trimStart: real("trim_start"),
   trimEnd: real("trim_end"),
-  pitchShift: real("pitch_shift").default(0), // semitones
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  pitchShift: real("pitch_shift").default(0),
+  createdAt: timestamp("created_at").notNull(),
 });
 
-export const shareLinks = sqliteTable("share_links", {
+export const shareLinks = pgTable("share_links", {
   id: text("id").primaryKey(),
   token: text("token").notNull().unique(),
   trackId: text("track_id"),
   albumId: text("album_id"),
-  expiresAt: integer("expires_at", { mode: "timestamp" }),
-  allowDownload: integer("allow_download", { mode: "boolean" }).default(false),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  expiresAt: timestamp("expires_at"),
+  allowDownload: boolean("allow_download").default(false),
+  createdAt: timestamp("created_at").notNull(),
 });

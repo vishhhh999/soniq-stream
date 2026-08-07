@@ -3,7 +3,9 @@ import { db } from "@/lib/db";
 import { tracks } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 
+export const dynamic = "force-dynamic"; // this hits the DB — never prerender at build time
+
 export async function GET() {
-  const rows = db.select().from(tracks).orderBy(desc(tracks.createdAt)).all();
+  const rows = await db.select().from(tracks).orderBy(desc(tracks.createdAt));
   return NextResponse.json(rows);
 }

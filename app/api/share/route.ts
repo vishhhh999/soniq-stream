@@ -3,10 +3,8 @@ import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
 import { shareLinks } from "@/lib/db/schema";
 
-// Deliberately NOT full multi-user auth — recipients need no account.
-// A share is just a bearer token with optional expiry. That matches how
-// [untitled] itself works for listeners, and it's the right amount of
-// complexity for a personal tool with a handful of recipients.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   const { trackId, albumId, expiresInDays, allowDownload } = await req.json();
   const row = {
@@ -18,6 +16,6 @@ export async function POST(req: NextRequest) {
     allowDownload: !!allowDownload,
     createdAt: new Date(),
   };
-  db.insert(shareLinks).values(row).run();
+  await db.insert(shareLinks).values(row);
   return NextResponse.json(row);
 }

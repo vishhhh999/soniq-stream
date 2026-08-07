@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: { serverComponentsExternalPackages: ["better-sqlite3", "music-metadata"] },
+  experimental: { serverComponentsExternalPackages: ["postgres", "music-metadata"] },
 };
 module.exports = nextConfig;
