@@ -7,6 +7,16 @@ import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2";
 
 export const dynamic = "force-dynamic";
 
+// Was missing entirely — only PATCH and DELETE existed. LyricsView fetches
+// this route to load a track's full lyrics/lyricsSynced fields (which
+// aren't included in the list view's payload shape used elsewhere), so its
+// requests were hitting an unhandled method and failing.
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const [row] = await db.select().from(tracks).where(eq(tracks.id, params.id));
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(row);
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
   const allowed = ["bpm", "bpmConfidence", "key", "notes", "trimStart", "trimEnd", "pitchShift", "title", "artist", "lyrics", "lyricsSynced"];

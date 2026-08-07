@@ -104,6 +104,32 @@ moved from `PlayerBar`'s local state into `PlayerProvider` itself, so
 without duplicating audio event listeners. This removed a small amount of
 duplicate state, not a behavior change.
 
+
+## This round: upload timeout crash, auth UX
+
+**Real root cause of the "Could not process uploaded file" crash on real
+tracks.** Vercel's default serverless function timeout without
+`maxDuration` set is ~10 seconds — fine for a small test file, not for
+fetching a full-size track back from R2, buffering it, and parsing its
+metadata. Hitting that default killed the function at the platform level,
+returning an empty response body — which is why the client saw "Unexpected
+end of JSON input" rather than an actual error message. Fixed:
+`maxDuration = 60` (the Hobby-plan max without Fluid compute) on the
+upload/finalize/cover routes, plus internal timeout guards around the R2
+fetch and metadata parsing specifically, so a genuinely hanging operation
+fails with a real error instead of silently running out the platform
+clock. Tested against a 3.8MB real file end-to-end — processed in under
+half a second, confirming the fix doesn't slow down normal uploads.
+
+**Login page now has a visible "New here? Sign up" link**, and `/setup`
+no longer silently bounces to `/login` with zero explanation when an
+account already exists — it now says so directly, with a link back to
+sign in. This was a UX/communication gap, not a missing feature: `/setup`
+already handled account creation, there was just no visible path to it
+and no explanation when it declined to create a second account. Still
+single-account by design (no open registration) — that part hasn't
+changed, only the messaging around it.
+
 ## Explicitly deferred — not started, not partial
 
 Lyrics + sync (was on this list) is done — see above. What remains, still

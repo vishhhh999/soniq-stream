@@ -10,6 +10,7 @@ export default function SetupPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [alreadySetUp, setAlreadySetUp] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -20,7 +21,12 @@ export default function SetupPage() {
       })
       .then((d) => {
         if (!d.needsSetup) {
-          router.push("/login");
+          // Previously this silently redirected to /login with zero
+          // explanation — landing here and getting instantly bounced with
+          // no message reads exactly like "there's no signup," which was
+          // the actual source of confusion, not a missing feature.
+          setAlreadySetUp(true);
+          setChecking(false);
         } else {
           setChecking(false);
         }
@@ -60,6 +66,25 @@ export default function SetupPage() {
         <div className="max-w-sm w-full text-center">
           <h1 className="text-2xl font-display font-bold text-primary tracking-tight mb-4">SONIQ</h1>
           <p className="text-sm text-error">{checkError}</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (alreadySetUp) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-canvas px-6">
+        <div className="max-w-sm w-full text-center">
+          <h1 className="text-2xl font-display font-bold text-primary tracking-tight mb-3">SONIQ</h1>
+          <p className="text-secondary text-sm mb-6">
+            An account already exists for this library. Sign up only runs once, for the first account.
+          </p>
+          <a
+            href="/login"
+            className="inline-block bg-accent text-canvas text-sm font-medium px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
+          >
+            Go to sign in
+          </a>
         </div>
       </main>
     );

@@ -7,13 +7,27 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
+// Vercel's default function timeout without this is ~10s — comfortably
+// enough for a small test file, not for fetching + buffering + parsing a
+// real several-MB audio file back from R2. 60s is the max available on
+// Hobby without Fluid compute. Without this, a genuinely large file crashes
+// the function at the platform level (empty response, "Unexpected end of
+// JSON input" client-side) instead of failing with a real error.
+export const maxDuration = 60;
+
 const normalizeTitle = (t: string) => t.trim().toLowerCase().replace(/\s+/g, " ");
 
-// Called after the browser has already PUT the file directly to R2. Fetches
-// it back server-to-server (Vercel function -> R2) to run metadata
-// extraction and duplicate/version detection — this download is NOT subject
-// to the 4.5MB client request-body limit that broke the old direct-upload
-// route on real audio files, and R2 has zero egress fees so it costs nothing.
+// Wraps a promise with a hard timeout — a hang here (R2 fetch stalling,
+// music-metadata choking on a malformed file) previously had no ceiling
+// other than the platform's own timeout, which produces the confusing
+// empty-response crash rather than a clear error. This fails fast instead.
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)),
+  ]);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { publicUrl, filename, contentType, fileSize, albumId, folderId } = await req.json();
@@ -21,11 +35,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "publicUrl and filename are required" }, { status: 400 });
     }
 
-    const fileRes = await fetch(publicUrl);
-    if (!fileRes.ok) {
-      return NextResponse.json({ error: "Could not read the uploaded file back from storage." }, { status: 502 });
+    let buffer: Buffer;
+    try {
+      const fileRes = await withTimeout(fetch(publicUrl), 30000, "Fetching file from storage");
+      if (!fileRes.ok) {
+        return NextResponse.json({ error: `Could not read the uploaded file back from storage (${fileRes.status}).` }, { status: 502 });
+      }
+      buffer = Buffer.from(await fileRes.arrayBuffer());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ error: `Fetching the file back from storage failed: ${message}` }, { status: 502 });
     }
-    const buffer = Buffer.from(await fileRes.arrayBuffer());
 
     const ext = filename.match(/\.[^.]+$/)?.[0] || ".mp3";
     const id = nanoid();
@@ -38,15 +58,20 @@ export async function POST(req: NextRequest) {
     let channels: number | null = null;
 
     try {
-      const meta = await parseBuffer(buffer, contentType || undefined);
-      durationSec = meta.format.duration ?? null;
-      sampleRate = meta.format.sampleRate ?? null;
-      bitrate = meta.format.bitrate ? Math.round(meta.format.bitrate / 1000) : null;
-      channels = meta.format.numberOfChannels ?? null;
+      // 20s ceiling on metadata parsing — a malformed or unusually-encoded
+      // file could otherwise hang this indefinitely with no error surfaced.
+      const meta = await withTimeout(parseBuffer(buffer, contentType || undefined), 20000, "Metadata parsing");
+      const finite = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? n : null);
+      durationSec = finite(meta.format.duration);
+      sampleRate = finite(meta.format.sampleRate);
+      bitrate = meta.format.bitrate ? finite(Math.round(meta.format.bitrate / 1000)) : null;
+      channels = finite(meta.format.numberOfChannels);
       if (meta.common.title) title = meta.common.title;
       if (meta.common.artist) artist = meta.common.artist;
-    } catch {
-      // header parse failed — track still gets created without metadata
+    } catch (err) {
+      // header parse failed or timed out — track still gets created without
+      // metadata, this is not fatal to the upload itself
+      console.warn("Metadata parse failed/timed out, continuing without it:", err);
     }
 
     const scopeCondition = albumId
@@ -96,7 +121,7 @@ export async function POST(req: NextRequest) {
       pitchShift: 0,
       versionGroupId,
       versionNumber,
-      sortOrder: -Date.now(), // newest upload always sorts first, see schema comment
+      sortOrder: -Date.now(),
       createdAt: new Date(),
     };
 
@@ -104,6 +129,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(row);
   } catch (err) {
     console.error("Finalize failed:", err);
-    return NextResponse.json({ error: "Could not process uploaded file." }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: `Could not process uploaded file: ${message}` }, { status: 500 });
   }
 }

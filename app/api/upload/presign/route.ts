@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 // Returns a short-lived signed URL the browser can PUT directly to R2.
 // This request/response is tiny (just JSON) — the actual file bytes never

@@ -117,6 +117,13 @@ export default function LoginPage() {
           </svg>
           Continue with Google
         </button>
+
+        <p className="text-center text-xs text-tertiary mt-6">
+          New here?{" "}
+          <a href="/setup" className="text-secondary hover:text-primary underline">
+            Sign up
+          </a>
+        </p>
       </div>
     </main>
   );
