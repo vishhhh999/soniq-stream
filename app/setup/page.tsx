@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 export default function SetupPage() {
   const [checking, setChecking] = useState(true);
+  const [checkError, setCheckError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -13,13 +14,23 @@ export default function SetupPage() {
 
   useEffect(() => {
     fetch("/api/setup")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Server returned ${r.status}`);
+        return r.json();
+      })
       .then((d) => {
         if (!d.needsSetup) {
           router.push("/login");
         } else {
           setChecking(false);
         }
+      })
+      .catch((e) => {
+        console.error("Setup check failed:", e);
+        setCheckError(
+          "Couldn't reach the server. This usually means the database schema is out of date — check DATABASE_URL and that `npm run db:push` has been run against production."
+        );
+        setChecking(false);
       });
   }, [router]);
 
@@ -42,6 +53,17 @@ export default function SetupPage() {
   };
 
   if (checking) return null;
+
+  if (checkError) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-canvas px-6">
+        <div className="max-w-sm w-full text-center">
+          <h1 className="text-2xl font-display font-bold text-primary tracking-tight mb-4">SONIQ</h1>
+          <p className="text-sm text-error">{checkError}</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-canvas px-6">

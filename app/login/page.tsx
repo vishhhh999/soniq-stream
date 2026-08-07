@@ -6,6 +6,7 @@ import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
   const [checking, setChecking] = useState(true);
+  const [checkError, setCheckError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -14,10 +15,24 @@ export default function LoginPage() {
 
   useEffect(() => {
     fetch("/api/setup")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Server returned ${r.status}`);
+        return r.json();
+      })
       .then((d) => {
         if (d.needsSetup) router.push("/setup");
         else setChecking(false);
+      })
+      .catch((e) => {
+        // Previously: this had no .catch(), so any failure here (e.g. the
+        // `users` table not existing in production yet) left `checking`
+        // stuck at true forever, and the component just returned null —
+        // a permanently blank page with no indication anything was wrong.
+        console.error("Setup check failed:", e);
+        setCheckError(
+          "Couldn't reach the server. This usually means the database schema is out of date — check DATABASE_URL and that `npm run db:push` has been run against production."
+        );
+        setChecking(false);
       });
   }, [router]);
 
@@ -36,6 +51,17 @@ export default function LoginPage() {
   };
 
   if (checking) return null;
+
+  if (checkError) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-canvas px-6">
+        <div className="max-w-sm w-full text-center">
+          <h1 className="text-2xl font-display font-bold text-primary tracking-tight mb-4">SONIQ</h1>
+          <p className="text-sm text-error">{checkError}</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-canvas px-6">
