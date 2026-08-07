@@ -11,7 +11,7 @@ export default function AmbientBackground() {
   const { getFrequencyData, isPlaying, current } = usePlayer();
   const { enabled } = useAmbient();
   const tRef = useRef(0);
-  const [colors, setColors] = useState<{ from: string; to: string }>({ from: "#888", to: "#444" });
+  const [colors, setColors] = useState<{ from: string; to: string }>({ from: "#888888", to: "#444444" });
 
   // Resolve the gradient once per track (not per frame) — deterministic from
   // the track's own id when no cover art, or sampled from the album cover
@@ -98,15 +98,25 @@ export default function AmbientBackground() {
 
       ctx.globalCompositeOperation = "screen";
       for (const b of blobs) {
-        const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
-        grad.addColorStop(0, b.color);
-        grad.addColorStop(0.5, b.color + "55");
-        grad.addColorStop(1, "transparent");
-        ctx.globalAlpha = 0.22 + bass * 0.12;
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-        ctx.fill();
+        try {
+          const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+          grad.addColorStop(0, b.color);
+          grad.addColorStop(0.5, b.color + "55");
+          grad.addColorStop(1, "transparent");
+          ctx.globalAlpha = 0.22 + bass * 0.12;
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+          ctx.fill();
+        } catch (err) {
+          // A malformed color string here used to crash the entire app (this
+          // draw() call runs synchronously inside the effect, not just in a
+          // requestAnimationFrame callback, so React treats it as an effect
+          // error, not a harmlessly-skipped animation frame). Catching it
+          // means a future bad color value degrades to "skip this blob"
+          // instead of taking down the whole page again.
+          console.error("Ambient background: skipping malformed color", b.color, err);
+        }
       }
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
