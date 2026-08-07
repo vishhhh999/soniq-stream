@@ -24,6 +24,7 @@ async function main() {
   await sql`
     CREATE TABLE IF NOT EXISTS folders (
       id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
       name TEXT NOT NULL,
       parent_id TEXT,
       created_at TIMESTAMP NOT NULL
@@ -32,6 +33,7 @@ async function main() {
   await sql`
     CREATE TABLE IF NOT EXISTS albums (
       id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
       folder_id TEXT,
       name TEXT NOT NULL,
       cover_url TEXT,
@@ -41,6 +43,7 @@ async function main() {
   await sql`
     CREATE TABLE IF NOT EXISTS tracks (
       id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
       album_id TEXT,
       folder_id TEXT,
       title TEXT NOT NULL,
@@ -72,6 +75,24 @@ async function main() {
   await sql`UPDATE tracks SET sort_order = -EXTRACT(EPOCH FROM created_at) * 1000 WHERE sort_order IS NULL;`;
   await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS lyrics TEXT;`;
   await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS lyrics_synced JSONB;`;
+
+  // Data isolation fix — tracks/albums/folders had NO owner column at all
+  // until now, meaning every account could see every other account's
+  // files. Adding user_id and backfilling anything created before this
+  // column existed to the FIRST account ever created (the original owner,
+  // before signup was ever opened to anyone else) — everyone who signed up
+  // after that point only ever had their own empty library anyway, so this
+  // backfill can't leak their data to someone else; it only correctly
+  // assigns pre-existing data to the person who actually uploaded it.
+  await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS user_id TEXT;`;
+  await sql`ALTER TABLE albums ADD COLUMN IF NOT EXISTS user_id TEXT;`;
+  await sql`ALTER TABLE folders ADD COLUMN IF NOT EXISTS user_id TEXT;`;
+  const [firstUser] = await sql`SELECT id FROM users ORDER BY created_at ASC LIMIT 1;`;
+  if (firstUser) {
+    await sql`UPDATE tracks SET user_id = ${firstUser.id} WHERE user_id IS NULL;`;
+    await sql`UPDATE albums SET user_id = ${firstUser.id} WHERE user_id IS NULL;`;
+    await sql`UPDATE folders SET user_id = ${firstUser.id} WHERE user_id IS NULL;`;
+  }
 
   await sql`
     CREATE TABLE IF NOT EXISTS share_links (

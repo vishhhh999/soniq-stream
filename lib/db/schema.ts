@@ -9,6 +9,7 @@ export const users = pgTable("users", {
 
 export const folders = pgTable("folders", {
   id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
   name: text("name").notNull(),
   parentId: text("parent_id"),
   createdAt: timestamp("created_at").notNull(),
@@ -16,6 +17,7 @@ export const folders = pgTable("folders", {
 
 export const albums = pgTable("albums", {
   id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
   folderId: text("folder_id"),
   name: text("name").notNull(),
   coverUrl: text("cover_url"),
@@ -24,6 +26,7 @@ export const albums = pgTable("albums", {
 
 export const tracks = pgTable("tracks", {
   id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
   albumId: text("album_id"),
   folderId: text("folder_id"),
   title: text("title").notNull(),
