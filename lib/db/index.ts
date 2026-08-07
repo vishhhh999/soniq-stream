@@ -2,13 +2,13 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "./schema";
 
-// IMPORTANT: this file is imported at build time (Next.js collects route
-// metadata even for force-dynamic routes), so it must NOT throw here just
-// because DATABASE_URL is missing during the build step — only when a query
-// actually runs at request time. postgres() itself connects lazily, so a
-// placeholder string is safe; a real missing-env failure will surface as a
-// connection error on first real request, which is the correct place for it.
 const connectionString = process.env.DATABASE_URL || "postgres://placeholder";
 
-const client = postgres(connectionString, { max: 1 });
+// prepare: false is REQUIRED against Neon's pooled connection string (which is
+// what Vercel's native Neon integration gives you by default — pgbouncer in
+// transaction mode). Named prepared statements don't survive transaction
+// pooling; without this flag, inserts/selects fail silently or throw
+// "prepared statement already exists" errors that never reach the client.
+// This was the root cause of tracks not appearing after upload.
+const client = postgres(connectionString, { max: 1, prepare: false });
 export const db = drizzle(client, { schema });

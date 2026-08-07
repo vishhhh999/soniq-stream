@@ -1,5 +1,6 @@
-// Creates the schema against your real Postgres (Neon) database.
-// Run once after setting DATABASE_URL: npm run db:push
+// Creates/updates the schema against your real Postgres (Neon) database.
+// Idempotent — safe to re-run after schema changes (uses IF NOT EXISTS /
+// ADD COLUMN IF NOT EXISTS throughout instead of dropping anything).
 const postgres = require("postgres");
 
 if (!process.env.DATABASE_URL) {
@@ -7,7 +8,9 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+// prepare: false — same requirement as lib/db/index.ts, this connects
+// through the same pooled Neon endpoint.
+const sql = postgres(process.env.DATABASE_URL, { max: 1, prepare: false });
 
 async function main() {
   await sql`
@@ -48,9 +51,15 @@ async function main() {
       trim_start REAL,
       trim_end REAL,
       pitch_shift REAL DEFAULT 0,
+      version_group_id TEXT,
+      version_number INTEGER DEFAULT 1,
       created_at TIMESTAMP NOT NULL
     );
   `;
+  // Additive migration for databases created before version grouping existed
+  await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS version_group_id TEXT;`;
+  await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS version_number INTEGER DEFAULT 1;`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS share_links (
       id TEXT PRIMARY KEY,

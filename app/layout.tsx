@@ -3,6 +3,8 @@ import { DM_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { PlayerProvider } from "@/components/PlayerProvider";
+import { AmbientProvider } from "@/components/AmbientProvider";
+import AmbientBackground from "@/components/AmbientBackground";
 import PlayerBar from "@/components/PlayerBar";
 
 const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" });
@@ -18,10 +20,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className={`${dmSans.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
         <ThemeProvider>
-          <PlayerProvider>
-            <div className="min-h-screen pb-24">{children}</div>
-            <PlayerBar />
-          </PlayerProvider>
+          <AmbientProvider>
+            <PlayerProvider>
+              <AmbientBackground />
+              <div className="relative z-10 min-h-screen pb-24">{children}</div>
+              <PlayerBar />
+            </PlayerProvider>
+          </AmbientProvider>
         </ThemeProvider>
       </body>
     </html>

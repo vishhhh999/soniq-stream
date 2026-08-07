@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, SkipBack, SkipForward, Repeat } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { usePlayer } from "./PlayerProvider";
 
 export default function PlayerBar() {
@@ -46,17 +47,25 @@ export default function PlayerBar() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 h-20 bg-elevated border-t border-border flex items-center px-6 gap-6 z-50">
-      <audio ref={audioRef} loop={loopOn} />
+      <audio ref={audioRef} loop={loopOn} crossOrigin="anonymous" />
 
       <div className="w-56 min-w-0">
-        {current ? (
-          <>
-            <p className="text-sm font-medium text-primary truncate">{current.title}</p>
-            <p className="text-xs text-secondary truncate">{current.artist || "Unknown"}</p>
-          </>
-        ) : (
-          <p className="text-sm text-tertiary">Nothing playing</p>
-        )}
+        <AnimatePresence mode="wait">
+          {current ? (
+            <motion.div
+              key={current.id}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2 }}
+            >
+              <p className="text-sm font-medium text-primary truncate">{current.title}</p>
+              <p className="text-xs text-secondary truncate">{current.artist || "Unknown"}</p>
+            </motion.div>
+          ) : (
+            <p className="text-sm text-tertiary">Nothing playing</p>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="flex items-center gap-4 text-secondary">

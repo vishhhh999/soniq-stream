@@ -35,6 +35,12 @@ export const tracks = pgTable("tracks", {
   trimStart: real("trim_start"),
   trimEnd: real("trim_end"),
   pitchShift: real("pitch_shift").default(0),
+  // Duplicate/version handling: tracks uploaded with a matching normalized
+  // title into the same album/folder are grouped under one versionGroupId
+  // (the id of the first track in the group) instead of rejected or silently
+  // duplicated. versionNumber increments within the group.
+  versionGroupId: text("version_group_id"),
+  versionNumber: integer("version_number").default(1),
   createdAt: timestamp("created_at").notNull(),
 });
 
