@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* LIGHT — warm paper, not clinical white. Designed as its own system, not an inverted dark theme. */
+  --bg-base: #f7f4ee;
+  --bg-surface: #fefdfb;
+  --bg-elevated: #ffffff;
+  --border: #e6e0d2;
+  --border-strong: #d1c7b0;
+
+  --text-primary: #1a1712;
+  --text-secondary: #6e6656;
+  --text-tertiary: #a89f8c;
+
+  --accent: #9c7b42;        /* deepened gold — #c8b99a fails contrast on light bg */
+  --accent-strong: #7a5f30;
+
+  --error: #c1443a;
+  --success: #3f8f5f;
+}
+
+.dark {
+  --bg-base: #0e0e0e;
+  --bg-surface: #151515;
+  --bg-elevated: #1c1c1c;
+  --border: #2a2a2a;
+  --border-strong: #3d3d3d;
+
+  --text-primary: #f0ece4;
+  --text-secondary: #9a9489;
+  --text-tertiary: #5c5751;
+
+  --accent: #c8b99a;
+  --accent-strong: #ddd0b5;
+
+  --error: #eb5757;
+  --success: #6fcf97;
+}
+
+html {
+  background: var(--bg-base);
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+* {
+  border-color: var(--border);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--bg-base);
+}
+
+/* wavesurfer container needs explicit sizing, not a Tailwind concern */
+.waveform-container wave {
+  overflow: hidden !important;
+}

@@ -1,0 +1,35 @@
+{
+  "name": "soniq-stream",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:push": "node scripts/init-db.js",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "drizzle-orm": "^0.32.1",
+    "better-sqlite3": "^11.1.2",
+    "music-metadata": "^10.5.1",
+    "wavesurfer.js": "^7.8.6",
+    "framer-motion": "^11.3.19",
+    "lucide-react": "^0.417.0",
+    "nanoid": "^5.0.7",
+    "clsx": "^2.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.11",
+    "@types/react": "^18.3.3",
+    "@types/better-sqlite3": "^7.6.11",
+    "typescript": "^5.5.4",
+    "tailwindcss": "^3.4.7",
+    "postcss": "^8.4.40",
+    "autoprefixer": "^10.4.19",
+    "drizzle-kit": "^0.23.2"
+  }
+}
