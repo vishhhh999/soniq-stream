@@ -72,9 +72,6 @@ function Row({
         )}
       </div>
 
-      <span className="text-xs text-tertiary tabular-nums w-14 text-right">
-        {track.bpm ? `${Math.round(track.bpm)} BPM` : "—"}
-      </span>
       <span className="text-xs text-tertiary tabular-nums w-12 text-right">{fmt(track.durationSec)}</span>
 
       <MoreHorizontal size={16} strokeWidth={1.5} className="text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />

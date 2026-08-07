@@ -22,9 +22,18 @@ export default function PlayerBar() {
   const [showLyrics, setShowLyrics] = useState(false);
   const [showVolume, setShowVolume] = useState(false);
   const triedFallbackRef = useRef(false);
+  const lastTrackIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!audioRef.current || !current) return;
+    // Previously this effect ran on ANY change to the `current` object
+    // reference, even if it was the same track — e.g. after navigating to
+    // an album page, which refetches track data and can produce a new
+    // object for the same track. That reset audio.src and force-restarted
+    // playback from 0, reading exactly as "opening an album stops
+    // playback." Now it only resets when the actual track id changes.
+    if (lastTrackIdRef.current === current.id) return;
+    lastTrackIdRef.current = current.id;
     triedFallbackRef.current = false;
     setBrokenTrack(null);
     audioRef.current.crossOrigin = "anonymous";

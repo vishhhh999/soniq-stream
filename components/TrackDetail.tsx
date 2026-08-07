@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Link2, Check, Download, Trash2 } from "lucide-react";
 import type { Track } from "./PlayerProvider";
@@ -26,8 +26,6 @@ export default function TrackDetail({
   onSaved: () => void;
   onDeleted: () => void;
 }) {
-  const waveformRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef<any>(null);
   const [title, setTitle] = useState(track.title);
   const [artist, setArtist] = useState(track.artist ?? "");
   const [bpm, setBpm] = useState(track.bpm ?? "");
@@ -39,46 +37,10 @@ export default function TrackDetail({
   const [allowDownload, setAllowDownload] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    let ws: any;
-    (async () => {
-      const WaveSurfer = (await import("wavesurfer.js")).default;
-      const RegionsPlugin = (await import("wavesurfer.js/dist/plugins/regions.js")).default;
-      if (!waveformRef.current) return;
-
-      const regions = RegionsPlugin.create();
-      ws = WaveSurfer.create({
-        container: waveformRef.current,
-        waveColor: "var(--border-strong)",
-        progressColor: "var(--accent)",
-        cursorColor: "var(--accent)",
-        height: 72,
-        barWidth: 2,
-        barGap: 2,
-        barRadius: 2,
-        url: track.fileUrl,
-        plugins: [regions],
-      });
-
-      ws.on("decode", () => {
-        regions.addRegion({
-          start: 0,
-          end: ws.getDuration(),
-          color: "rgba(200, 185, 154, 0.15)",
-          drag: true,
-          resize: true,
-        });
-      });
-
-      wsRef.current = ws;
-    })();
-
-    return () => ws?.destroy();
-  }, [track.fileUrl]);
 
   const saveField = async (fields: Record<string, unknown>) => {
     setSaving(true);
@@ -92,8 +54,11 @@ export default function TrackDetail({
     setTimeout(() => setSaved(false), 1500);
   };
 
+  // Trim/loop removed for now — the region-editing UI wasn't actually wired
+  // to playback (saved coordinates, but nothing read them back), so it was
+  // dead weight sitting in the panel. Worth rebuilding properly later,
+  // alongside a real playback-gating implementation, not before.
   const saveChanges = async () => {
-    const region = wsRef.current?.plugins?.[0]?.getRegions?.()?.[0];
     await fetch(`/api/tracks/${track.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -103,8 +68,6 @@ export default function TrackDetail({
         bpm: bpm === "" ? null : Number(bpm),
         key: key || null,
         notes: notes || null,
-        trimStart: region?.start ?? null,
-        trimEnd: region?.end ?? null,
       }),
     });
     onSaved();
@@ -116,12 +79,35 @@ export default function TrackDetail({
     onDeleted();
   };
 
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const res = await fetch(track.fileUrl);
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const ext = track.fileUrl.match(/\.[^./?]+(?:\?|$)/)?.[0]?.replace("?", "") || ".mp3";
+      a.download = `${track.title}${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download failed:", err);
+      alert("Download failed — the file couldn't be fetched. This is usually an R2 CORS issue on GET requests.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const runDetection = async () => {
     setDetecting(true);
     try {
       const [bpmResult, keyResult] = await Promise.all([
-        detectBPM(track.fileUrl).catch(() => ({ bpm: 0, confidence: 0 })),
-        detectKey(track.fileUrl).catch(() => ({ key: "", confidence: 0 })),
+        detectBPM(track.fileUrl).catch((e) => ({ bpm: 0, confidence: 0, error: e })),
+        detectKey(track.fileUrl).catch((e) => ({ key: "", confidence: 0, error: e })),
       ]);
       const patch: Record<string, unknown> = {};
       if (bpmResult.bpm > 0) {
@@ -134,13 +120,17 @@ export default function TrackDetail({
         patch.key = keyResult.key;
       }
       if (Object.keys(patch).length === 0) {
-        alert("Couldn't analyze this file. If it was uploaded before R2 CORS was configured for GET requests, that's very likely why — check the bucket's CORS policy.");
+        // Surfacing the actual error now instead of a generic message —
+        // "still doesn't work" with no detail is impossible to diagnose
+        // further without this.
+        const bpmErr = (bpmResult as any).error;
+        const keyErr = (keyResult as any).error;
+        const detail = bpmErr?.message || keyErr?.message || "unknown reason";
+        alert(
+          `Couldn't analyze this file (${detail}). Most likely cause: the R2 bucket's CORS policy allows PUT for uploads but the browser's fetch() for reading the file back still isn't getting a valid response — check that the CORS policy's AllowedMethods includes GET and that AllowedOrigins exactly matches your live domain.`
+        );
         return;
       }
-      // Previously this only updated local form state — if you closed the
-      // panel without separately clicking "Save changes" at the bottom, the
-      // detected values were lost and looked like detection "didn't work."
-      // Persist immediately instead, matching every other auto-save field.
       await fetch(`/api/tracks/${track.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -217,12 +207,6 @@ export default function TrackDetail({
         </div>
 
         <div className="p-6 space-y-8 overflow-y-auto flex-1">
-          <div>
-            <label className="text-xs uppercase tracking-wide text-tertiary mb-3 block">Trim / loop region</label>
-            <div ref={waveformRef} className="waveform-container" />
-            <p className="text-xs text-tertiary mt-2">Drag the handles on the waveform to set in/out points, then save.</p>
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs uppercase tracking-wide text-tertiary mb-2 block">BPM</label>
@@ -331,14 +315,14 @@ export default function TrackDetail({
           </div>
 
           <div className="border-t border-border pt-6 flex items-center gap-3">
-            <a
-              href={track.fileUrl}
-              download
-              className="flex items-center gap-2 text-sm text-secondary border border-border rounded-md px-4 py-2 hover:border-border-strong hover:text-primary transition-colors"
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="flex items-center gap-2 text-sm text-secondary border border-border rounded-md px-4 py-2 hover:border-border-strong hover:text-primary transition-colors disabled:opacity-50"
             >
               <Download size={14} strokeWidth={1.5} />
-              Download
-            </a>
+              {downloading ? "Downloading..." : "Download"}
+            </button>
 
             {!confirmingDelete ? (
               <button
