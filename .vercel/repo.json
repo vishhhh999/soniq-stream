@@ -1,0 +1,11 @@
+{
+  "remoteName": "origin",
+  "projects": [
+    {
+      "id": "prj_yXfCRTOqP8hRoEPqsai11tUwA0e1",
+      "name": "soniq-stream",
+      "directory": ".",
+      "orgId": "team_wJ8j7QWWgoBmDGhQtFYsHIOA"
+    }
+  ]
+}

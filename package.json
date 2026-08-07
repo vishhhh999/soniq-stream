@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "db:push": "node scripts/init-db.js",
+    "db:push": "dotenv -e .env.local -- node scripts/init-db.js",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
@@ -30,6 +30,7 @@
     "@types/node": "^20.14.11",
     "@types/react": "^18.3.3",
     "autoprefixer": "^10.4.19",
+    "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.23.2",
     "postcss": "^8.4.40",
     "tailwindcss": "^3.4.7",
