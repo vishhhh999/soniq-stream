@@ -70,11 +70,22 @@ export default function AmbientBackground() {
     noiseTile = buildNoiseTile();
     let noiseAge = 0;
 
+    // Beat-onset detection: track a rolling average of bass energy and treat
+    // a sudden spike above it as a "hit" — this is what makes the gradient
+    // actually feel synced to the music instead of just smoothly (and
+    // sluggishly) tracking raw amplitude. A continuous glow that rises and
+    // falls with volume reads as "there in the background"; a sharp pulse
+    // that snaps on kick/bass hits and decays reads as "reacting to the beat".
+    const bassHistory: number[] = [];
+    let pulse = 0;
+    let lastPulseTime = 0;
+
     const draw = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
       tRef.current += 0.006;
       const t = tRef.current;
+      const now = performance.now();
 
       ctx.clearRect(0, 0, w, h);
 
@@ -87,13 +98,27 @@ export default function AmbientBackground() {
           const midBins = freq.slice(8, 40);
           bass = (bassBins.reduce((a, b) => a + b, 0) / bassBins.length / 255) * 0.9 + 0.1;
           mid = (midBins.reduce((a, b) => a + b, 0) / midBins.length / 255) * 0.7 + 0.08;
+
+          bassHistory.push(bass);
+          if (bassHistory.length > 40) bassHistory.shift();
+          const avgBass = bassHistory.reduce((a, b) => a + b, 0) / bassHistory.length;
+
+          // Debounced so a single sustained hit doesn't re-trigger every
+          // frame — ~180ms minimum gap between pulses, roughly matching the
+          // fastest beats a listener perceives as distinct hits rather than
+          // a single sustained sound.
+          if (bass > avgBass * 1.35 && bass > 0.3 && now - lastPulseTime > 180) {
+            pulse = 1;
+            lastPulseTime = now;
+          }
         }
       }
+      pulse *= 0.87; // decay — fades to near-zero within ~250-300ms
 
       const blobs = [
-        { x: w * 0.3 + Math.sin(t) * 60, y: h * (1.05 - bass * 0.15), r: w * (0.35 + bass * 0.12), color: colors.from },
-        { x: w * 0.7 + Math.cos(t * 0.8) * 80, y: h * (1.1 - mid * 0.12), r: w * (0.3 + mid * 0.1), color: colors.to },
-        { x: w * 0.5 + Math.sin(t * 1.3) * 50, y: h * 1.15, r: w * (0.4 + bass * 0.08), color: colors.from },
+        { x: w * 0.3 + Math.sin(t) * 60, y: h * (1.05 - bass * 0.1), r: w * (0.32 + pulse * 0.22 + bass * 0.05), color: colors.from },
+        { x: w * 0.7 + Math.cos(t * 0.8) * 80, y: h * (1.1 - mid * 0.08), r: w * (0.28 + pulse * 0.12 + mid * 0.06), color: colors.to },
+        { x: w * 0.5 + Math.sin(t * 1.3) * 50, y: h * 1.15, r: w * (0.38 + pulse * 0.15), color: colors.from },
       ];
 
       ctx.globalCompositeOperation = "screen";
@@ -101,20 +126,14 @@ export default function AmbientBackground() {
         try {
           const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
           grad.addColorStop(0, b.color);
-          grad.addColorStop(0.5, b.color + "55");
+          grad.addColorStop(0.5, b.color + "88");
           grad.addColorStop(1, "transparent");
-          ctx.globalAlpha = 0.22 + bass * 0.12;
+          ctx.globalAlpha = 0.28 + pulse * 0.3;
           ctx.fillStyle = grad;
           ctx.beginPath();
           ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
           ctx.fill();
         } catch (err) {
-          // A malformed color string here used to crash the entire app (this
-          // draw() call runs synchronously inside the effect, not just in a
-          // requestAnimationFrame callback, so React treats it as an effect
-          // error, not a harmlessly-skipped animation frame). Catching it
-          // means a future bad color value degrades to "skip this blob"
-          // instead of taking down the whole page again.
           console.error("Ambient background: skipping malformed color", b.color, err);
         }
       }

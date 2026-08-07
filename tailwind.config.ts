@@ -20,7 +20,7 @@ export default {
       },
       fontFamily: {
         sans: ["var(--font-inter-tight)", "sans-serif"],
-        display: ["var(--font-bricolage)", "sans-serif"],
+        display: ["var(--font-mono-display)", "monospace"],
       },
       fontSize: {
         xs: ["11px", "1.4"],

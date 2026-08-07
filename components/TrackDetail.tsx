@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Link2, Check } from "lucide-react";
+import { X, Link2, Check, Download, Trash2 } from "lucide-react";
 import type { Track } from "./PlayerProvider";
 
 const EXPIRY_OPTIONS = [
@@ -12,15 +12,30 @@ const EXPIRY_OPTIONS = [
   { label: "Never", value: 0 },
 ];
 
-export default function TrackDetail({ track, onClose, onSaved }: { track: Track; onClose: () => void; onSaved: () => void }) {
+export default function TrackDetail({
+  track,
+  onClose,
+  onSaved,
+  onDeleted,
+}: {
+  track: Track;
+  onClose: () => void;
+  onSaved: () => void;
+  onDeleted: () => void;
+}) {
   const waveformRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<any>(null);
+  const [title, setTitle] = useState(track.title);
+  const [artist, setArtist] = useState(track.artist ?? "");
   const [bpm, setBpm] = useState(track.bpm ?? "");
   const [key, setKey] = useState(track.key ?? "");
+  const [notes, setNotes] = useState((track as any).notes ?? "");
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [expiryDays, setExpiryDays] = useState(30);
   const [allowDownload, setAllowDownload] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let ws: any;
@@ -59,19 +74,28 @@ export default function TrackDetail({ track, onClose, onSaved }: { track: Track;
     return () => ws?.destroy();
   }, [track.fileUrl]);
 
-  const saveTrim = async () => {
+  const saveChanges = async () => {
     const region = wsRef.current?.plugins?.[0]?.getRegions?.()?.[0];
     await fetch(`/api/tracks/${track.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        title: title.trim() || track.title,
+        artist: artist.trim() || null,
         bpm: bpm === "" ? null : Number(bpm),
         key: key || null,
+        notes: notes || null,
         trimStart: region?.start ?? null,
         trimEnd: region?.end ?? null,
       }),
     });
     onSaved();
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    await fetch(`/api/tracks/${track.id}`, { method: "DELETE" });
+    onDeleted();
   };
 
   const createShare = async () => {
@@ -105,11 +129,20 @@ export default function TrackDetail({ track, onClose, onSaved }: { track: Track;
         className="fixed inset-y-0 right-0 w-full max-w-md bg-elevated border-l border-border z-40 flex flex-col"
       >
         <div className="flex items-center justify-between px-6 py-5 border-b border-border">
-          <div className="min-w-0">
-            <h3 className="text-md font-medium text-primary truncate">{track.title}</h3>
-            <p className="text-sm text-secondary truncate">{track.artist || "Unknown artist"}</p>
+          <div className="min-w-0 flex-1 mr-4 space-y-1">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="text-md font-medium text-primary bg-transparent border-b border-transparent hover:border-border focus:border-border-strong outline-none w-full truncate"
+            />
+            <input
+              value={artist}
+              onChange={(e) => setArtist(e.target.value)}
+              placeholder="Unknown artist"
+              className="text-sm text-secondary bg-transparent border-b border-transparent hover:border-border focus:border-border-strong outline-none w-full truncate"
+            />
           </div>
-          <button onClick={onClose} className="text-tertiary hover:text-primary transition-colors shrink-0 ml-4">
+          <button onClick={onClose} className="text-tertiary hover:text-primary transition-colors shrink-0">
             <X size={18} strokeWidth={1.5} />
           </button>
         </div>
@@ -123,7 +156,7 @@ export default function TrackDetail({ track, onClose, onSaved }: { track: Track;
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs uppercase tracking-wide text-tertiary mb-2 block">BPM (estimated)</label>
+              <label className="text-xs uppercase tracking-wide text-tertiary mb-2 block">BPM</label>
               <input
                 value={bpm}
                 onChange={(e) => setBpm(e.target.value === "" ? "" : Number(e.target.value))}
@@ -143,6 +176,17 @@ export default function TrackDetail({ track, onClose, onSaved }: { track: Track;
               />
               {track.key != null && <p className="text-xs text-tertiary mt-1">Auto-detected — correct if off.</p>}
             </div>
+          </div>
+
+          <div>
+            <label className="text-xs uppercase tracking-wide text-tertiary mb-2 block">Notes</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              placeholder="Mix notes, context, anything worth remembering about this version..."
+              className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-primary focus:border-border-strong outline-none resize-none"
+            />
           </div>
 
           <div className="border-t border-border pt-6">
@@ -193,10 +237,48 @@ export default function TrackDetail({ track, onClose, onSaved }: { track: Track;
               </div>
             )}
           </div>
+
+          <div className="border-t border-border pt-6 flex items-center gap-3">
+            <a
+              href={track.fileUrl}
+              download
+              className="flex items-center gap-2 text-sm text-secondary border border-border rounded-md px-4 py-2 hover:border-border-strong hover:text-primary transition-colors"
+            >
+              <Download size={14} strokeWidth={1.5} />
+              Download
+            </a>
+
+            {!confirmingDelete ? (
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                className="flex items-center gap-2 text-sm text-error border border-error/40 rounded-md px-4 py-2 hover:bg-error/10 transition-colors"
+              >
+                <Trash2 size={14} strokeWidth={1.5} />
+                Delete
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-secondary">Delete this track permanently?</span>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="text-xs text-error border border-error/40 rounded-md px-3 py-1.5 hover:bg-error/10 transition-colors disabled:opacity-50"
+                >
+                  {deleting ? "Deleting..." : "Yes, delete"}
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(false)}
+                  className="text-xs text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="p-6 border-t border-border">
-          <button onClick={saveTrim} className="w-full bg-accent text-canvas text-sm font-medium py-2.5 rounded-md hover:bg-accent-strong transition-colors">
+          <button onClick={saveChanges} className="w-full bg-accent text-canvas text-sm font-medium py-2.5 rounded-md hover:bg-accent-strong transition-colors">
             Save changes
           </button>
         </div>

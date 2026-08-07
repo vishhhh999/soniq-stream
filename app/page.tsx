@@ -27,6 +27,9 @@ export default function Home() {
 
   useEffect(() => {
     load();
+    const onDeleted = () => load();
+    window.addEventListener("soniq:track-deleted", onDeleted);
+    return () => window.removeEventListener("soniq:track-deleted", onDeleted);
   }, []);
 
   const unsorted = tracks.filter((t: any) => !t.albumId);
@@ -61,7 +64,7 @@ export default function Home() {
       {albums.length > 0 && (
         <section className="mb-16">
           <h2 className="text-xs uppercase tracking-wide text-tertiary mb-5">Albums</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-10">
             {albums.map((a, i) => (
               <motion.div
                 key={a.id}
@@ -107,6 +110,10 @@ export default function Home() {
           track={detailTrack}
           onClose={() => setDetailTrack(null)}
           onSaved={() => {
+            load();
+            setDetailTrack(null);
+          }}
+          onDeleted={() => {
             load();
             setDetailTrack(null);
           }}

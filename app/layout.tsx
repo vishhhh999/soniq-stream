@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Inter_Tight } from "next/font/google";
+import { JetBrains_Mono, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import AuthSessionProvider from "@/components/AuthSessionProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -9,7 +9,7 @@ import AmbientBackground from "@/components/AmbientBackground";
 import PlayerBar from "@/components/PlayerBar";
 
 const interTight = Inter_Tight({ subsets: ["latin"], variable: "--font-inter-tight" });
-const bricolage = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage" });
+const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-display" });
 
 export const metadata: Metadata = {
   title: "SONIQ — your tracks, organized",
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${interTight.variable} ${bricolage.variable} font-sans antialiased`}>
+      <body className={`${interTight.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <AuthSessionProvider>
           <ThemeProvider>
             <AmbientProvider>
