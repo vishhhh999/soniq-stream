@@ -4,67 +4,48 @@ Organize, play, and share your own work-in-progress tracks.
 
 ## Stack
 - Next.js 14 on Vercel
-- Postgres via Neon (Vercel Storage integration)
-- Cloudflare R2 for audio + cover art storage
+- **Auth.js v5** — email+password (bcrypt-hashed, stored in Postgres) and
+  Google sign-in, both real accounts, not an env-var password
+- Postgres via Neon, Cloudflare R2 for audio + cover art
 - Drizzle ORM, `wavesurfer.js`, client-side BPM estimation, Framer Motion
 
-## What's working (verified end-to-end against real Postgres this round)
-- **Login** — single-password gate via middleware. All routes protected
-  except `/login`, the public share pages (`/s/[token]`), and their APIs.
-  Tested: redirect when logged out, 401 on API, wrong-password rejection,
-  cookie-based session working across both pages and API routes.
-- **Albums** — create with name + cover art (uploads to R2), grid view,
-  album detail page with its own upload scope.
-- **Duplicate/version handling** — uploading a track with a matching title
-  (case/whitespace-insensitive) into the same album or folder groups it as
-  v2, v3, etc. instead of colliding or duplicating silently. Verified against
-  real Postgres: grouping, version incrementing, and cross-album isolation
-  all confirmed correct.
-- **Share links** — expiry choice (7/30/90 days/never) and allow-download
-  toggle, both actually wired now (previously hardcoded). Verified end-to-end
-  including the public share page.
-- **Ambient background** — canvas-based soft gradient + grain, reacts to
-  playback via a Web Audio analyser tapped off the player's `<audio>`
-  element, confined to the bottom of the screen with a fade mask, toggle
-  defaults on. **Untested against a real R2-hosted file** — see caveat below.
-- Real audio metadata, BPM estimation, waveform trim view, light/dark modes
-  — carried over from the previous round, still working.
+## Auth — how it actually works now
+This isn't open signup. The first time the app runs with an empty `users`
+table, visiting it sends you to `/setup` to create the one account. After
+that, `/setup` refuses to create another — `/login` is the only way in from
+then on, with two options:
 
-## What's NOT verified this round (needs your real credentials/deploy)
-- **The upload route's R2 path itself.** Everything downstream of a
-  successful upload (duplicate detection, DB insert, metadata) was verified
-  by running the exact same queries directly against Postgres — but the
-  actual R2 `PutObjectCommand` call has no real bucket to test against here.
-  It fails cleanly when unconfigured (confirmed — clean 503, server survives),
-  but "does a real file actually land in R2 and get a working public URL"
-  is only provable on your deploy.
-- **The ambient background's audio reactivity specifically.** The Web Audio
-  analyser requires the audio element's `crossOrigin="anonymous"` to work
-  against a cross-origin R2 URL, which in turn requires your R2 bucket to
-  send proper CORS headers on GET requests. If your bucket doesn't have a
-  CORS policy configured, playback works fine but the ambient background
-  falls back to gentle idle motion instead of reacting to the music — it
-  won't error, just won't be reactive. **Check your bucket's CORS settings**
-  (R2 → your bucket → Settings → CORS Policy) if it doesn't seem to pulse
-  with the music: add an entry allowing `GET` from your deployed domain (or
-  `*` for simplicity on a personal project).
-- The overall visual/UX pass — needs your eyes on the real thing once
-  deployed. This got real functional and structural work (albums, versions,
-  motion, ambient mode) but a proper design pass on spacing/hierarchy/feel
-  across the new pages hasn't happened yet.
+- **Email + password** — real account, password hashed with bcrypt, stored
+  in your Postgres database. Nothing to configure beyond `AUTH_SECRET`.
+- **Google sign-in** — requires a Google Cloud OAuth app (steps below) and
+  an `ALLOWED_EMAILS` allowlist. **Deny by default** — if `ALLOWED_EMAILS`
+  isn't set, Google sign-in refuses everyone, not "anyone with a Google
+  account." This is deliberate: an open Google login on a personal file
+  library is a bigger hole than the env-var password it replaced.
 
-## Not built yet
-- Pitch shift — schema field + UI exist, no playback engine wired in
-- Trim/loop region — visual only, doesn't gate playback yet
-- Folder UI — API exists, no frontend (albums are the primary structure now)
-- Musical key — manual entry only
+### Setting up Google sign-in
+1. [console.cloud.google.com](https://console.cloud.google.com) → new project (or reuse one)
+2. APIs & Services → OAuth consent screen → External → fill in app name, your email
+3. APIs & Services → Credentials → Create Credentials → OAuth client ID → Web application
+4. **Authorized redirect URI**: `https://your-app.vercel.app/api/auth/callback/google`
+   (and `http://localhost:3000/api/auth/callback/google` if you want it working locally too)
+5. Copy the Client ID and Client Secret → `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+6. Set `ALLOWED_EMAILS=your-actual-gmail@gmail.com` (comma-separate for more than one)
+
+If you don't want Google sign-in at all, just leave those three env vars
+unset — verified this round: the button still renders, clicking it fails
+gracefully to an error page, and the rest of the app (including email+password
+login) is completely unaffected.
 
 ## Env vars
 
 ```
 DATABASE_URL=postgres://...
-APP_PASSWORD=choose-a-real-password
-APP_SECRET=any-long-random-string      # signs session cookies — generate with: openssl rand -hex 32
+AUTH_SECRET=...                # generate: openssl rand -hex 32
+AUTH_TRUST_HOST=true           # needed locally always; keep it set on Vercel too — see note below
+GOOGLE_CLIENT_ID=...           # optional — omit to disable Google sign-in
+GOOGLE_CLIENT_SECRET=...       # optional
+ALLOWED_EMAILS=you@gmail.com   # required if using Google sign-in — comma-separated
 R2_ACCOUNT_ID=...
 R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
@@ -72,8 +53,39 @@ R2_BUCKET_NAME=soniq-tracks
 R2_PUBLIC_URL=https://pub-xxxxxxxx.r2.dev
 ```
 
-`APP_SECRET` is new this round — required for login sessions. Generate one
-with `openssl rand -hex 32` and add it in Vercel same as the others.
+`APP_PASSWORD` and `APP_SECRET` from the previous version are gone — Auth.js
+replaces that whole system. If they're still set in Vercel, they're just
+ignored now, safe to remove whenever.
+
+**On `AUTH_TRUST_HOST`:** Auth.js is supposed to auto-detect Vercel and trust
+its host header without this variable, and that's what the docs promise —
+but there are unresolved community reports of `UntrustedHost` errors on
+Vercel even with it set to Vercel's own auto-detection. Setting it explicitly
+is a harmless safety net either way, so it's in the list above for both
+environments rather than assumed away.
+
+## What's verified this round (real runs, not just builds)
+- Full email+password flow against real Postgres: account creation via
+  `/setup`, sign-in through Auth.js's actual callback endpoint, session
+  cookie unlocking both pages and API routes, wrong password correctly
+  rejected (confirmed no session was granted, not just a status code)
+- `/setup` correctly refuses to create a second account once one exists
+- Google sign-in confirmed structurally: fails gracefully when unconfigured
+  (server survives, login page unaffected), and with credentials present
+  builds a fully correct OAuth authorization request (right redirect URI,
+  right scopes, PKCE challenge) pointed at Google's real endpoint — the
+  handshake itself needs your real Google Cloud app to go further than that
+- Duplicate/version detection, share links, and R2 upload path — carried
+  over from the previous round, still working (see prior notes for detail)
+
+## What's NOT verified
+- The actual Google OAuth callback completing end-to-end — needs a real
+  registered app, can't fake that part
+- R2 upload itself — same as before, no real bucket to test against here
+
+## Not built yet
+- Pitch shift, trim/loop playback gating, folder UI, musical key detection
+  — unchanged from previous rounds
 
 ## Local setup
 
@@ -81,37 +93,35 @@ with `openssl rand -hex 32` and add it in Vercel same as the others.
 npm install
 ```
 
-Create `.env.local` with all the vars above, then:
+`.env.local` with everything above (Google vars optional), then:
 
 ```bash
-npm run db:push   # idempotent — safe to re-run after schema changes
+npm run db:push   # adds the new users table — idempotent, safe to re-run
 npm run dev
 ```
 
-## Deploying
+Visit `localhost:3000` — first run sends you to `/setup`.
 
-Same as before (Postgres via Storage tab, R2 vars pasted manually), plus now:
-add `APP_PASSWORD` and `APP_SECRET` to Vercel's Environment Variables. Redeploy,
-then visit the site — you'll land on `/login` first.
+## Deploying
+Same Postgres/R2 setup as before. Add the new `AUTH_SECRET`,
+`AUTH_TRUST_HOST`, and (if using Google) the three Google/allowlist vars to
+Vercel's Environment Variables. Redeploy, then create your account at
+`/setup` on the live URL.
 
 ## First-deploy checklist
-1. Homepage redirects to `/login` when logged out — confirms middleware/auth
-2. Log in with `APP_PASSWORD` — confirms `APP_SECRET` is set correctly
-3. Create an album with cover art — confirms R2 + Postgres both work
-4. Upload two tracks with the same name into that album — second one should
-   show a "v2" badge with a chevron to expand — confirms version detection
-5. Generate a share link, open it in incognito — confirms public share path
-6. Check whether the ambient background pulses when something's playing —
-   if it's static, check R2 CORS policy (see caveat above)
+1. Visit the live URL — should land on `/setup` (empty `users` table)
+2. Create your account — should land on `/login` afterward, not still on `/setup`
+3. Sign in with email+password — should reach the library
+4. If using Google: sign out, try Google sign-in with your allowed email —
+   should work; try a different Google account if you want to confirm the
+   allowlist actually blocks it
+5. Everything from the previous checklist (album creation, version
+   detection, share links, ambient background CORS) still applies
 
 ## Known deploy pitfalls already hit
-- **SQLite on Vercel** (fixed, see git history) — ephemeral filesystem,
-  never going to work.
-- **`prepared statement already exists` / tracks silently not saving**
-  (fixed this round) — Vercel's Neon integration gives you a *pooled*
-  connection string by default; `postgres-js` needs `{ prepare: false }`
-  against it or writes fail silently. This was the root cause of uploads
-  landing in R2 but never appearing in the library.
-- **Middleware `crypto` module error** (fixed this round, caught before you
-  hit it) — Vercel Edge Runtime doesn't support Node's `crypto`; session
-  signing uses Web Crypto (`crypto.subtle`) instead, which works in both.
+- SQLite on Vercel, `prepare: false` for Neon's pooler, Node `crypto` in
+  Edge middleware — all from previous rounds, see git history
+- **This round:** the login route had no error handling, so a missing
+  `AUTH_SECRET` (or `APP_SECRET` under the old system) produced an
+  unparseable HTML error page instead of a real error message — fixed, now
+  returns clear JSON either way

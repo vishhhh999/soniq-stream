@@ -14,6 +14,14 @@ const sql = postgres(process.env.DATABASE_URL, { max: 1, prepare: false });
 
 async function main() {
   await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      created_at TIMESTAMP NOT NULL
+    );
+  `;
+  await sql`
     CREATE TABLE IF NOT EXISTS folders (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,

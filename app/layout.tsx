@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import AuthSessionProvider from "@/components/AuthSessionProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { PlayerProvider } from "@/components/PlayerProvider";
 import { AmbientProvider } from "@/components/AmbientProvider";
@@ -19,15 +20,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${dmSans.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
-        <ThemeProvider>
-          <AmbientProvider>
-            <PlayerProvider>
-              <AmbientBackground />
-              <div className="relative z-10 min-h-screen pb-24">{children}</div>
-              <PlayerBar />
-            </PlayerProvider>
-          </AmbientProvider>
-        </ThemeProvider>
+        <AuthSessionProvider>
+          <ThemeProvider>
+            <AmbientProvider>
+              <PlayerProvider>
+                <AmbientBackground />
+                <div className="relative z-10 min-h-screen pb-24">{children}</div>
+                <PlayerBar />
+              </PlayerProvider>
+            </AmbientProvider>
+          </ThemeProvider>
+        </AuthSessionProvider>
       </body>
     </html>
   );

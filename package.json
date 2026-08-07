@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.637.0",
+    "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.32.1",
     "framer-motion": "^11.3.19",
@@ -18,12 +19,14 @@
     "music-metadata": "^10.5.1",
     "nanoid": "^5.0.7",
     "next": "14.2.5",
+    "next-auth": "5.0.0-beta.32",
     "postgres": "^3.4.4",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "wavesurfer.js": "^7.8.6"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.14.11",
     "@types/react": "^18.3.3",
     "autoprefixer": "^10.4.19",
