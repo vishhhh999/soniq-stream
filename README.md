@@ -4,48 +4,69 @@ Organize, play, and share your own work-in-progress tracks.
 
 ## Stack
 - Next.js 14 on Vercel
-- **Auth.js v5** — email+password (bcrypt-hashed, stored in Postgres) and
-  Google sign-in, both real accounts, not an env-var password
+- Auth.js v5 — email+password (bcrypt-hashed, in Postgres) and Google sign-in
 - Postgres via Neon, Cloudflare R2 for audio + cover art
 - Drizzle ORM, `wavesurfer.js`, client-side BPM estimation, Framer Motion
 
-## Auth — how it actually works now
-This isn't open signup. The first time the app runs with an empty `users`
-table, visiting it sends you to `/setup` to create the one account. After
-that, `/setup` refuses to create another — `/login` is the only way in from
-then on, with two options:
+## Upload architecture — read this before setting up R2
+Files upload **directly from your browser to R2**, not through a Vercel
+function. This isn't a style choice — Vercel serverless functions have a
+hard 4.5MB request body limit that cannot be raised by any plan or config,
+and a real audio file routinely exceeds it. The flow:
 
-- **Email + password** — real account, password hashed with bcrypt, stored
-  in your Postgres database. Nothing to configure beyond `AUTH_SECRET`.
-- **Google sign-in** — requires a Google Cloud OAuth app (steps below) and
-  an `ALLOWED_EMAILS` allowlist. **Deny by default** — if `ALLOWED_EMAILS`
-  isn't set, Google sign-in refuses everyone, not "anyone with a Google
-  account." This is deliberate: an open Google login on a personal file
-  library is a bigger hole than the env-var password it replaced.
+1. Browser asks our server for a signed upload URL (`/api/upload/presign`)
+2. Browser PUTs the file straight to R2 using that URL — never touches our
+   server, so the 4.5MB limit doesn't apply
+3. Browser tells our server the upload finished (`/api/upload/finalize`) —
+   the server fetches the file back from R2 (server-to-server, also not
+   subject to that limit) to extract metadata and run duplicate detection
+
+**This means your R2 bucket needs a CORS policy, or step 2 fails.** Browsers
+block cross-origin PUT requests by default. In the Cloudflare dashboard:
+R2 → your bucket → Settings → CORS Policy → add a rule:
+```json
+[
+  {
+    "AllowedOrigins": ["https://your-app.vercel.app", "http://localhost:3000"],
+    "AllowedMethods": ["PUT", "GET"],
+    "AllowedHeaders": ["*"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+Replace the domain with your real one. Without this, uploads will fail in
+the browser with a CORS error at the PUT step, even though everything else
+(presign, R2 credentials) is configured correctly.
+
+## Auth — how it actually works
+Not open signup. First run with an empty `users` table sends you to
+`/setup` to create the one account; after that `/setup` refuses to create
+another. `/login` offers email+password (bcrypt, stored in your Postgres)
+and Google sign-in (deny-by-default allowlist via `ALLOWED_EMAILS` — an
+unconfigured allowlist blocks everyone, not "anyone with a Google account").
 
 ### Setting up Google sign-in
-1. [console.cloud.google.com](https://console.cloud.google.com) → new project (or reuse one)
-2. APIs & Services → OAuth consent screen → External → fill in app name, your email
+1. console.cloud.google.com → new project
+2. APIs & Services → OAuth consent screen → External → fill in basics
 3. APIs & Services → Credentials → Create Credentials → OAuth client ID → Web application
-4. **Authorized redirect URI**: `https://your-app.vercel.app/api/auth/callback/google`
-   (and `http://localhost:3000/api/auth/callback/google` if you want it working locally too)
-5. Copy the Client ID and Client Secret → `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
-6. Set `ALLOWED_EMAILS=your-actual-gmail@gmail.com` (comma-separate for more than one)
+4. Authorized redirect URI: `https://your-app.vercel.app/api/auth/callback/google`
+5. Copy Client ID / Secret → `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+6. Set `ALLOWED_EMAILS=you@gmail.com`
+7. While the consent screen is in Testing mode, also add yourself under
+   Test Users on that same screen — Google blocks non-test-users regardless
+   of your app's own allowlist until you publish the app.
 
-If you don't want Google sign-in at all, just leave those three env vars
-unset — verified this round: the button still renders, clicking it fails
-gracefully to an error page, and the rest of the app (including email+password
-login) is completely unaffected.
+Skip all of this and email+password still works fine on its own.
 
 ## Env vars
 
 ```
 DATABASE_URL=postgres://...
-AUTH_SECRET=...                # generate: openssl rand -hex 32
-AUTH_TRUST_HOST=true           # needed locally always; keep it set on Vercel too — see note below
-GOOGLE_CLIENT_ID=...           # optional — omit to disable Google sign-in
+AUTH_SECRET=...                # openssl rand -hex 32
+AUTH_TRUST_HOST=true
+GOOGLE_CLIENT_ID=...           # optional
 GOOGLE_CLIENT_SECRET=...       # optional
-ALLOWED_EMAILS=you@gmail.com   # required if using Google sign-in — comma-separated
+ALLOWED_EMAILS=you@gmail.com   # required if using Google sign-in
 R2_ACCOUNT_ID=...
 R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
@@ -53,75 +74,87 @@ R2_BUCKET_NAME=soniq-tracks
 R2_PUBLIC_URL=https://pub-xxxxxxxx.r2.dev
 ```
 
-`APP_PASSWORD` and `APP_SECRET` from the previous version are gone — Auth.js
-replaces that whole system. If they're still set in Vercel, they're just
-ignored now, safe to remove whenever.
+`APP_PASSWORD` / `APP_SECRET` from earlier versions are gone — safe to
+delete from Vercel if still present.
 
-**On `AUTH_TRUST_HOST`:** Auth.js is supposed to auto-detect Vercel and trust
-its host header without this variable, and that's what the docs promise —
-but there are unresolved community reports of `UntrustedHost` errors on
-Vercel even with it set to Vercel's own auto-detection. Setting it explicitly
-is a harmless safety net either way, so it's in the list above for both
-environments rather than assumed away.
-
-## What's verified this round (real runs, not just builds)
-- Full email+password flow against real Postgres: account creation via
-  `/setup`, sign-in through Auth.js's actual callback endpoint, session
-  cookie unlocking both pages and API routes, wrong password correctly
-  rejected (confirmed no session was granted, not just a status code)
-- `/setup` correctly refuses to create a second account once one exists
-- Google sign-in confirmed structurally: fails gracefully when unconfigured
-  (server survives, login page unaffected), and with credentials present
-  builds a fully correct OAuth authorization request (right redirect URI,
-  right scopes, PKCE challenge) pointed at Google's real endpoint — the
-  handshake itself needs your real Google Cloud app to go further than that
-- Duplicate/version detection, share links, and R2 upload path — carried
-  over from the previous round, still working (see prior notes for detail)
+## What's verified this round (real runs against real Postgres)
+- Full presign → finalize flow: presign fails cleanly when R2 is
+  unconfigured (503, clear message, no crash); finalize correctly fetches
+  a file back from a real HTTP server standing in for R2, extracts real
+  metadata (duration, sample rate, format all correct), runs duplicate/
+  version detection, writes the DB row, and a follow-up GET confirms it's
+  actually persisted — not just a 200 response
+- Login/session flow, `/setup` lockout, wrong-password rejection — all
+  re-confirmed still working after this round's changes
+- Fixed: `/login` and `/setup` used to render permanently blank if their
+  status check failed for any reason (e.g. the `users` table not existing
+  yet) — now shows a real error message instead. This was the direct cause
+  of the blank-page issue you hit.
 
 ## What's NOT verified
-- The actual Google OAuth callback completing end-to-end — needs a real
-  registered app, can't fake that part
-- R2 upload itself — same as before, no real bucket to test against here
+- The actual browser-to-R2 PUT — needs a real bucket with CORS configured,
+  can't fake that part here. This is the one new piece of risk in this
+  round's rework; test it as the very first thing after deploying (upload
+  one real track, not a tiny test file).
+- Google OAuth callback completing end-to-end — same as before, needs a
+  real registered app
 
 ## Not built yet
-- Pitch shift, trim/loop playback gating, folder UI, musical key detection
-  — unchanged from previous rounds
+Pitch shift, trim/loop playback gating, folder UI, musical key detection —
+unchanged.
 
 ## Local setup
-
 ```bash
 npm install
 ```
-
-`.env.local` with everything above (Google vars optional), then:
-
+`.env.local` with everything above, then:
 ```bash
-npm run db:push   # adds the new users table — idempotent, safe to re-run
+npm run db:push   # auto-loads .env.local now — no manual export needed
 npm run dev
 ```
 
-Visit `localhost:3000` — first run sends you to `/setup`.
-
 ## Deploying
-Same Postgres/R2 setup as before. Add the new `AUTH_SECRET`,
-`AUTH_TRUST_HOST`, and (if using Google) the three Google/allowlist vars to
-Vercel's Environment Variables. Redeploy, then create your account at
-`/setup` on the live URL.
+Same Postgres/R2 setup as before, plus:
+1. **Set up R2 bucket CORS** (see above) — new requirement this round
+2. Add `AUTH_SECRET`, `AUTH_TRUST_HOST`, Google vars if using them
+3. After first deploy: `vercel link` then
+   `vercel env pull .env.local --environment=production` (plain
+   `vercel env pull` defaults to Development, which is usually empty) —
+   then `npm run db:push` against the real database
+
+**Note on sensitive env vars:** if `DATABASE_URL` or others are marked
+Sensitive in Vercel (common for Storage-integration-created variables),
+`vercel env pull` cannot retrieve the real value — it writes the literal
+placeholder text `[SENSITIVE]` instead. If `db:push` fails with an
+"Invalid URL" error, this is why: open the variable's value directly from
+the Storage tab or Neon's own dashboard and paste it into `.env.local`
+by hand.
 
 ## First-deploy checklist
-1. Visit the live URL — should land on `/setup` (empty `users` table)
-2. Create your account — should land on `/login` afterward, not still on `/setup`
-3. Sign in with email+password — should reach the library
-4. If using Google: sign out, try Google sign-in with your allowed email —
-   should work; try a different Google account if you want to confirm the
-   allowlist actually blocks it
-5. Everything from the previous checklist (album creation, version
-   detection, share links, ambient background CORS) still applies
+1. Visit the live URL → `/setup` → create account → `/login` → sign in
+2. Create an album with cover art (tests R2 CORS + presign + finalize together)
+3. **Upload one real audio track, not a tiny test file** — this is what
+   actually exercises the new upload path
+4. Upload a second track with the same name into the same album — should
+   show a "v2" badge
+5. Generate a share link, open in incognito
+6. Check whether the ambient background reacts to playback (needs R2 CORS
+   to also permit GET for the Web Audio analyser — same CORS policy above
+   already covers this)
 
-## Known deploy pitfalls already hit
-- SQLite on Vercel, `prepare: false` for Neon's pooler, Node `crypto` in
-  Edge middleware — all from previous rounds, see git history
-- **This round:** the login route had no error handling, so a missing
-  `AUTH_SECRET` (or `APP_SECRET` under the old system) produced an
-  unparseable HTML error page instead of a real error message — fixed, now
-  returns clear JSON either way
+## Known deploy pitfalls already hit (chronological)
+1. SQLite on Vercel — ephemeral filesystem, never going to work
+2. `prepare: false` required for Neon's pooled connection string, or writes
+   fail silently
+3. Node's `crypto` module doesn't run in Vercel Edge middleware — session
+   signing needs Web Crypto or (with Auth.js) the edge-safe config split
+4. Login route with no error handling turned "APP_SECRET missing" into an
+   unparseable HTML error page instead of a real message
+5. `/login` and `/setup` rendered permanently blank on any status-check
+   failure, with no error path — root cause of the blank-page report
+6. `vercel env pull` defaults to Development environment, not Production
+7. Sensitive-flagged env vars can't be read back via `vercel env pull` at
+   all — writes `[SENSITIVE]` as a literal placeholder
+8. **This round:** uploads silently failed on any real audio file because
+   they routed through a Vercel function's 4.5MB hard body-size limit —
+   fixed with direct browser-to-R2 upload via presigned URLs

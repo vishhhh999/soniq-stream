@@ -25,40 +25,75 @@ export default function UploadButton({
     setBusy(true);
     setError(null);
     for (const file of Array.from(files)) {
-      setLabel(`Uploading ${file.name}...`);
-      const fd = new FormData();
-      fd.append("file", file);
-      if (albumId) fd.append("albumId", albumId);
-      if (folderId) fd.append("folderId", folderId);
-
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
-
-      if (!res.ok) {
-        // This is the fix for the bug where uploads silently vanished:
-        // previously nothing checked res.ok, so a failed insert (or storage
-        // error) looked identical to success from the UI's perspective.
-        const data = await res.json().catch(() => ({ error: "Unknown error" }));
-        setError(`${file.name}: ${data.error || "upload failed"}`);
-        continue;
-      }
-
-      const track = await res.json();
-      onUploaded();
-
-      setLabel(`Estimating BPM for ${file.name}...`);
       try {
-        const { bpm, confidence } = await detectBPM(track.fileUrl);
-        if (bpm > 0) {
-          await fetch(`/api/tracks/${track.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ bpm, bpmConfidence: confidence }),
-          });
+        // Step 1: ask our server for a direct-to-R2 upload URL. Tiny
+        // request/response — the file itself doesn't touch this call.
+        setLabel(`Preparing ${file.name}...`);
+        const presignRes = await fetch("/api/upload/presign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: file.name, contentType: file.type, kind: "track" }),
+        });
+        if (!presignRes.ok) {
+          const d = await presignRes.json().catch(() => ({}));
+          throw new Error(d.error || "Could not prepare upload.");
         }
-      } catch {
-        // decode failed (unsupported format edge case) — track stays without BPM, editable manually
+        const { uploadUrl, publicUrl } = await presignRes.json();
+
+        // Step 2: browser uploads the actual file straight to R2. This is
+        // the step that used to go through our Vercel function and hit its
+        // hard 4.5MB body-size limit on any real audio file. Now it goes
+        // directly to storage instead.
+        setLabel(`Uploading ${file.name}...`);
+        const putRes = await fetch(uploadUrl, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+        });
+        if (!putRes.ok) {
+          throw new Error(`Storage rejected the upload (${putRes.status}). Check your R2 bucket's CORS policy.`);
+        }
+
+        // Step 3: tell our server the file landed — it fetches it back from
+        // R2 (server-to-server, no size limit) to extract metadata and run
+        // duplicate detection, then writes the DB row.
+        setLabel(`Processing ${file.name}...`);
+        const finalizeRes = await fetch("/api/upload/finalize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            publicUrl,
+            filename: file.name,
+            contentType: file.type,
+            fileSize: file.size,
+            albumId,
+            folderId,
+          }),
+        });
+        if (!finalizeRes.ok) {
+          const d = await finalizeRes.json().catch(() => ({}));
+          throw new Error(d.error || "Upload processing failed.");
+        }
+        const track = await finalizeRes.json();
+        onUploaded();
+
+        setLabel(`Estimating BPM for ${file.name}...`);
+        try {
+          const { bpm, confidence } = await detectBPM(track.fileUrl);
+          if (bpm > 0) {
+            await fetch(`/api/tracks/${track.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ bpm, bpmConfidence: confidence }),
+            });
+          }
+        } catch {
+          // decode failed (unsupported format edge case) — track stays without BPM, editable manually
+        }
+        onUploaded();
+      } catch (e: any) {
+        setError(`${file.name}: ${e.message || "upload failed"}`);
       }
-      onUploaded();
     }
     setBusy(false);
     setLabel(labelProp);

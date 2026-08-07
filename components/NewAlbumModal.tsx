@@ -16,9 +16,12 @@ export default function NewAlbumModal({ onClose, onCreated }: { onClose: () => v
     setCoverPreview(URL.createObjectURL(file));
   };
 
+  const [error, setError] = useState<string | null>(null);
+
   const submit = async () => {
     if (!name.trim()) return;
     setBusy(true);
+    setError(null);
     const res = await fetch("/api/albums", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -27,10 +30,35 @@ export default function NewAlbumModal({ onClose, onCreated }: { onClose: () => v
     const album = await res.json();
 
     if (coverFile) {
-      const fd = new FormData();
-      fd.append("file", coverFile);
-      fd.append("albumId", album.id);
-      await fetch("/api/upload/cover", { method: "POST", body: fd }).catch(() => {});
+      try {
+        const presignRes = await fetch("/api/upload/presign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: coverFile.name, contentType: coverFile.type, kind: "cover" }),
+        });
+        if (!presignRes.ok) throw new Error((await presignRes.json().catch(() => ({}))).error || "Could not prepare cover upload.");
+        const { uploadUrl, publicUrl } = await presignRes.json();
+
+        const putRes = await fetch(uploadUrl, {
+          method: "PUT",
+          body: coverFile,
+          headers: { "Content-Type": coverFile.type || "application/octet-stream" },
+        });
+        if (!putRes.ok) throw new Error(`Storage rejected the upload (${putRes.status}).`);
+
+        await fetch("/api/upload/cover/finalize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ albumId: album.id, publicUrl }),
+        });
+      } catch (e: any) {
+        // Album itself was created successfully — only the cover art failed.
+        // Surface it and let the user decide when to move on, rather than
+        // flashing an error that immediately gets hidden by an auto-close.
+        setError(`Album created, but cover art failed: ${e.message}`);
+        setBusy(false);
+        return;
+      }
     }
 
     setBusy(false);
@@ -92,12 +120,18 @@ export default function NewAlbumModal({ onClose, onCreated }: { onClose: () => v
             className="w-full bg-surface border border-border rounded-md px-3 py-2.5 text-sm text-primary focus:border-border-strong outline-none mb-4"
           />
 
+          {error && (
+            <div className="mb-4 text-xs text-error border border-error/40 rounded-md px-3 py-2">
+              {error}
+            </div>
+          )}
+
           <button
-            onClick={submit}
+            onClick={error ? onCreated : submit}
             disabled={!name.trim() || busy}
             className="w-full bg-accent text-canvas text-sm font-medium py-2.5 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
           >
-            {busy ? "Creating..." : "Create album"}
+            {busy ? "Creating..." : error ? "Continue without cover" : "Create album"}
           </button>
         </motion.div>
       </motion.div>
