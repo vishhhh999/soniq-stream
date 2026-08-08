@@ -35,7 +35,7 @@ type PlayerState = {
   cycleRepeatMode: () => void;
   getFrequencyData: () => Uint8Array | null;
   crossfadeEnabled: boolean;
-  crossfadeDuration: number; // seconds
+  crossfadeDuration: number;
   setCrossfade: (enabled: boolean, duration: number) => void;
 };
 
@@ -50,37 +50,50 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-function loadCrossfadeSettings(): { enabled: boolean; duration: number } {
-  try {
-    const raw = localStorage.getItem("soniq:crossfade");
-    if (raw) return JSON.parse(raw);
-  } catch {}
+function loadCrossfadeSettings() {
+  try { const r = localStorage.getItem("soniq:crossfade"); if (r) return JSON.parse(r); } catch {}
   return { enabled: false, duration: 3 };
 }
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
-  // Two audio elements — A and B alternate roles as primary/crossfade.
   const audioRefA = useRef<HTMLAudioElement>(null);
   const audioRefB = useRef<HTMLAudioElement>(null);
-  // Which element is currently "primary" (source of truth for UI).
+
+  // Which element is "primary" — source of truth for UI (time, seek, etc.)
   const activeLetter = useRef<"A" | "B">("A");
+  // Track which audio URL is loaded on each element — compared by ID, not URL
+  // string, to avoid browser URL-resolution differences causing false mismatches.
+  const loadedIdA = useRef<string | null>(null);
+  const loadedIdB = useRef<string | null>(null);
 
-  // Stable computed ref that always returns the active audio element.
-  // Consumers use audioRef.current just like a normal ref.
+  const getActive = (): HTMLAudioElement | null =>
+    activeLetter.current === "A" ? audioRefA.current : audioRefB.current;
+  const getInactive = (): HTMLAudioElement | null =>
+    activeLetter.current === "A" ? audioRefB.current : audioRefA.current;
+  const getLoadedId = () =>
+    activeLetter.current === "A" ? loadedIdA.current : loadedIdB.current;
+  const setLoadedId = (id: string) => {
+    if (activeLetter.current === "A") loadedIdA.current = id;
+    else loadedIdB.current = id;
+  };
+  const setInactiveLoadedId = (id: string) => {
+    if (activeLetter.current === "A") loadedIdB.current = id;
+    else loadedIdA.current = id;
+  };
+
+  // Stable computed ref — consumers do audioRef.current as normal.
   const audioRef = {
-    get current(): HTMLAudioElement | null {
-      return activeLetter.current === "A" ? audioRefA.current : audioRefB.current;
-    },
+    get current(): HTMLAudioElement | null { return getActive(); },
   } as React.RefObject<HTMLAudioElement>;
-
-  const getActive = () => activeLetter.current === "A" ? audioRefA.current : audioRefB.current;
-  const getInactive = () => activeLetter.current === "A" ? audioRefB.current : audioRefA.current;
 
   const [current, setCurrent] = useState<Track | null>(null);
   const currentRef = useRef<Track | null>(null);
   useEffect(() => { currentRef.current = current; }, [current]);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const isPlayingRef = useRef(false);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [queue, setQueue] = useState<Track[]>([]);
@@ -95,18 +108,23 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
   const originalQueueRef = useRef<Track[]>([]);
 
-  // Web Audio graph — both sources go through separate GainNodes into a shared analyser.
+  // Web Audio graph — both elements route through their own GainNodes into
+  // a shared analyser. Crossfade animates the gains.
   const audioCtxRef = useRef<AudioContext | null>(null);
   const gainARef = useRef<GainNode | null>(null);
   const gainBRef = useRef<GainNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
-  const graphInitialized = useRef(false);
+  const graphReady = useRef(false);
 
-  // Crossfade state.
+  // Crossfade bookkeeping.
   const crossfadingRef = useRef(false);
-  const crossfadeRafRef = useRef<number | null>(null);
-  const crossfadeStartedAtRef = useRef<number>(0);
+  const crossfadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const crossfadeRafRef = useRef<number | null>(null); // only used when Web Audio unavailable
+  // Brief hold-off after a crossfade completes so the sync effect doesn't
+  // reload the just-swapped-in element.
+  const holdOffRef = useRef(false);
+
   const [crossfadeEnabled, setCrossfadeEnabled] = useState(() => loadCrossfadeSettings().enabled);
   const [crossfadeDuration, setCrossfadeDuration] = useState(() => loadCrossfadeSettings().duration);
   const crossfadeEnabledRef = useRef(crossfadeEnabled);
@@ -121,7 +139,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const ensureAudioGraph = useCallback(() => {
-    if (graphInitialized.current) return;
+    if (graphReady.current) return;
     const elA = audioRefA.current;
     const elB = audioRefB.current;
     if (!elA || !elB) return;
@@ -132,44 +150,99 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       analyser.fftSize = 256;
 
       const srcA = ctx.createMediaElementSource(elA);
-      const gA = ctx.createGain();
-      gA.gain.value = activeLetter.current === "A" ? 1 : 0;
-      srcA.connect(gA);
-      gA.connect(analyser);
+      const gA = ctx.createGain(); gA.gain.value = 1; // A starts as active
+      srcA.connect(gA); gA.connect(analyser);
 
       const srcB = ctx.createMediaElementSource(elB);
-      const gB = ctx.createGain();
-      gB.gain.value = activeLetter.current === "B" ? 1 : 0;
-      srcB.connect(gB);
-      gB.connect(analyser);
+      const gB = ctx.createGain(); gB.gain.value = 0;
+      srcB.connect(gB); gB.connect(analyser);
 
       analyser.connect(ctx.destination);
       dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
-
       audioCtxRef.current = ctx;
       gainARef.current = gA;
       gainBRef.current = gB;
       analyserRef.current = analyser;
-      graphInitialized.current = true;
+      graphReady.current = true;
     } catch (e) {
-      console.warn("Audio analysis unavailable (playback unaffected):", e);
+      console.warn("Web Audio unavailable (playback unaffected):", e);
     }
   }, []);
 
   const getActiveGain = () => activeLetter.current === "A" ? gainARef.current : gainBRef.current;
   const getInactiveGain = () => activeLetter.current === "A" ? gainBRef.current : gainARef.current;
 
+  // Cancel any in-flight crossfade cleanly.
   const cancelCrossfade = useCallback(() => {
-    if (crossfadeRafRef.current) cancelAnimationFrame(crossfadeRafRef.current);
-    crossfadingRef.current = false;
+    if (crossfadeTimerRef.current) { clearTimeout(crossfadeTimerRef.current); crossfadeTimerRef.current = null; }
+    if (crossfadeRafRef.current) { cancelAnimationFrame(crossfadeRafRef.current); crossfadeRafRef.current = null; }
+
+    // Stop the inactive element and clear its loaded-id so the next crossfade
+    // knows it needs to load a fresh src.
     const inactive = getInactive();
-    if (inactive) { inactive.pause(); inactive.volume = 1; inactive.src = ""; }
-    // Reset gains.
-    if (gainARef.current) gainARef.current.gain.value = activeLetter.current === "A" ? 1 : 0;
-    if (gainBRef.current) gainBRef.current.gain.value = activeLetter.current === "B" ? 1 : 0;
+    if (inactive) { inactive.pause(); inactive.volume = 1; }
+    if (activeLetter.current === "A") loadedIdB.current = null;
+    else loadedIdA.current = null;
+
+    // Snap gains back: active=1, inactive=0.
+    const ctx = audioCtxRef.current;
+    const activeGain = getActiveGain();
+    const inactiveGain = getInactiveGain();
+    if (ctx && activeGain && inactiveGain) {
+      const now = ctx.currentTime;
+      activeGain.gain.cancelScheduledValues(now);
+      activeGain.gain.setValueAtTime(1, now);
+      inactiveGain.gain.cancelScheduledValues(now);
+      inactiveGain.gain.setValueAtTime(0, now);
+    }
+
+    crossfadingRef.current = false;
   }, []);
 
-  // Start a crossfade into nextTrack. Called from timeupdate when approaching end.
+  // Called by setTimeout after crossfadeDuration seconds.
+  const completeCrossfade = useCallback((nextTrack: Track) => {
+    if (!crossfadingRef.current) return; // was cancelled
+
+    // Ensure final gains are clean before swap.
+    const ctx = audioCtxRef.current;
+    const outGain = getActiveGain();
+    const inGain = getInactiveGain();
+    if (ctx && outGain && inGain) {
+      const now = ctx.currentTime;
+      outGain.gain.cancelScheduledValues(now);
+      outGain.gain.setValueAtTime(0, now);
+      inGain.gain.cancelScheduledValues(now);
+      inGain.gain.setValueAtTime(1, now);
+    }
+
+    // Stop the outgoing element, reset it for next use.
+    const outgoing = getActive();
+    if (outgoing) { outgoing.pause(); outgoing.volume = 1; }
+
+    // Swap which element is primary.
+    activeLetter.current = activeLetter.current === "A" ? "B" : "A";
+
+    crossfadingRef.current = false;
+    // Brief hold-off so the sync effect doesn't reload the now-active element.
+    holdOffRef.current = true;
+    setTimeout(() => { holdOffRef.current = false; }, 300);
+
+    // Advance queue state.
+    const nextIdx = queueIndexRef.current + 1;
+    const q = queueRef.current;
+    if (nextIdx < q.length) {
+      setQueueIndex(nextIdx);
+      setCurrent(nextTrack);
+      setIsPlaying(true);
+    } else if (repeatModeRef.current === "all") {
+      setQueueIndex(0);
+      setCurrent(q[0]);
+      setIsPlaying(true);
+    } else {
+      setIsPlaying(false);
+    }
+  }, []);
+
   const startCrossfade = useCallback((nextTrack: Track) => {
     if (crossfadingRef.current) return;
     const outgoing = getActive();
@@ -177,72 +250,51 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (!outgoing || !incoming) return;
 
     crossfadingRef.current = true;
-    crossfadeStartedAtRef.current = performance.now();
-    const fadeDurationMs = crossfadeDurationRef.current * 1000;
+    const fadeSec = crossfadeDurationRef.current;
+    const fadeMs = fadeSec * 1000;
 
+    // Load the next track onto the inactive element.
     incoming.src = nextTrack.fileUrl;
-    incoming.volume = 1; // volume is handled by gain nodes if graph is set up
+    incoming.volume = 1;
     incoming.play().catch(() => {});
+    setInactiveLoadedId(nextTrack.id);
 
-    // If Web Audio graph is available, use gain nodes for smooth crossfade.
-    // Otherwise fall back to element.volume.
-    const useGain = !!audioCtxRef.current;
+    const ctx = audioCtxRef.current;
     const outGain = getActiveGain();
     const inGain = getInactiveGain();
 
-    if (useGain && outGain && inGain && audioCtxRef.current) {
-      const now = audioCtxRef.current.currentTime;
+    if (ctx && outGain && inGain) {
+      // Web Audio path — schedule linear ramps.
+      // Use ctx.currentTime, NOT a float like 0, for cancelScheduledValues
+      // so we only cancel future events, not mess with values already applied.
+      const now = ctx.currentTime;
       outGain.gain.cancelScheduledValues(now);
-      inGain.gain.cancelScheduledValues(now);
       outGain.gain.setValueAtTime(outGain.gain.value, now);
-      outGain.gain.linearRampToValueAtTime(0, now + crossfadeDurationRef.current);
+      outGain.gain.linearRampToValueAtTime(0, now + fadeSec);
+      inGain.gain.cancelScheduledValues(now);
       inGain.gain.setValueAtTime(0, now);
-      inGain.gain.linearRampToValueAtTime(1, now + crossfadeDurationRef.current);
-    }
-
-    const animate = () => {
-      const elapsed = performance.now() - crossfadeStartedAtRef.current;
-      const progress = Math.min(1, elapsed / fadeDurationMs);
-
-      if (!useGain) {
-        outgoing.volume = 1 - progress;
-        incoming.volume = progress;
-      }
-
-      if (progress < 1) {
-        crossfadeRafRef.current = requestAnimationFrame(animate);
-      } else {
-        // Crossfade done — swap active element.
-        outgoing.pause();
-        outgoing.volume = 1;
-        if (useGain && outGain && inGain) {
-          outGain.gain.cancelScheduledValues(0);
-          inGain.gain.cancelScheduledValues(0);
-          outGain.gain.value = 0;
-          inGain.gain.value = 1;
-        }
-        activeLetter.current = activeLetter.current === "A" ? "B" : "A";
-        crossfadingRef.current = false;
-
-        const nextIndex = queueIndexRef.current + 1;
-        const q = queueRef.current;
-        if (nextIndex < q.length) {
-          setQueueIndex(nextIndex);
-          setCurrent(nextTrack);
-          setIsPlaying(true);
-        } else if (repeatModeRef.current === "all") {
-          setQueueIndex(0);
-          setCurrent(q[0]);
-          setIsPlaying(true);
+      inGain.gain.linearRampToValueAtTime(1, now + fadeSec);
+      // setTimeout drives completion — single timing source, no RAF conflict.
+      crossfadeTimerRef.current = setTimeout(() => completeCrossfade(nextTrack), fadeMs);
+    } else {
+      // Fallback: element.volume animation via RAF.
+      const start = performance.now();
+      const animate = () => {
+        if (!crossfadingRef.current) return;
+        const p = Math.min(1, (performance.now() - start) / fadeMs);
+        outgoing.volume = 1 - p;
+        incoming.volume = p;
+        if (p < 1) {
+          crossfadeRafRef.current = requestAnimationFrame(animate);
         } else {
-          setIsPlaying(false);
+          completeCrossfade(nextTrack);
         }
-      }
-    };
+      };
+      crossfadeRafRef.current = requestAnimationFrame(animate);
+    }
+  }, [completeCrossfade]);
 
-    crossfadeRafRef.current = requestAnimationFrame(animate);
-  }, []);
-
+  // Normal single-track play — clears queue context.
   const play = useCallback((track: Track) => {
     cancelCrossfade();
     ensureAudioGraph();
@@ -250,9 +302,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setQueue([track]);
     originalQueueRef.current = [track];
     setQueueIndex(0);
-    if (currentRef.current?.id !== track.id) setCurrent(track);
+    setCurrent(track);
     setIsPlaying(true);
-  }, [ensureAudioGraph, cancelCrossfade]);
+  }, [cancelCrossfade, ensureAudioGraph]);
 
   const playQueue = useCallback((tracks: Track[], startIndex: number) => {
     cancelCrossfade();
@@ -265,7 +317,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setQueueIndex(Math.max(0, idx));
     setCurrent(tracks[startIndex]);
     setIsPlaying(true);
-  }, [shuffleOn, ensureAudioGraph, cancelCrossfade]);
+  }, [shuffleOn, cancelCrossfade, ensureAudioGraph]);
 
   const jumpToQueueIndex = useCallback((i: number) => {
     if (i < 0 || i >= queueRef.current.length) return;
@@ -278,19 +330,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const reorderQueue = useCallback((newOrder: Track[]) => {
     setQueue(newOrder);
     if (currentRef.current) {
-      const newIndex = newOrder.findIndex((t) => t.id === currentRef.current!.id);
-      if (newIndex !== -1) setQueueIndex(newIndex);
+      const idx = newOrder.findIndex((t) => t.id === currentRef.current!.id);
+      if (idx !== -1) setQueueIndex(idx);
     }
   }, []);
 
   const next = useCallback(() => {
     if (queueRef.current.length === 0) return;
-    const nextIndex = queueIndexRef.current + 1;
-    if (nextIndex < queueRef.current.length) {
-      jumpToQueueIndex(nextIndex);
-    } else if (repeatModeRef.current === "all") {
-      jumpToQueueIndex(0);
-    }
+    const nextIdx = queueIndexRef.current + 1;
+    if (nextIdx < queueRef.current.length) jumpToQueueIndex(nextIdx);
+    else if (repeatModeRef.current === "all") jumpToQueueIndex(0);
   }, [jumpToQueueIndex]);
 
   const cycleRepeatMode = useCallback(() => {
@@ -298,35 +347,33 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const previous = useCallback(() => {
-    if (queueRef.current.length === 0) return;
+    if (!queueRef.current.length) return;
     if (audioRef.current && audioRef.current.currentTime > 3) {
       audioRef.current.currentTime = 0;
       return;
     }
-    const prevIndex = queueIndexRef.current - 1;
-    if (prevIndex >= 0) jumpToQueueIndex(prevIndex);
+    if (queueIndexRef.current > 0) jumpToQueueIndex(queueIndexRef.current - 1);
   }, [jumpToQueueIndex]);
 
   const toggleShuffle = useCallback(() => {
     setShuffleOn((prev) => {
-      const turningOn = !prev;
-      if (turningOn) {
-        const currentId = currentRef.current?.id;
-        const rest = originalQueueRef.current.filter((t) => t.id !== currentId);
-        const newQueue = currentRef.current ? [currentRef.current, ...shuffleArray(rest)] : shuffleArray(rest);
-        setQueue(newQueue);
-        setQueueIndex(0);
+      const on = !prev;
+      if (on) {
+        const id = currentRef.current?.id;
+        const rest = shuffleArray(originalQueueRef.current.filter((t) => t.id !== id));
+        const q = currentRef.current ? [currentRef.current, ...rest] : rest;
+        setQueue(q); setQueueIndex(0);
       } else {
         setQueue(originalQueueRef.current);
         const idx = originalQueueRef.current.findIndex((t) => t.id === currentRef.current?.id);
         setQueueIndex(Math.max(0, idx));
       }
-      return turningOn;
+      return on;
     });
   }, []);
 
   const toggle = useCallback(() => {
-    const audio = audioRef.current;
+    const audio = getActive();
     if (!audio) return;
     ensureAudioGraph();
     if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
@@ -334,62 +381,78 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     else { audio.pause(); setIsPlaying(false); }
   }, [ensureAudioGraph]);
 
-  // Auto-advance on track end.
+  // Sync active audio element to current track + play state.
+  // Skipped during crossfade (crossfade manages its own element lifecycle)
+  // and during the brief hold-off after crossfade completes (to avoid
+  // reloading the just-swapped-in element because of a stale ID comparison).
+  useEffect(() => {
+    if (crossfadingRef.current || holdOffRef.current) return;
+    const audio = getActive();
+    if (!audio || !current) return;
+
+    if (getLoadedId() !== current.id) {
+      // New track — load it.
+      audio.src = current.fileUrl;
+      audio.load();
+      setLoadedId(current.id);
+    }
+
+    if (isPlaying) audio.play().catch(() => {});
+    else audio.pause();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id, isPlaying]);
+
+  // Repeat-one: use native audio.loop so 'ended' never fires.
+  useEffect(() => {
+    const audio = getActive();
+    if (audio) audio.loop = repeatMode === "one";
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repeatMode, current?.id]);
+
+  // Events: ended, timeupdate, loadedmetadata, seeking — on both elements.
   useEffect(() => {
     const elA = audioRefA.current;
     const elB = audioRefB.current;
     if (!elA || !elB) return;
 
     const makeEnded = (el: HTMLAudioElement) => () => {
-      // Skip if this element isn't the active one (e.g. outgoing during crossfade).
-      if (el !== getActive()) return;
-      // Skip if a crossfade already handled the track advance.
-      if (crossfadingRef.current) return;
+      if (el !== getActive()) return;        // only active element drives state
+      if (crossfadingRef.current) return;   // crossfade already handled the advance
       next();
     };
 
-    const onEndedA = makeEnded(elA);
-    const onEndedB = makeEnded(elB);
-    elA.addEventListener("ended", onEndedA);
-    elB.addEventListener("ended", onEndedB);
-    return () => {
-      elA.removeEventListener("ended", onEndedA);
-      elB.removeEventListener("ended", onEndedB);
-    };
-  }, [next]);
-
-  // Time tracking — only active element updates the shared state.
-  useEffect(() => {
-    const elA = audioRefA.current;
-    const elB = audioRefB.current;
-    if (!elA || !elB) return;
-
-    const makeOnTime = (el: HTMLAudioElement) => () => {
+    const makeTimeUpdate = (el: HTMLAudioElement) => () => {
       if (el !== getActive()) return;
-      setCurrentTime(el.currentTime);
+      const t = el.currentTime;
+      setCurrentTime(t);
 
-      // Crossfade trigger — check if we should start fading to the next track.
+      // Crossfade trigger — when close enough to the end.
       if (
         crossfadeEnabledRef.current &&
         !crossfadingRef.current &&
+        !el.seeking &&
         repeatModeRef.current !== "one" &&
-        el.duration > 0
+        el.duration > 0 &&
+        Number.isFinite(el.duration)
       ) {
-        const remaining = el.duration - el.currentTime;
-        const nextIdx = queueIndexRef.current + 1;
-        const q = queueRef.current;
-        const hasNext = nextIdx < q.length || repeatModeRef.current === "all";
-        if (remaining <= crossfadeDurationRef.current && remaining > 0 && hasNext) {
-          const nextTrack = q[repeatModeRef.current === "all" && nextIdx >= q.length ? 0 : nextIdx];
-          if (nextTrack) startCrossfade(nextTrack);
+        const remaining = el.duration - t;
+        const fadeSec = crossfadeDurationRef.current;
+        if (remaining > 0 && remaining <= fadeSec) {
+          const nextIdx = queueIndexRef.current + 1;
+          const q = queueRef.current;
+          const hasNext = nextIdx < q.length || repeatModeRef.current === "all";
+          if (hasNext) {
+            const nextTrack = q[repeatModeRef.current === "all" && nextIdx >= q.length ? 0 : nextIdx];
+            if (nextTrack) startCrossfade(nextTrack);
+          }
         }
       }
     };
 
-    const makeOnMeta = (el: HTMLAudioElement) => () => {
+    const makeMeta = (el: HTMLAudioElement) => () => {
       if (el !== getActive()) return;
-      const real = el.duration || 0;
-      setDuration(real);
+      const real = el.duration;
+      setDuration(Number.isFinite(real) ? real : 0);
       const track = currentRef.current;
       if (!track || !real || !Number.isFinite(real)) return;
       if (Math.abs((track.durationSec ?? 0) - real) > 0.5) {
@@ -401,44 +464,38 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    const onTimeA = makeOnTime(elA);
-    const onTimeB = makeOnTime(elB);
-    const onMetaA = makeOnMeta(elA);
-    const onMetaB = makeOnMeta(elB);
+    // Seeking on the active element: cancel any in-progress crossfade so the
+    // inactive element stops playing and gains reset. The timeupdate after the
+    // seek will re-trigger a crossfade if the new position is close enough to the end.
+    const makeSeeking = (el: HTMLAudioElement) => () => {
+      if (el === getActive() && crossfadingRef.current) cancelCrossfade();
+    };
 
-    elA.addEventListener("timeupdate", onTimeA);
-    elA.addEventListener("loadedmetadata", onMetaA);
-    elB.addEventListener("timeupdate", onTimeB);
-    elB.addEventListener("loadedmetadata", onMetaB);
+    const endA = makeEnded(elA), endB = makeEnded(elB);
+    const tuA = makeTimeUpdate(elA), tuB = makeTimeUpdate(elB);
+    const metaA = makeMeta(elA), metaB = makeMeta(elB);
+    const seekA = makeSeeking(elA), seekB = makeSeeking(elB);
+
+    elA.addEventListener("ended", endA);
+    elB.addEventListener("ended", endB);
+    elA.addEventListener("timeupdate", tuA);
+    elB.addEventListener("timeupdate", tuB);
+    elA.addEventListener("loadedmetadata", metaA);
+    elB.addEventListener("loadedmetadata", metaB);
+    elA.addEventListener("seeking", seekA);
+    elB.addEventListener("seeking", seekB);
 
     return () => {
-      elA.removeEventListener("timeupdate", onTimeA);
-      elA.removeEventListener("loadedmetadata", onMetaA);
-      elB.removeEventListener("timeupdate", onTimeB);
-      elB.removeEventListener("loadedmetadata", onMetaB);
+      elA.removeEventListener("ended", endA);
+      elB.removeEventListener("ended", endB);
+      elA.removeEventListener("timeupdate", tuA);
+      elB.removeEventListener("timeupdate", tuB);
+      elA.removeEventListener("loadedmetadata", metaA);
+      elB.removeEventListener("loadedmetadata", metaB);
+      elA.removeEventListener("seeking", seekA);
+      elB.removeEventListener("seeking", seekB);
     };
-  }, [startCrossfade]);
-
-  // Sync src/play/pause to the active audio element when current/isPlaying changes.
-  useEffect(() => {
-    const audio = getActive();
-    if (!audio || !current) return;
-    if (audio.src !== current.fileUrl) {
-      audio.src = current.fileUrl;
-      audio.load();
-    }
-    if (isPlaying) {
-      audio.play().catch(() => {});
-    } else {
-      audio.pause();
-    }
-  }, [current?.id, isPlaying]);
-
-  // repeat one: native loop on active element.
-  useEffect(() => {
-    const audio = getActive();
-    if (audio) audio.loop = repeatMode === "one";
-  }, [repeatMode, current?.id]);
+  }, [next, startCrossfade, cancelCrossfade]);
 
   const getFrequencyData = useCallback(() => {
     if (!analyserRef.current || !dataArrayRef.current) return null;
@@ -447,15 +504,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <PlayerContext.Provider
-      value={{
-        current, isPlaying, currentTime, duration, audioRef, queue, queueIndex, shuffleOn,
-        play, playQueue, toggle, next, previous, toggleShuffle, jumpToQueueIndex, reorderQueue,
-        repeatMode, cycleRepeatMode,
-        getFrequencyData,
-        crossfadeEnabled, crossfadeDuration, setCrossfade,
-      }}
-    >
+    <PlayerContext.Provider value={{
+      current, isPlaying, currentTime, duration, audioRef, queue, queueIndex, shuffleOn,
+      play, playQueue, toggle, next, previous, toggleShuffle, jumpToQueueIndex, reorderQueue,
+      repeatMode, cycleRepeatMode, getFrequencyData,
+      crossfadeEnabled, crossfadeDuration, setCrossfade,
+    }}>
       <audio ref={audioRefA} className="hidden" crossOrigin="anonymous" />
       <audio ref={audioRefB} className="hidden" crossOrigin="anonymous" />
       {children}
