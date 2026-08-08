@@ -222,7 +222,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
          resolves, which meant this ref didn't exist yet when the
          time-tracking effect above first ran, and (with an empty
          dependency array) never got a second chance to attach. */}
-      <audio ref={audioRef} className="hidden" />
+      <audio
+  ref={audioRef}
+  className="hidden"
+  crossOrigin="anonymous"
+/>
       {children}
     </PlayerContext.Provider>
   );
