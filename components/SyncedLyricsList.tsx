@@ -61,8 +61,16 @@ export default function SyncedLyricsList({
   };
 
   const onWheel = (e: React.WheelEvent) => {
+    // deltaMode 0 = pixels (default, Chrome/Safari), 1 = lines (Firefox),
+    // 2 = pages. Without normalizing, Firefox sends deltaY=3 meaning "3 lines"
+    // which we'd treat as 3px — scroll feels nearly frozen. Multiply out to pixels.
+    const LINE_HEIGHT = 32;
+    const PAGE_HEIGHT = containerRef.current?.offsetHeight ?? 500;
+    let delta = e.deltaY;
+    if (e.deltaMode === 1) delta *= LINE_HEIGHT;
+    else if (e.deltaMode === 2) delta *= PAGE_HEIGHT;
     beginManualOverride();
-    setOffset((prev) => prev + e.deltaY);
+    setOffset((prev) => prev + delta);
   };
 
   const touchStartY = useRef(0);

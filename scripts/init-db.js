@@ -129,10 +129,12 @@ async function main() {
     CREATE TABLE IF NOT EXISTS play_events (
       id TEXT PRIMARY KEY,
       track_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
+      user_id TEXT,
       played_at TIMESTAMP NOT NULL
     );
   `;
+  // If the table already existed with NOT NULL, drop the constraint.
+  await sql`ALTER TABLE play_events ALTER COLUMN user_id DROP NOT NULL;`;
 
   console.log("Postgres schema ready");
   await sql.end();

@@ -111,7 +111,9 @@ export const otpCodes = pgTable("otp_codes", {
 export const playEvents = pgTable("play_events", {
   id: text("id").primaryKey(),
   trackId: text("track_id").notNull(),
-  userId: text("user_id").notNull(),
+  // Nullable — null means an anonymous listener via a share link.
+  // Authenticated listeners have their real userId recorded.
+  userId: text("user_id"),
   playedAt: timestamp("played_at").notNull(),
 });
 
