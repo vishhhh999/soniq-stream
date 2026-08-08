@@ -5,14 +5,16 @@ import { motion } from "framer-motion";
 import { Maximize2 } from "lucide-react";
 import { usePlayer } from "./PlayerProvider";
 import SyncedLyricsList from "./SyncedLyricsList";
+import { useIsMobile } from "@/lib/useMediaQuery";
 import type { SyncedLine } from "@/lib/lyricsSync";
 
 export default function LyricsSidebar({ onExpand }: { onExpand: () => void }) {
   const { current, currentTime } = usePlayer();
+  const isMobile = useIsMobile();
   const [lines, setLines] = useState<SyncedLine[] | null>(null);
 
   useEffect(() => {
-    if (!current) {
+    if (!current || isMobile) {
       setLines(null);
       return;
     }
@@ -27,8 +29,9 @@ export default function LyricsSidebar({ onExpand }: { onExpand: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [current?.id]);
+  }, [current?.id, isMobile]);
 
+  if (isMobile) return null;
   if (!lines || lines.length === 0) return null;
 
   return (
