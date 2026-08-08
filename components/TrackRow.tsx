@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDraggable } from "@dnd-kit/core";
 import { Play, Pause, MoreHorizontal, ChevronDown } from "lucide-react";
@@ -70,8 +70,32 @@ function Row({
     () => (selectionMode ? onToggleSelect?.() : handlePlay())
   );
 
+  // Browsers fire `click` on the way to every `dblclick` (click, click,
+  // dblclick, in that order) — a plain onClick handler for selection was
+  // firing on every double-click too, which is exactly "double click to
+  // play also selects the song." Delay the select action briefly; if a
+  // second click arrives before it fires, cancel it and let dblclick's
+  // play action be the only thing that happens.
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleClick = (e: React.MouseEvent) => {
+    if (isMobile) return;
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    const persisted = { ...e } as React.MouseEvent;
+    clickTimerRef.current = setTimeout(() => {
+      onSelect(persisted);
+      clickTimerRef.current = null;
+    }, 220);
+  };
+  const handleDoubleClickDesktop = () => {
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+    }
+    handlePlay();
+  };
+
   const desktopProps = !isMobile
-    ? { onClick: onSelect, onDoubleClick: handlePlay }
+    ? { onClick: handleClick, onDoubleClick: handleDoubleClickDesktop }
     : longPress;
 
   return (
@@ -81,7 +105,11 @@ function Row({
       {...(dragEnabled && !isMobile ? listeners : {})}
       {...desktopProps}
       className={`group flex items-center gap-4 px-4 py-3 rounded-md transition-colors cursor-pointer select-none ${
-        isSelected ? "bg-accent/15" : isCurrent ? "bg-surface" : "hover:bg-surface"
+        isSelected
+          ? "bg-accent/20 ring-1 ring-inset ring-accent"
+          : isCurrent
+          ? "bg-surface"
+          : "hover:bg-surface"
       } ${isDragging ? "opacity-40" : ""}`}
     >
       <button

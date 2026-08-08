@@ -107,8 +107,8 @@ export default function UploadButton({
         setLabel(`Analyzing ${file.name} (BPM & key)...`);
         try {
           const [bpmResult, keyResult] = await Promise.all([
-            detectBPM(track.fileUrl).catch(() => ({ bpm: 0, confidence: 0 })),
-            detectKey(track.fileUrl).catch(() => ({ key: "", confidence: 0 })),
+            detectBPM(track.fileUrl).catch((e) => ({ bpm: 0, confidence: 0, error: e })),
+            detectKey(track.fileUrl).catch((e) => ({ key: "", confidence: 0, error: e })),
           ]);
           const patch: Record<string, unknown> = {};
           if (bpmResult.bpm > 0) {
@@ -124,6 +124,13 @@ export default function UploadButton({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(patch),
             });
+          } else {
+            // Previously silent — this was the actual gap keeping BPM
+            // undiagnosed. If both detectors come back empty, surface why,
+            // using the same error banner as upload failures (non-blocking
+            // — the track itself uploaded fine).
+            const detail = (bpmResult as any).error?.message || (keyResult as any).error?.message || "no error details available";
+            setError(`${file.name}: uploaded, but BPM/key analysis failed (${detail})`);
           }
         } catch {
           // decode failed (unsupported format edge case) — track stays without BPM/key, editable manually

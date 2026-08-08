@@ -250,6 +250,55 @@ decoder rejects — a real, different failure mode with no code fix if
 that's what's happening. Still waiting on the actual error text from a
 failed re-detect attempt to confirm.
 
+## This round: the actual lyrics bug, plus real interaction/visibility fixes
+
+**Found the real cause of lyrics never loading — `GET /api/tracks/[id]`
+didn't exist.** The route only ever exported `PATCH` and `DELETE`.
+`LyricsView` and `LyricsSidebar` both call `fetch(\`/api/tracks/${id}\`)`
+with no method specified (defaults to `GET`) to read the full record,
+since `lyricsSynced` isn't carried on list-level track objects. Every one
+of those calls was hitting a 405, and the empty response body then
+crashed the caller's `.json()` parse — this is exactly what showed up in
+the console screenshot. **Lyrics could never have loaded, independent of
+whether saving worked.** Added the missing `GET` handler (with the same
+ownership check as the other methods) and reproduced the exact failing
+call from a real browser session — confirmed 405 → 200, `lyricsSynced`
+returning as a real array, and confirmed a different user still correctly
+gets 404 instead of the data.
+
+**Double-click was also triggering selection — real browser behavior, not
+a fluke.** Browsers fire `click` before `dblclick` on every double-click
+sequence (click, click, dblclick), so a plain `onClick` selection handler
+ran on the way to every double-click too. Fixed with the standard
+disambiguation pattern: delay the select action briefly, cancel it if a
+second click arrives before it fires.
+
+**Selection visibility was genuinely backwards-looking.** Selected rows
+used `bg-accent/15` — a 15%-opacity wash of a near-white accent color,
+which reads as barely-there against a dark background — while the
+*currently playing but unselected* row used solid `bg-surface`, which
+looks more prominent. That's exactly "selected looks transparent, current
+song has a black box." Selected rows now get a dominant treatment
+(`bg-accent/20` plus a visible ring) that always outranks both hover and
+"currently playing" visually, so selection state is unambiguous regardless
+of what else is happening in that row.
+
+**BPM — closed the actual diagnostic gap this time, not just the manual
+button.** Upload-time detection failures were completely silent — no
+alert, nothing — unlike the manual re-detect button. If you were only
+testing via fresh uploads (not the re-detect button), you'd have seen
+literally no indication anything failed. Now surfaces the real error via
+the same banner used for upload failures.
+
+**Selection toolbar centering** — checked against `PlayerBar`, which uses
+the identical `left-1/2 -translate-x-1/2` centering and isn't reported as
+broken anywhere. The CSS itself is sound; what most likely read as
+"off-center" was the toolbar appearing unexpectedly due to the
+double-click bug above, now fixed. If it's still off specifically when the
+lyrics sidebar is also open, that's a real, narrower issue (viewport
+centering vs. the narrower visible content area next to the sidebar) —
+flag it if so.
+
 ## Explicitly deferred — not started, not partial
 
 Lyrics + sync (was on this list) is done — see above. What remains, still

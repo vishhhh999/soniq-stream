@@ -13,6 +13,22 @@ async function getUserId() {
   return session?.user && (session.user as any).id;
 }
 
+// Was missing entirely — LyricsView and LyricsSidebar both fetch this
+// endpoint with no method specified (defaults to GET) to read the full
+// track record including lyricsSynced, which isn't carried on the
+// list-level Track objects. Every one of those calls was 405ing since
+// only PATCH/DELETE existed here, and the empty response body then
+// crashed the caller's `.json()` parse. Lyrics could never have loaded.
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const userId = await getUserId();
+  if (!userId) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+
+  const [track] = await db.select().from(tracks).where(and(eq(tracks.id, params.id), eq(tracks.userId, userId)));
+  if (!track) return NextResponse.json({ error: "Not found." }, { status: 404 });
+
+  return NextResponse.json(track);
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
