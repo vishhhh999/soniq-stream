@@ -5,7 +5,7 @@ import { usePlayer } from "./PlayerProvider";
 import { useAmbient } from "./AmbientProvider";
 import { gradientFromSeed, gradientFromImage } from "@/lib/gradient";
 
-export default function AmbientBackground() {
+export default function AmbientBackground({ scoped = false }: { scoped?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>();
   const { getFrequencyData, isPlaying, current } = usePlayer();
@@ -169,8 +169,8 @@ export default function AmbientBackground() {
     <canvas
       ref={canvasRef}
       aria-hidden
-      className="fixed inset-0 pointer-events-none z-0"
-      style={{
+      className={scoped ? "absolute inset-0 pointer-events-none z-0" : "fixed inset-0 pointer-events-none z-0"}
+      style={scoped ? undefined : {
         maskImage: "linear-gradient(to bottom, transparent 0%, transparent 40%, black 65%, black 100%)",
         WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, transparent 40%, black 65%, black 100%)",
       }}

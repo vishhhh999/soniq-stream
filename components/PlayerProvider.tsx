@@ -34,6 +34,9 @@ type PlayerState = {
   repeatMode: "off" | "all" | "one";
   cycleRepeatMode: () => void;
   getFrequencyData: () => Uint8Array | null;
+  crossfadeEnabled: boolean;
+  crossfadeDuration: number; // seconds
+  setCrossfade: (enabled: boolean, duration: number) => void;
 };
 
 const PlayerContext = createContext<PlayerState | null>(null);
@@ -47,63 +50,212 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
+function loadCrossfadeSettings(): { enabled: boolean; duration: number } {
+  try {
+    const raw = localStorage.getItem("soniq:crossfade");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { enabled: false, duration: 3 };
+}
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
+  // Two audio elements — A and B alternate roles as primary/crossfade.
+  const audioRefA = useRef<HTMLAudioElement>(null);
+  const audioRefB = useRef<HTMLAudioElement>(null);
+  // Which element is currently "primary" (source of truth for UI).
+  const activeLetter = useRef<"A" | "B">("A");
+
+  // Stable computed ref that always returns the active audio element.
+  // Consumers use audioRef.current just like a normal ref.
+  const audioRef = {
+    get current(): HTMLAudioElement | null {
+      return activeLetter.current === "A" ? audioRefA.current : audioRefB.current;
+    },
+  } as React.RefObject<HTMLAudioElement>;
+
+  const getActive = () => activeLetter.current === "A" ? audioRefA.current : audioRefB.current;
+  const getInactive = () => activeLetter.current === "A" ? audioRefB.current : audioRefA.current;
+
   const [current, setCurrent] = useState<Track | null>(null);
-  // Mirrors `current` for use inside stable-listener effects below, so
-  // those effects don't need `current` in their dependency array (which
-  // would mean detaching/reattaching the audio element's listeners on
-  // every single track change).
   const currentRef = useRef<Track | null>(null);
-  useEffect(() => {
-    currentRef.current = current;
-  }, [current]);
+  useEffect(() => { currentRef.current = current; }, [current]);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [queue, setQueue] = useState<Track[]>([]);
+  const queueRef = useRef<Track[]>([]);
+  useEffect(() => { queueRef.current = queue; }, [queue]);
   const [queueIndex, setQueueIndex] = useState(0);
+  const queueIndexRef = useRef(0);
+  useEffect(() => { queueIndexRef.current = queueIndex; }, [queueIndex]);
   const [shuffleOn, setShuffleOn] = useState(false);
   const [repeatMode, setRepeatMode] = useState<"off" | "all" | "one">("off");
-  const originalQueueRef = useRef<Track[]>([]); // unshuffled order, so toggling shuffle off restores it
+  const repeatModeRef = useRef<"off" | "all" | "one">("off");
+  useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
+  const originalQueueRef = useRef<Track[]>([]);
 
+  // Web Audio graph — both sources go through separate GainNodes into a shared analyser.
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const gainARef = useRef<GainNode | null>(null);
+  const gainBRef = useRef<GainNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
+  const graphInitialized = useRef(false);
+
+  // Crossfade state.
+  const crossfadingRef = useRef(false);
+  const crossfadeRafRef = useRef<number | null>(null);
+  const crossfadeStartedAtRef = useRef<number>(0);
+  const [crossfadeEnabled, setCrossfadeEnabled] = useState(() => loadCrossfadeSettings().enabled);
+  const [crossfadeDuration, setCrossfadeDuration] = useState(() => loadCrossfadeSettings().duration);
+  const crossfadeEnabledRef = useRef(crossfadeEnabled);
+  const crossfadeDurationRef = useRef(crossfadeDuration);
+  useEffect(() => { crossfadeEnabledRef.current = crossfadeEnabled; }, [crossfadeEnabled]);
+  useEffect(() => { crossfadeDurationRef.current = crossfadeDuration; }, [crossfadeDuration]);
+
+  const setCrossfade = useCallback((enabled: boolean, dur: number) => {
+    setCrossfadeEnabled(enabled);
+    setCrossfadeDuration(dur);
+    try { localStorage.setItem("soniq:crossfade", JSON.stringify({ enabled, duration: dur })); } catch {}
+  }, []);
 
   const ensureAudioGraph = useCallback(() => {
-    if (audioCtxRef.current || !audioRef.current) return;
+    if (graphInitialized.current) return;
+    const elA = audioRefA.current;
+    const elB = audioRefB.current;
+    if (!elA || !elB) return;
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       const ctx = new AudioCtx();
-      const source = ctx.createMediaElementSource(audioRef.current);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
-      source.connect(analyser);
+
+      const srcA = ctx.createMediaElementSource(elA);
+      const gA = ctx.createGain();
+      gA.gain.value = activeLetter.current === "A" ? 1 : 0;
+      srcA.connect(gA);
+      gA.connect(analyser);
+
+      const srcB = ctx.createMediaElementSource(elB);
+      const gB = ctx.createGain();
+      gB.gain.value = activeLetter.current === "B" ? 1 : 0;
+      srcB.connect(gB);
+      gB.connect(analyser);
+
       analyser.connect(ctx.destination);
-      audioCtxRef.current = ctx;
-      analyserRef.current = analyser;
       dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
+
+      audioCtxRef.current = ctx;
+      gainARef.current = gA;
+      gainBRef.current = gB;
+      analyserRef.current = analyser;
+      graphInitialized.current = true;
     } catch (e) {
       console.warn("Audio analysis unavailable (playback unaffected):", e);
     }
   }, []);
 
-  // Single-track play — no queue context (e.g. clicking a track outside any
-  // list). Clears any existing queue so skip buttons correctly do nothing.
+  const getActiveGain = () => activeLetter.current === "A" ? gainARef.current : gainBRef.current;
+  const getInactiveGain = () => activeLetter.current === "A" ? gainBRef.current : gainARef.current;
+
+  const cancelCrossfade = useCallback(() => {
+    if (crossfadeRafRef.current) cancelAnimationFrame(crossfadeRafRef.current);
+    crossfadingRef.current = false;
+    const inactive = getInactive();
+    if (inactive) { inactive.pause(); inactive.volume = 1; inactive.src = ""; }
+    // Reset gains.
+    if (gainARef.current) gainARef.current.gain.value = activeLetter.current === "A" ? 1 : 0;
+    if (gainBRef.current) gainBRef.current.gain.value = activeLetter.current === "B" ? 1 : 0;
+  }, []);
+
+  // Start a crossfade into nextTrack. Called from timeupdate when approaching end.
+  const startCrossfade = useCallback((nextTrack: Track) => {
+    if (crossfadingRef.current) return;
+    const outgoing = getActive();
+    const incoming = getInactive();
+    if (!outgoing || !incoming) return;
+
+    crossfadingRef.current = true;
+    crossfadeStartedAtRef.current = performance.now();
+    const fadeDurationMs = crossfadeDurationRef.current * 1000;
+
+    incoming.src = nextTrack.fileUrl;
+    incoming.volume = 1; // volume is handled by gain nodes if graph is set up
+    incoming.play().catch(() => {});
+
+    // If Web Audio graph is available, use gain nodes for smooth crossfade.
+    // Otherwise fall back to element.volume.
+    const useGain = !!audioCtxRef.current;
+    const outGain = getActiveGain();
+    const inGain = getInactiveGain();
+
+    if (useGain && outGain && inGain && audioCtxRef.current) {
+      const now = audioCtxRef.current.currentTime;
+      outGain.gain.cancelScheduledValues(now);
+      inGain.gain.cancelScheduledValues(now);
+      outGain.gain.setValueAtTime(outGain.gain.value, now);
+      outGain.gain.linearRampToValueAtTime(0, now + crossfadeDurationRef.current);
+      inGain.gain.setValueAtTime(0, now);
+      inGain.gain.linearRampToValueAtTime(1, now + crossfadeDurationRef.current);
+    }
+
+    const animate = () => {
+      const elapsed = performance.now() - crossfadeStartedAtRef.current;
+      const progress = Math.min(1, elapsed / fadeDurationMs);
+
+      if (!useGain) {
+        outgoing.volume = 1 - progress;
+        incoming.volume = progress;
+      }
+
+      if (progress < 1) {
+        crossfadeRafRef.current = requestAnimationFrame(animate);
+      } else {
+        // Crossfade done — swap active element.
+        outgoing.pause();
+        outgoing.volume = 1;
+        if (useGain && outGain && inGain) {
+          outGain.gain.cancelScheduledValues(0);
+          inGain.gain.cancelScheduledValues(0);
+          outGain.gain.value = 0;
+          inGain.gain.value = 1;
+        }
+        activeLetter.current = activeLetter.current === "A" ? "B" : "A";
+        crossfadingRef.current = false;
+
+        const nextIndex = queueIndexRef.current + 1;
+        const q = queueRef.current;
+        if (nextIndex < q.length) {
+          setQueueIndex(nextIndex);
+          setCurrent(nextTrack);
+          setIsPlaying(true);
+        } else if (repeatModeRef.current === "all") {
+          setQueueIndex(0);
+          setCurrent(q[0]);
+          setIsPlaying(true);
+        } else {
+          setIsPlaying(false);
+        }
+      }
+    };
+
+    crossfadeRafRef.current = requestAnimationFrame(animate);
+  }, []);
+
   const play = useCallback((track: Track) => {
+    cancelCrossfade();
     ensureAudioGraph();
     if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
     setQueue([track]);
     originalQueueRef.current = [track];
     setQueueIndex(0);
-    if (current?.id !== track.id) setCurrent(track);
+    if (currentRef.current?.id !== track.id) setCurrent(track);
     setIsPlaying(true);
-  }, [current, ensureAudioGraph]);
+  }, [ensureAudioGraph, cancelCrossfade]);
 
-  // Play from a list with context (album view, library list) — skip
-  // forward/back and auto-advance-on-end navigate within this list.
   const playQueue = useCallback((tracks: Track[], startIndex: number) => {
+    cancelCrossfade();
     ensureAudioGraph();
     if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
     originalQueueRef.current = tracks;
@@ -113,142 +265,180 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setQueueIndex(Math.max(0, idx));
     setCurrent(tracks[startIndex]);
     setIsPlaying(true);
-  }, [shuffleOn, ensureAudioGraph]);
+  }, [shuffleOn, ensureAudioGraph, cancelCrossfade]);
 
   const jumpToQueueIndex = useCallback((i: number) => {
-    if (i < 0 || i >= queue.length) return;
+    if (i < 0 || i >= queueRef.current.length) return;
+    cancelCrossfade();
     setQueueIndex(i);
-    setCurrent(queue[i]);
+    setCurrent(queueRef.current[i]);
     setIsPlaying(true);
-  }, [queue]);
+  }, [cancelCrossfade]);
 
-  // Drag-reorder within the queue — a runtime/session concept, doesn't
-  // persist to the database like album track order does. The currently
-  // playing track's index is re-derived by id after reordering, so
-  // skip-forward/back stay correct relative to its new position.
   const reorderQueue = useCallback((newOrder: Track[]) => {
     setQueue(newOrder);
-    if (current) {
-      const newIndex = newOrder.findIndex((t) => t.id === current.id);
+    if (currentRef.current) {
+      const newIndex = newOrder.findIndex((t) => t.id === currentRef.current!.id);
       if (newIndex !== -1) setQueueIndex(newIndex);
     }
-  }, [current]);
+  }, []);
 
   const next = useCallback(() => {
-    if (queue.length === 0) return;
-    const nextIndex = queueIndex + 1;
-    if (nextIndex < queue.length) {
+    if (queueRef.current.length === 0) return;
+    const nextIndex = queueIndexRef.current + 1;
+    if (nextIndex < queueRef.current.length) {
       jumpToQueueIndex(nextIndex);
-    } else if (repeatMode === "all") {
-      // End of queue with "repeat all" on — loop back to the start,
-      // unlike the plain skip-forward button, which stays disabled at
-      // the boundary rather than surprising you with a jump to track 1.
+    } else if (repeatModeRef.current === "all") {
       jumpToQueueIndex(0);
     }
-    // "off" and "one": stop at the end. "one" never actually reaches this
-    // path in practice — native `audio.loop` (set below) handles repeating
-    // the current track directly and the 'ended' event that triggers
-    // next() never fires while loop=true.
-  }, [queue, queueIndex, jumpToQueueIndex, repeatMode]);
+  }, [jumpToQueueIndex]);
 
   const cycleRepeatMode = useCallback(() => {
     setRepeatMode((m) => (m === "off" ? "all" : m === "all" ? "one" : "off"));
   }, []);
 
   const previous = useCallback(() => {
-    if (queue.length === 0) return;
-    // Standard behavior: if more than ~3s into the track, restart it instead
-    // of going to the previous track — matches every mainstream player.
+    if (queueRef.current.length === 0) return;
     if (audioRef.current && audioRef.current.currentTime > 3) {
       audioRef.current.currentTime = 0;
       return;
     }
-    const prevIndex = queueIndex - 1;
+    const prevIndex = queueIndexRef.current - 1;
     if (prevIndex >= 0) jumpToQueueIndex(prevIndex);
-  }, [queue, queueIndex, jumpToQueueIndex]);
+  }, [jumpToQueueIndex]);
 
   const toggleShuffle = useCallback(() => {
     setShuffleOn((prev) => {
       const turningOn = !prev;
       if (turningOn) {
-        const currentId = current?.id;
+        const currentId = currentRef.current?.id;
         const rest = originalQueueRef.current.filter((t) => t.id !== currentId);
-        const shuffledRest = shuffleArray(rest);
-        const newQueue = current ? [current, ...shuffledRest] : shuffledRest;
+        const newQueue = currentRef.current ? [currentRef.current, ...shuffleArray(rest)] : shuffleArray(rest);
         setQueue(newQueue);
         setQueueIndex(0);
       } else {
         setQueue(originalQueueRef.current);
-        const idx = originalQueueRef.current.findIndex((t) => t.id === current?.id);
+        const idx = originalQueueRef.current.findIndex((t) => t.id === currentRef.current?.id);
         setQueueIndex(Math.max(0, idx));
       }
       return turningOn;
     });
-  }, [current]);
+  }, []);
 
   const toggle = useCallback(() => {
-    if (!audioRef.current) return;
+    const audio = audioRef.current;
+    if (!audio) return;
     ensureAudioGraph();
     if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
-    if (audioRef.current.paused) {
-      audioRef.current.play();
-      setIsPlaying(true);
-    } else {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    }
+    if (audio.paused) { audio.play(); setIsPlaying(true); }
+    else { audio.pause(); setIsPlaying(false); }
   }, [ensureAudioGraph]);
 
-  // Auto-advance when a track ends, if there's a next one in the queue.
+  // Auto-advance on track end.
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const onEnded = () => next();
-    audio.addEventListener("ended", onEnded);
-    return () => audio.removeEventListener("ended", onEnded);
+    const elA = audioRefA.current;
+    const elB = audioRefB.current;
+    if (!elA || !elB) return;
+
+    const makeEnded = (el: HTMLAudioElement) => () => {
+      // Skip if this element isn't the active one (e.g. outgoing during crossfade).
+      if (el !== getActive()) return;
+      // Skip if a crossfade already handled the track advance.
+      if (crossfadingRef.current) return;
+      next();
+    };
+
+    const onEndedA = makeEnded(elA);
+    const onEndedB = makeEnded(elB);
+    elA.addEventListener("ended", onEndedA);
+    elB.addEventListener("ended", onEndedB);
+    return () => {
+      elA.removeEventListener("ended", onEndedA);
+      elB.removeEventListener("ended", onEndedB);
+    };
   }, [next]);
 
-  // Centralized time tracking — was previously duplicated in PlayerBar's own
-  // local state, which meant no other component (like a lyrics view) could
-  // read playback position without re-wiring its own listener.
+  // Time tracking — only active element updates the shared state.
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const onTime = () => setCurrentTime(audio.currentTime);
-    const onMeta = () => {
-      const real = audio.duration || 0;
+    const elA = audioRefA.current;
+    const elB = audioRefB.current;
+    if (!elA || !elB) return;
+
+    const makeOnTime = (el: HTMLAudioElement) => () => {
+      if (el !== getActive()) return;
+      setCurrentTime(el.currentTime);
+
+      // Crossfade trigger — check if we should start fading to the next track.
+      if (
+        crossfadeEnabledRef.current &&
+        !crossfadingRef.current &&
+        repeatModeRef.current !== "one" &&
+        el.duration > 0
+      ) {
+        const remaining = el.duration - el.currentTime;
+        const nextIdx = queueIndexRef.current + 1;
+        const q = queueRef.current;
+        const hasNext = nextIdx < q.length || repeatModeRef.current === "all";
+        if (remaining <= crossfadeDurationRef.current && remaining > 0 && hasNext) {
+          const nextTrack = q[repeatModeRef.current === "all" && nextIdx >= q.length ? 0 : nextIdx];
+          if (nextTrack) startCrossfade(nextTrack);
+        }
+      }
+    };
+
+    const makeOnMeta = (el: HTMLAudioElement) => () => {
+      if (el !== getActive()) return;
+      const real = el.duration || 0;
       setDuration(real);
       const track = currentRef.current;
       if (!track || !real || !Number.isFinite(real)) return;
-      const stored = track.durationSec ?? 0;
-      // Only patch when meaningfully different — avoids a write on every
-      // single play for tracks that already have a correct stored value,
-      // and avoids false triggers from floating-point rounding.
-      if (Math.abs(stored - real) > 0.5) {
+      if (Math.abs((track.durationSec ?? 0) - real) > 0.5) {
         fetch(`/api/tracks/${track.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ durationSec: real }),
-        }).catch(() => {
-          // best-effort — the player itself already has the right value
-          // for this session regardless of whether the save succeeds
-        });
+        }).catch(() => {});
       }
     };
-    audio.addEventListener("timeupdate", onTime);
-    audio.addEventListener("loadedmetadata", onMeta);
-    return () => {
-      audio.removeEventListener("timeupdate", onTime);
-      audio.removeEventListener("loadedmetadata", onMeta);
-    };
-  }, []);
 
-  // Native audio.loop handles "repeat one" directly — the browser loops
-  // the current track without ever firing 'ended', so next()'s own logic
-  // never has to think about the "one" case at all.
+    const onTimeA = makeOnTime(elA);
+    const onTimeB = makeOnTime(elB);
+    const onMetaA = makeOnMeta(elA);
+    const onMetaB = makeOnMeta(elB);
+
+    elA.addEventListener("timeupdate", onTimeA);
+    elA.addEventListener("loadedmetadata", onMetaA);
+    elB.addEventListener("timeupdate", onTimeB);
+    elB.addEventListener("loadedmetadata", onMetaB);
+
+    return () => {
+      elA.removeEventListener("timeupdate", onTimeA);
+      elA.removeEventListener("loadedmetadata", onMetaA);
+      elB.removeEventListener("timeupdate", onTimeB);
+      elB.removeEventListener("loadedmetadata", onMetaB);
+    };
+  }, [startCrossfade]);
+
+  // Sync src/play/pause to the active audio element when current/isPlaying changes.
   useEffect(() => {
-    if (audioRef.current) audioRef.current.loop = repeatMode === "one";
-  }, [repeatMode]);
+    const audio = getActive();
+    if (!audio || !current) return;
+    if (audio.src !== current.fileUrl) {
+      audio.src = current.fileUrl;
+      audio.load();
+    }
+    if (isPlaying) {
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+    }
+  }, [current?.id, isPlaying]);
+
+  // repeat one: native loop on active element.
+  useEffect(() => {
+    const audio = getActive();
+    if (audio) audio.loop = repeatMode === "one";
+  }, [repeatMode, current?.id]);
 
   const getFrequencyData = useCallback(() => {
     if (!analyserRef.current || !dataArrayRef.current) return null;
@@ -263,18 +453,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         play, playQueue, toggle, next, previous, toggleShuffle, jumpToQueueIndex, reorderQueue,
         repeatMode, cycleRepeatMode,
         getFrequencyData,
+        crossfadeEnabled, crossfadeDuration, setCrossfade,
       }}
     >
-      {/* Always rendered here, not inside PlayerBar — PlayerBar is
-         auth-gated and mounts asynchronously after the session check
-         resolves, which meant this ref didn't exist yet when the
-         time-tracking effect above first ran, and (with an empty
-         dependency array) never got a second chance to attach. */}
-      <audio
-  ref={audioRef}
-  className="hidden"
-  crossOrigin="anonymous"
-/>
+      <audio ref={audioRefA} className="hidden" crossOrigin="anonymous" />
+      <audio ref={audioRefB} className="hidden" crossOrigin="anonymous" />
       {children}
     </PlayerContext.Provider>
   );

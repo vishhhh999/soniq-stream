@@ -7,6 +7,7 @@ import { X, Pencil } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
 import SyncedLyricsList from "./SyncedLyricsList";
 import type { SyncedLine } from "@/lib/lyricsSync";
+import AmbientBackground from "./AmbientBackground";
 
 export default function LyricsView({ track, onClose }: { track: Track; onClose: () => void }) {
   const { currentTime } = usePlayer();
@@ -44,8 +45,14 @@ export default function LyricsView({ track, onClose }: { track: Track; onClose: 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-canvas z-40 flex flex-col"
+        className="fixed inset-0 z-40 flex flex-col relative overflow-hidden"
       >
+        {/* Reactive ambient gradient — same one as the main library page,
+            scoped inside this fullscreen overlay so it fills the lyrics view. */}
+        <AmbientBackground scoped />
+        {/* Dark overlay so lyrics remain readable against the gradient. */}
+        <div className="absolute inset-0 bg-canvas/75 z-0" />
+        <div className="relative z-10 flex flex-col h-full">
         <div className="flex items-center justify-between px-8 py-6 shrink-0">
           <div>
             <p className="text-lg font-medium text-primary">{track.title}</p>
@@ -79,6 +86,7 @@ export default function LyricsView({ track, onClose }: { track: Track; onClose: 
               </p>
             </div>
           )}
+        </div>
         </div>
       </motion.div>
     </AnimatePresence>

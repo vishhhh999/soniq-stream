@@ -6,12 +6,14 @@ import { X, Sun, Moon, Sparkles, LogOut, Check, Pencil, Camera } from "lucide-re
 import { signOut } from "next-auth/react";
 import { useTheme } from "./ThemeProvider";
 import { useAmbient } from "./AmbientProvider";
+import { usePlayer } from "./PlayerProvider";
 import { APP_VERSION } from "@/lib/version";
 import { gradientFromSeed } from "@/lib/gradient";
 
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const { theme, toggle: toggleTheme } = useTheme();
   const { enabled: ambientOn, toggle: toggleAmbient } = useAmbient();
+  const { crossfadeEnabled, crossfadeDuration, setCrossfade } = usePlayer();
   const [email, setEmail] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -273,6 +275,47 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Playback */}
+            <div>
+              <label className="text-xs uppercase tracking-wide text-tertiary mb-3 block">Playback</label>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <p className="text-sm text-primary">Crossfade</p>
+                    <p className="text-xs text-tertiary">Blend between tracks</p>
+                  </div>
+                  <button
+                    onClick={() => setCrossfade(!crossfadeEnabled, crossfadeDuration)}
+                    className={`relative w-10 h-6 rounded-full transition-colors shrink-0 ${crossfadeEnabled ? "bg-accent" : "bg-border"}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${crossfadeEnabled ? "translate-x-5" : "translate-x-1"}`} />
+                  </button>
+                </div>
+
+                {crossfadeEnabled && (
+                  <div className="pb-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-secondary">Duration</p>
+                      <p className="text-xs font-medium text-primary tabular-nums">{crossfadeDuration}s</p>
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={12}
+                      step={0.5}
+                      value={crossfadeDuration}
+                      onChange={(e) => setCrossfade(true, parseFloat(e.target.value))}
+                      className="w-full accent-[var(--accent)]"
+                    />
+                    <div className="flex justify-between text-[10px] text-tertiary mt-1">
+                      <span>1s</span>
+                      <span>12s</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
