@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, ListMusic, Volume2, Volume1, VolumeX,
+  Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, ListMusic, Volume2, Volume1, VolumeX,
   X, Mic2, ChevronDown,
 } from "lucide-react";
 import { usePlayer } from "./PlayerProvider";
@@ -15,9 +15,8 @@ import LyricsView from "./LyricsView";
 import { gradientFromSeed } from "@/lib/gradient";
 
 export default function MobilePlayerBar() {
-  const { current, isPlaying, currentTime, duration, audioRef, toggle, next, previous, queue, queueIndex, shuffleOn, toggleShuffle } = usePlayer();
+  const { current, isPlaying, currentTime, duration, audioRef, toggle, next, previous, queue, queueIndex, shuffleOn, toggleShuffle, repeatMode, cycleRepeatMode } = usePlayer();
   const [expanded, setExpanded] = useState(false);
-  const [loopOn, setLoopOn] = useState(false);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
@@ -37,11 +36,6 @@ export default function MobilePlayerBar() {
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = muted ? 0 : volume;
   }, [volume, muted]);
-
-  useEffect(() => {
-    if (audioRef.current) audioRef.current.loop = loopOn;
-  }, [loopOn]);
-
   const fmt = (s: number) => {
     if (!s || Number.isNaN(s)) return "0:00";
     const m = Math.floor(s / 60);
@@ -134,7 +128,11 @@ export default function MobilePlayerBar() {
           {isPlaying ? <Pause size={24} strokeWidth={2} /> : <Play size={24} strokeWidth={2} className="ml-1" />}
         </button>
         <SkipForward size={26} strokeWidth={1.5} onClick={next} className={queueIndex < queue.length - 1 ? "text-primary" : "text-tertiary"} />
-        <Repeat size={20} strokeWidth={1.5} onClick={() => setLoopOn((v) => !v)} className={loopOn ? "text-primary" : "text-secondary"} />
+        {repeatMode === "one" ? (
+          <Repeat1 size={20} strokeWidth={1.5} onClick={cycleRepeatMode} className="text-primary" />
+        ) : (
+          <Repeat size={20} strokeWidth={1.5} onClick={cycleRepeatMode} className={repeatMode === "all" ? "text-primary" : "text-secondary"} />
+        )}
       </div>
 
       <div className="flex items-center gap-3">

@@ -183,13 +183,16 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
     <UploadDropZone albumId={params.id} onUploaded={load}>
     <div className="flex">
     <main className="relative max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-16 pt-8 sm:pt-16 flex-1 min-w-0">
-      {/* Full-bleed hero wash behind the header — blurred cover art if one
-         exists, or the same deterministic per-album gradient used for the
-         ambient background otherwise, so an album without art still feels
-         intentional rather than blank. The "left-1/2 -translate-x-1/2
-         w-screen" trick breaks out of this container's max-width/padding
-         to go edge-to-edge behind the constrained content. */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-screen h-[360px] overflow-hidden -z-10 pointer-events-none">
+      {/* Hero wash behind the header — blurred cover art if one exists, or
+         the same deterministic per-album gradient used for the ambient
+         background otherwise, so an album without art still feels
+         intentional rather than blank. Fills main's own width (inset-x-0),
+         NOT a full-viewport breakout — main's width varies depending on
+         whether the lyrics sidebar is showing, so a viewport-relative
+         trick here would always eventually misalign against one state or
+         the other. This way main's right edge and the hero's right edge
+         are always the same edge, sidebar or not. */}
+      <div className="absolute inset-x-0 top-0 h-[360px] overflow-hidden -z-10 pointer-events-none">
         {album?.coverUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

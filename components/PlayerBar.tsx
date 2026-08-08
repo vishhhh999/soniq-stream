@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, ListMusic, Volume2, Volume1, VolumeX, X, Mic2 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, ListMusic, Volume2, Volume1, VolumeX, X, Mic2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
@@ -16,8 +16,8 @@ export default function PlayerBar() {
   const {
     current, isPlaying, currentTime, duration, audioRef, toggle, next, previous,
     queue, queueIndex, shuffleOn, toggleShuffle, jumpToQueueIndex, reorderQueue,
+    repeatMode, cycleRepeatMode,
   } = usePlayer();
-  const [loopOn, setLoopOn] = useState(false);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [brokenTrack, setBrokenTrack] = useState<{ id: string; title: string } | null>(null);
@@ -76,11 +76,6 @@ export default function PlayerBar() {
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = muted ? 0 : volume;
   }, [volume, muted]);
-
-  useEffect(() => {
-    if (audioRef.current) audioRef.current.loop = loopOn;
-  }, [loopOn]);
-
   const fmt = (s: number) => {
     if (!s || Number.isNaN(s)) return "0:00";
     const m = Math.floor(s / 60);
@@ -197,12 +192,21 @@ export default function PlayerBar() {
             onClick={next}
             className={`transition-colors ${queueIndex < queue.length - 1 ? "cursor-pointer hover:text-primary" : "opacity-30"}`}
           />
-          <Repeat
-            size={14}
-            strokeWidth={1.5}
-            onClick={() => setLoopOn((v) => !v)}
-            className={`cursor-pointer transition-colors ${loopOn ? "text-primary" : "hover:text-primary"}`}
-          />
+          {repeatMode === "one" ? (
+            <Repeat1
+              size={14}
+              strokeWidth={1.5}
+              onClick={cycleRepeatMode}
+              className="cursor-pointer text-primary transition-colors"
+            />
+          ) : (
+            <Repeat
+              size={14}
+              strokeWidth={1.5}
+              onClick={cycleRepeatMode}
+              className={`cursor-pointer transition-colors ${repeatMode === "all" ? "text-primary" : "hover:text-primary"}`}
+            />
+          )}
         </div>
 
         {current ? (

@@ -31,6 +31,8 @@ type PlayerState = {
   toggleShuffle: () => void;
   jumpToQueueIndex: (i: number) => void;
   reorderQueue: (newOrder: Track[]) => void;
+  repeatMode: "off" | "all" | "one";
+  cycleRepeatMode: () => void;
   getFrequencyData: () => Uint8Array | null;
 };
 
@@ -54,6 +56,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [queue, setQueue] = useState<Track[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
   const [shuffleOn, setShuffleOn] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<"off" | "all" | "one">("off");
   const originalQueueRef = useRef<Track[]>([]); // unshuffled order, so toggling shuffle off restores it
 
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -128,11 +131,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const nextIndex = queueIndex + 1;
     if (nextIndex < queue.length) {
       jumpToQueueIndex(nextIndex);
+    } else if (repeatMode === "all") {
+      // End of queue with "repeat all" on — loop back to the start,
+      // unlike the plain skip-forward button, which stays disabled at
+      // the boundary rather than surprising you with a jump to track 1.
+      jumpToQueueIndex(0);
     }
-    // At end of queue: stop rather than loop back silently — matches how
-    // the skip-forward button already visually disables at track boundaries
-    // in most players, and avoids surprising the user with a jump to track 1.
-  }, [queue, queueIndex, jumpToQueueIndex]);
+    // "off" and "one": stop at the end. "one" never actually reaches this
+    // path in practice — native `audio.loop` (set below) handles repeating
+    // the current track directly and the 'ended' event that triggers
+    // next() never fires while loop=true.
+  }, [queue, queueIndex, jumpToQueueIndex, repeatMode]);
+
+  const cycleRepeatMode = useCallback(() => {
+    setRepeatMode((m) => (m === "off" ? "all" : m === "all" ? "one" : "off"));
+  }, []);
 
   const previous = useCallback(() => {
     if (queue.length === 0) return;
@@ -203,6 +216,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Native audio.loop handles "repeat one" directly — the browser loops
+  // the current track without ever firing 'ended', so next()'s own logic
+  // never has to think about the "one" case at all.
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.loop = repeatMode === "one";
+  }, [repeatMode]);
+
   const getFrequencyData = useCallback(() => {
     if (!analyserRef.current || !dataArrayRef.current) return null;
     analyserRef.current.getByteFrequencyData(dataArrayRef.current as Uint8Array<ArrayBuffer>);
@@ -214,6 +234,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       value={{
         current, isPlaying, currentTime, duration, audioRef, queue, queueIndex, shuffleOn,
         play, playQueue, toggle, next, previous, toggleShuffle, jumpToQueueIndex, reorderQueue,
+        repeatMode, cycleRepeatMode,
         getFrequencyData,
       }}
     >

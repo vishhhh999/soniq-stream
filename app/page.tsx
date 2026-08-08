@@ -2,13 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, X as XIcon } from "lucide-react";
+import { Plus, Search, X as XIcon, Settings as SettingsIcon } from "lucide-react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import UploadButton from "@/components/UploadButton";
 import UploadDropZone from "@/components/UploadDropZone";
-import ThemeToggle from "@/components/ThemeToggle";
-import AmbientToggle from "@/components/AmbientToggle";
-import LogoutButton from "@/components/LogoutButton";
+import SettingsModal from "@/components/SettingsModal";
 import TrackDetail from "@/components/TrackDetail";
 import TrackRowGroup from "@/components/TrackRow";
 import AlbumCard, { Album } from "@/components/AlbumCard";
@@ -30,6 +28,7 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [detailTrack, setDetailTrack] = useState<Track | null>(null);
   const [showNewAlbum, setShowNewAlbum] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false); // mobile only
@@ -53,14 +52,20 @@ export default function Home() {
   const unsorted = tracks.filter((t: any) => !t.albumId);
   const groups = groupVersions(unsorted as any);
   const countInAlbum = (albumId: string) => tracks.filter((t: any) => t.albumId === albumId).length;
+  const albumNameById = new Map(albums.map((a) => [a.id, a.name]));
 
   const q = query.trim().toLowerCase();
-  const filteredGroups = q
-    ? groups.filter((g) =>
-        g.latest.title.toLowerCase().includes(q) ||
-        (g.latest.artist || "").toLowerCase().includes(q)
+  // Search runs against ALL tracks, not just unsorted ones — previously
+  // this filtered `groups` (already scoped to unsorted-only), so any
+  // track sitting inside an album was never searchable at all. When not
+  // searching, the normal Albums-grid + Unsorted-list view is unchanged.
+  const searchMatches = q
+    ? tracks.filter(
+        (t: any) =>
+          t.title.toLowerCase().includes(q) || (t.artist || "").toLowerCase().includes(q)
       )
-    : groups;
+    : [];
+  const filteredGroups = q ? groupVersions(searchMatches as any) : groups;
   const filteredAlbums = q
     ? albums.filter((a) => a.name.toLowerCase().includes(q))
     : albums;
@@ -192,9 +197,14 @@ export default function Home() {
               </button>
             )}
           </div>
-          <AmbientToggle />
-          <ThemeToggle />
-          <LogoutButton />
+          <button
+            onClick={() => setShowSettings(true)}
+            aria-label="Settings"
+            title="Settings"
+            className="w-8 h-8 flex items-center justify-center rounded-full border border-border hover:border-border-strong transition-colors text-secondary hover:text-primary"
+          >
+            <SettingsIcon size={15} strokeWidth={1.5} />
+          </button>
           <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
           <button
             onClick={() => setShowNewAlbum(true)}
@@ -265,6 +275,11 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i * 0.03, 0.3), duration: 0.25 }}
               >
+                {q && (g.latest as any).albumId && (
+                  <p className="text-[11px] text-tertiary px-4 pt-2">
+                    in {albumNameById.get((g.latest as any).albumId) || "an album"}
+                  </p>
+                )}
                 <TrackRowGroup
                 group={g}
                 onOpenDetail={setDetailTrack}
@@ -337,6 +352,8 @@ export default function Home() {
           onCancel={() => setFolderPrompt(null)}
         />
       )}
+
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
 
       <DragOverlay>
         {activeDragLabel && (
