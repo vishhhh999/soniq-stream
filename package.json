@@ -29,7 +29,8 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "resend": "^6.18.1",
-    "wavesurfer.js": "^7.8.6"
+    "wavesurfer.js": "^7.8.6",
+    "fflate": "^0.8.2"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

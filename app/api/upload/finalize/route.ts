@@ -158,8 +158,8 @@ export async function POST(req: NextRequest) {
 
         for (const member of members) {
           if (!member.savedAlbumId) continue;
-          const sourceKey = new URL(publicUrl).pathname.replace(/^//, '');
-          const ext = sourceKey.match(/.[^.]+$/)?.[0] || '';
+          const sourceKey = new URL(publicUrl).pathname.replace(/^\//, "");
+          const ext = sourceKey.match(/\.[^.]+$/)?.[0] || "";
           const newKey = `tracks/${nanoid()}${ext}`;
           try {
             await r2.send(new CopyObjectCommand({ Bucket: R2_BUCKET, CopySource: `${R2_BUCKET}/${sourceKey}`, Key: newKey }));
