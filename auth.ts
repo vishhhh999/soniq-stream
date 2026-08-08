@@ -45,14 +45,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const [existing] = await db.select().from(users).where(eq(users.email, email));
 
       if (existing && existing.passwordHash) {
-        // A password account exists for this email. Auto-link is safe here
-        // because OTP verification already confirmed email ownership at signup.
-        // Allow sign-in — the jwt callback will pick up the existing user id.
+        // Password account exists — this is a Google link. If it's the first
+        // time, stamp googleLinkedAt so the jwt callback can signal the toast.
+        if (!existing.googleLinkedAt) {
+          await db
+            .update(users)
+            .set({ googleLinkedAt: new Date() })
+            .where(eq(users.id, existing.id));
+          // Signal to jwt callback that this sign-in is the first link.
+          // We store it on the account object — it's available in jwt on
+          // the same auth cycle.
+          (account as any).__justLinked = true;
+        }
         return true;
       }
 
       if (!existing) {
-        // First time signing in with Google — create the account.
+        // New Google-only account.
         await db.insert(users).values({
           id: nanoid(),
           email,
@@ -67,15 +76,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         if (account?.provider === "google") {
           const [dbUser] = await db.select().from(users).where(eq(users.email, (user.email || "").toLowerCase()));
-          if (dbUser) token.id = dbUser.id;
+          if (dbUser) {
+            token.id = dbUser.id;
+            // Only true on the exact sign-in where linking first happened.
+            token.justLinked = (account as any).__justLinked === true;
+          }
         } else {
           token.id = (user as any).id;
+          token.justLinked = false;
         }
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) (session.user as any).id = token.id as string;
+      if (session.user) {
+        (session.user as any).id = token.id as string;
+        // Pass through to client so it can show the one-time toast.
+        (session.user as any).justLinked = token.justLinked ?? false;
+      }
       return session;
     },
   },

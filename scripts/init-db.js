@@ -110,6 +110,20 @@ async function main() {
       created_at TIMESTAMP NOT NULL
     );
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS otp_codes (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      code_hash TEXT NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      attempts SMALLINT NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL
+    );
+  `;
+
+  // Additive migration: first-Google-link timestamp for one-time toast.
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_linked_at TIMESTAMP;`;
+
   console.log("Postgres schema ready");
   await sql.end();
 }

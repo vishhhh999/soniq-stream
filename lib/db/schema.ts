@@ -9,6 +9,11 @@ export const users = pgTable("users", {
   // paths from silently merging (see auth.ts).
   passwordHash: text("password_hash"),
   createdAt: timestamp("created_at").notNull(),
+  // Set the first time a Google sign-in is matched to an existing
+  // password account. Used to show a one-time "accounts linked" toast.
+  // Null means either a Google-only account, or a password account
+  // that has never signed in via Google.
+  googleLinkedAt: timestamp("google_linked_at"),
 });
 
 export const folders = pgTable("folders", {

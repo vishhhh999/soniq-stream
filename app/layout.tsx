@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { PlayerProvider } from "@/components/PlayerProvider";
 import { AmbientProvider } from "@/components/AmbientProvider";
 import AuthedPlayerShell from "@/components/AuthedPlayerShell";
+import GoogleLinkToast from "@/components/GoogleLinkToast";
 
 const interTight = Inter_Tight({ subsets: ["latin"], variable: "--font-inter-tight" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-display" });
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AmbientProvider>
               <PlayerProvider>
                 <AuthedPlayerShell />
+                <GoogleLinkToast />
                 <div className="relative z-10 min-h-screen pb-24">{children}</div>
               </PlayerProvider>
             </AmbientProvider>
