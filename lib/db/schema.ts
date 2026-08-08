@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, timestamp, boolean, jsonb, smallint } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -90,6 +90,21 @@ export const shareLinks = pgTable("share_links", {
 // anyone with a share token can view it. That's an acceptable bar for a
 // personal tool with random, unguessable nanoid IDs, but it would NOT be
 // an acceptable bar if this app ever had untrusted/adversarial users.
+// Ephemeral OTP codes used during signup. A row is created when someone
+// requests a code, and deleted (or expired) after verify. No user row is
+// created until the code is confirmed — this ensures we never store an
+// account for an email address the person doesn't own.
+// attempts tracks failed verify tries — after 5, the code is voided to
+// prevent brute-force on a 6-digit space.
+export const otpCodes = pgTable("otp_codes", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  codeHash: text("code_hash").notNull(), // bcrypt hash of the 6-digit code
+  expiresAt: timestamp("expires_at").notNull(),
+  attempts: smallint("attempts").notNull().default(0),
+  createdAt: timestamp("created_at").notNull(),
+});
+
 export const comments = pgTable("comments", {
   id: text("id").primaryKey(),
   trackId: text("track_id"),

@@ -244,12 +244,11 @@ export default function Home() {
                     return next;
                   });
                 }}
-                onSelect={(e) => {
-                  e.stopPropagation();
+                onSelect={(mods) => {
                   if (isMobile) return; // mobile uses long-press, not click
                   const orderedIds = groups.map((gr) => gr.latest.id);
                   const { next, newLastSelected } = computeSelection(
-                    g.latest.id, orderedIds, selectedIds, lastSelectedId, e
+                    g.latest.id, orderedIds, selectedIds, lastSelectedId, mods
                   );
                   setSelectedIds(next);
                   setLastSelectedId(newLastSelected);

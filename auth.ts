@@ -39,23 +39,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ account, profile }) {
       if (account?.provider !== "google") return true;
 
-      const allowed = (process.env.ALLOWED_EMAILS || "")
-        .split(",")
-        .map((e) => e.trim().toLowerCase())
-        .filter(Boolean);
-      if (allowed.length === 0) {
-        console.warn("Google sign-in blocked: ALLOWED_EMAILS is not set.");
-        return false;
-      }
       const email = (profile?.email || "").toLowerCase();
-      if (!allowed.includes(email)) return false;
+      if (!email) return false;
 
       const [existing] = await db.select().from(users).where(eq(users.email, email));
+
       if (existing && existing.passwordHash) {
-        console.warn(`Google sign-in blocked for ${email}: a password account already exists for this email.`);
-        return false;
+        // A password account exists for this email. Auto-link is safe here
+        // because OTP verification already confirmed email ownership at signup.
+        // Allow sign-in — the jwt callback will pick up the existing user id.
+        return true;
       }
+
       if (!existing) {
+        // First time signing in with Google — create the account.
         await db.insert(users).values({
           id: nanoid(),
           email,
@@ -63,6 +60,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           createdAt: new Date(),
         });
       }
+
       return true;
     },
     async jwt({ token, user, account }) {
