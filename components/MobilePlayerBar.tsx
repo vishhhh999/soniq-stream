@@ -22,7 +22,6 @@ export default function MobilePlayerBar() {
   const [muted, setMuted] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const triedFallbackRef = useRef(false);
   const lastTrackIdRef = useRef<string | null>(null);
 
   useEffect(() => setMounted(true), []);
@@ -31,24 +30,8 @@ export default function MobilePlayerBar() {
     if (!audioRef.current || !current) return;
     if (lastTrackIdRef.current === current.id) return;
     lastTrackIdRef.current = current.id;
-    triedFallbackRef.current = false;
-    audioRef.current.crossOrigin = "anonymous";
     audioRef.current.src = current.fileUrl;
     audioRef.current.play().catch(() => {});
-  }, [current]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const onError = () => {
-      if (!current || triedFallbackRef.current) return;
-      triedFallbackRef.current = true;
-      audio.removeAttribute("crossorigin");
-      audio.src = current.fileUrl;
-      audio.play().catch(() => {});
-    };
-    audio.addEventListener("error", onError);
-    return () => audio.removeEventListener("error", onError);
   }, [current]);
 
   useEffect(() => {

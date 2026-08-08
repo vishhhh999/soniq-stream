@@ -104,7 +104,9 @@ function Row({
       {...(dragEnabled && !isMobile ? attributes : {})}
       {...(dragEnabled && !isMobile ? listeners : {})}
       {...desktopProps}
-      className={`group flex items-center gap-4 px-4 py-3 rounded-md transition-colors cursor-pointer select-none ${
+      className={`group flex items-center gap-4 px-4 py-3 rounded-md transition-colors select-none ${
+        dragEnabled && !isMobile ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+      } ${
         isSelected
           ? "bg-accent/20 ring-1 ring-inset ring-accent"
           : isCurrent

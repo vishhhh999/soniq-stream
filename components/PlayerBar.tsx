@@ -24,7 +24,6 @@ export default function PlayerBar() {
   const [showQueue, setShowQueue] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [showVolume, setShowVolume] = useState(false);
-  const triedFallbackRef = useRef(false);
   const lastTrackIdRef = useRef<string | null>(null);
   const queueSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -40,17 +39,9 @@ export default function PlayerBar() {
 
   useEffect(() => {
     if (!audioRef.current || !current) return;
-    // Previously this effect ran on ANY change to the `current` object
-    // reference, even if it was the same track — e.g. after navigating to
-    // an album page, which refetches track data and can produce a new
-    // object for the same track. That reset audio.src and force-restarted
-    // playback from 0, reading exactly as "opening an album stops
-    // playback." Now it only resets when the actual track id changes.
     if (lastTrackIdRef.current === current.id) return;
     lastTrackIdRef.current = current.id;
-    triedFallbackRef.current = false;
     setBrokenTrack(null);
-    audioRef.current.crossOrigin = "anonymous";
     audioRef.current.src = current.fileUrl;
     audioRef.current.play().catch(() => {});
   }, [current]);
@@ -69,13 +60,6 @@ export default function PlayerBar() {
     if (!audio) return;
     const onError = () => {
       if (!current) return;
-      if (!triedFallbackRef.current) {
-        triedFallbackRef.current = true;
-        audio.removeAttribute("crossorigin");
-        audio.src = current.fileUrl;
-        audio.play().catch(() => {});
-        return;
-      }
       setBrokenTrack({ id: current.id, title: current.title });
     };
     audio.addEventListener("error", onError);

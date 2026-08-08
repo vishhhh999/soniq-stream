@@ -227,7 +227,7 @@ export default function Home() {
                 queueTracks={groups.map((gr) => gr.latest)}
                 queueIndex={i}
                 isSelected={selectedIds.has(g.latest.id)}
-                dragEnabled={albums.length > 0}
+                dragEnabled={true}
                 isMobile={isMobile}
                 selectionMode={selectionMode}
                 onLongPressSelect={() => {

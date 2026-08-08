@@ -345,6 +345,43 @@ easy place to get this wrong) before trusting it. Added a subtle glow
 (`text-shadow`) on the active line, and every line is now clickable to
 seek directly to that point in the track.
 
+## This round: mobile lyrics overlap, slow large-file playback, drag-and-drop gating
+
+**Lyrics sidebar had no mobile check at all.** It's desktop-only by design
+(mobile gets lyrics through the mic button in the player sheet instead),
+but nothing was actually gating it — it rendered and overlapped the whole
+mobile page. Now checks screen size and renders nothing on mobile,
+including skipping the data fetch entirely, not just hiding the result.
+
+**Large WAV files (50MB+) loading slowly — real cause, not a guess.**
+Every track load set `crossOrigin="anonymous"` before assigning `src`,
+forcing every single playback attempt into CORS mode. CORS-mode loading
+needs R2 to expose specific headers (`Content-Range`, `Accept-Ranges`,
+`Content-Length`) for the browser to properly negotiate progressive
+range-request streaming — headers that were never configured. Without
+them, large files can fall back to pulling far more data before playback
+starts. Worse: the existing fallback that removed `crossOrigin` only
+triggered on an outright `error` event, which never fires for merely slow
+loading — so large files had no escape hatch at all. `crossOrigin` only
+ever existed to feed the ambient background's audio-reactive visualizer,
+a decorative feature. Removed it from the default playback path entirely
+— playback now always uses standard progressive loading, fast and
+reliable regardless of file size. Trade-off, stated plainly: the ambient
+background's audio reactivity will be muted/silent-ish rather than truly
+reactive, since the Web Audio analyser needs CORS-clean media to read
+real frequency data. It won't crash or error — `ensureAudioGraph` was
+already wrapped in a try/catch for exactly this scenario — it'll just show
+closer to idle motion. Reliable playback of your actual files matters
+more than a decorative visual, so this is the right trade.
+
+**Drag-and-drop tracks — found a real gating bug.** Track rows were only
+draggable when `albums.length > 0`, meaning if you tried dragging before
+an album existed (or in some other state where that check failed), it
+silently did nothing — indistinguishable from "doesn't work." Tracks are
+now always draggable on desktop regardless of album count, and rows show
+an actual grab cursor now so it's visually obvious they can be dragged
+(they didn't before, which was its own small gap in discoverability).
+
 ## Explicitly deferred — not started, not partial
 
 Lyrics + sync (was on this list) is done — see above. What remains, still
