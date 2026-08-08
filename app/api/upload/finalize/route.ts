@@ -5,6 +5,9 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { tracks, albums } from "@/lib/db/schema";
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { CopyObjectCommand } from "@aws-sdk/client-s3";
+import { albumMembers, contentFollows } from "@/lib/db/schema";
+import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2";
 import { notifyAlbumFollowers, getUsernameById } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
@@ -143,6 +146,46 @@ export async function POST(req: NextRequest) {
     };
 
     await db.insert(tracks).values(row);
+
+    // Sync the new track to any receivers who have a saved copy of this album.
+    // This keeps their library up-to-date without them needing to re-save.
+    if (albumId) {
+      try {
+        const members = await db
+          .select()
+          .from(albumMembers)
+          .where(and(eq(albumMembers.albumId, albumId)));
+
+        for (const member of members) {
+          if (!member.savedAlbumId) continue;
+          const sourceKey = new URL(publicUrl).pathname.replace(/^//, '');
+          const ext = sourceKey.match(/.[^.]+$/)?.[0] || '';
+          const newKey = `tracks/${nanoid()}${ext}`;
+          try {
+            await r2.send(new CopyObjectCommand({ Bucket: R2_BUCKET, CopySource: `${R2_BUCKET}/${sourceKey}`, Key: newKey }));
+            const newId = nanoid();
+            await db.insert(tracks).values({
+              ...row,
+              id: newId,
+              userId: member.userId,
+              albumId: member.savedAlbumId,
+              fileUrl: `${R2_PUBLIC_URL.replace(/\/$/, '')}/${newKey}`,
+              versionGroupId: newId,
+              versionNumber: 1,
+              originalTrackId: id,
+              notes: null,
+              lyrics: null,
+              lyricsSynced: null,
+              createdAt: new Date(),
+            });
+          } catch (memberErr) {
+            console.error(`Failed to sync track to member ${member.userId}:`, memberErr);
+          }
+        }
+      } catch (syncErr) {
+        console.error('Member track sync failed (non-fatal):', syncErr);
+      }
+    }
     return NextResponse.json(row);
   } catch (err) {
     console.error("Finalize failed:", err);

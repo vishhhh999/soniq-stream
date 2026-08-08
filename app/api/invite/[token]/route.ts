@@ -3,7 +3,7 @@ import { CopyObjectCommand } from "@aws-sdk/client-s3";
 import { nanoid } from "nanoid";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { inviteLinks, albums, tracks, albumMembers, users } from "@/lib/db/schema";
+import { inviteLinks, albums, tracks, albumMembers, users, contentFollows } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2";
 
@@ -122,6 +122,18 @@ export async function POST(
     savedAlbumId: newAlbumId,
     createdAt: new Date(),
   });
+
+  // Create a content_follows row so the member receives future change notifications.
+  try {
+    await db.insert(contentFollows).values({
+      id: nanoid(),
+      userId,
+      ownerId: album.userId,
+      albumId: album.id,
+      trackId: null,
+      createdAt: new Date(),
+    });
+  } catch {} // idempotent — ignore duplicate
 
   // Increment invite link use count.
   await db

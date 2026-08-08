@@ -394,6 +394,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
                     exit={{ opacity: 0, y: 8 }}
                     className="absolute top-full right-0 mt-2 w-48 max-w-[calc(100vw-2rem)] bg-elevated border border-border rounded-lg shadow-xl overflow-hidden z-10"
                   >
+                    {!isReadOnly && (
                     <button
                       onClick={() => {
                         setShowMoreMenu(false);
@@ -404,6 +405,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
                       <BarChart3 size={14} strokeWidth={1.5} className="text-secondary" />
                       Insights
                     </button>
+                    )}
                     <button
                       onClick={() => {
                         setShowMoreMenu(false);

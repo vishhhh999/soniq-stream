@@ -3,7 +3,7 @@ import { CopyObjectCommand } from "@aws-sdk/client-s3";
 import { nanoid } from "nanoid";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { shareLinks, tracks, albums, users, albumMembers } from "@/lib/db/schema";
+import { shareLinks, tracks, albums, users, albumMembers, contentFollows } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2";
 
@@ -115,6 +115,18 @@ export async function POST(
         savedAlbumId: newAlbumId,
         createdAt: new Date(),
       });
+
+      // Create a content_follows row for future change notifications.
+      try {
+        await db.insert(contentFollows).values({
+          id: nanoid(),
+          userId,
+          ownerId: originalAlbum.userId,
+          albumId: originalAlbum.id,
+          trackId: null,
+          createdAt: new Date(),
+        });
+      } catch {}
 
       return NextResponse.json({ ok: true, type: "album", albumId: newAlbumId });
     }
