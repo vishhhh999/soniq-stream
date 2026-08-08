@@ -8,6 +8,7 @@ import { AmbientProvider } from "@/components/AmbientProvider";
 import AuthedPlayerShell from "@/components/AuthedPlayerShell";
 import GoogleLinkToast from "@/components/GoogleLinkToast";
 import PlayTracker from "@/components/PlayTracker";
+import InstallPrompt from "@/components/InstallPrompt";
 
 const interTight = Inter_Tight({ subsets: ["latin"], variable: "--font-inter-tight" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-display" });
@@ -15,10 +16,20 @@ const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mon
 export const metadata: Metadata = {
   title: "SONIQ — your tracks, organized",
   description: "Personal library for work-in-progress music.",
+  manifest: "/manifest.json",
   icons: {
     icon: [{ url: "/favicon.ico" }, { url: "/logo.svg", type: "image/svg+xml" }],
     apple: "/apple-touch-icon.png",
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "SONIQ",
+  },
+};
+
+export const viewport = {
+  themeColor: "#121212",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -32,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <AuthedPlayerShell />
                 <GoogleLinkToast />
                 <PlayTracker />
+                <InstallPrompt />
                 <div className="relative z-10 min-h-screen pb-24">{children}</div>
               </PlayerProvider>
             </AmbientProvider>

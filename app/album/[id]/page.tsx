@@ -368,7 +368,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 8 }}
-                    className="absolute top-full right-0 mt-2 w-48 bg-elevated border border-border rounded-lg shadow-xl overflow-hidden z-10"
+                    className="absolute top-full right-0 mt-2 w-48 max-w-[calc(100vw-2rem)] bg-elevated border border-border rounded-lg shadow-xl overflow-hidden z-10"
                   >
                     <button
                       onClick={() => {

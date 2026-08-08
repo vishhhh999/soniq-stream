@@ -57,7 +57,7 @@ export default function UploadButton({
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="absolute top-full mt-2 right-0 z-10 w-72 bg-elevated border border-error/40 rounded-md px-3 py-2 flex items-start gap-2"
+            className="absolute top-full mt-2 right-0 z-10 w-72 max-w-[calc(100vw-2rem)] bg-elevated border border-error/40 rounded-md px-3 py-2 flex items-start gap-2"
           >
             <AlertCircle size={14} className="text-error shrink-0 mt-0.5" strokeWidth={1.5} />
             <p className="text-xs text-secondary flex-1">{error}</p>

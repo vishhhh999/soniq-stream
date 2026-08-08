@@ -526,6 +526,47 @@ making `play_events.user_id` nullable for anonymous visitors. Not
 attempted this round — flagging the actual gap rather than shipping a
 partial/misleading version of it.
 
+## This round: mobile audit, PWA install prompt
+
+**Mobile audit — found and fixed 3 real overflow risks.** Checked every
+floating/dropdown element added across recent rounds for viewport-width
+safety. `GoogleLinkToast` had no width constraint at all (`whitespace-
+nowrap` on a fixed-width-less container — genuine horizontal-overflow
+risk on narrow phones), `UploadButton`'s error banner was a fixed 288px
+with no clamp, and the new album three-dot menu had the same gap. All
+three now use the same `max-w-[calc(100vw-2rem)]` pattern already proven
+on `SelectionToolbar`. Checked `TrackContextMenu`'s pixel-positioned
+desktop menu too — already correctly gated behind `!isMobile`, so it
+never runs below 768px in the first place; no fix needed there.
+
+**PWA install prompt.** Real manifest (`manifest.json`, 192/512px icons
+generated from the existing logo mark), wired into page metadata.
+Detects iOS vs Android vs desktop via user agent, skips entirely if
+already running standalone (installed) or previously dismissed
+(localStorage). Android gets the real native install prompt (captures
+`beforeinstallprompt`, triggers it on tap) — iOS Safari has no
+programmatic install API at all, so it gets manual Share → Add to Home
+Screen instructions instead, which is the actual ceiling of what's
+possible there, not a shortcut.
+
+**Caught a real bug while verifying this, not before shipping it:** the
+middleware's auth matcher didn't exclude `manifest.json` or the icon
+files, so unauthenticated requests for them (which is how a browser
+actually fetches a manifest) got redirected to `/login` instead of the
+real file — a login-page redirect isn't valid manifest JSON, so "add to
+home screen" would have silently failed entirely despite everything else
+being correct. Fixed the matcher, then re-verified both that the fix
+works AND that it didn't accidentally weaken protection anywhere else
+(confirmed actual protected routes still correctly redirect).
+
+**On notifications** — clarified the model (you get notified about
+changes *someone else* makes to something *they* shared with *you*, not
+collaborative editing of your own library). Two open questions before
+building: which events should notify (adds/removes only, or also plays —
+the latter could get noisy), and whether "shared with me" activates the
+moment a logged-in user opens a share link, or requires the owner to pick
+a specific recipient. Not started pending those answers.
+
 ## Explicitly deferred — not started, not partial
 
 Lyrics + sync (was on this list) is done — see above. What remains, still
