@@ -4,13 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 
-type Step = "email" | "verify";
+type Step = "email" | "verify" | "username";
 
 export default function SetupPage() {
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [username, setUsername] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -19,53 +20,79 @@ export default function SetupPage() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-
     const res = await fetch("/api/auth/otp/request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
     });
-
     const data = await res.json().catch(() => ({}));
-
     if (!res.ok) {
       setError(data.error || "Couldn't send code. Try again.");
       setBusy(false);
       return;
     }
-
     setStep("verify");
     setBusy(false);
   };
 
-  const verifyAndCreate = async (e: React.FormEvent) => {
+  const verifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
-
     const res = await fetch("/api/auth/otp/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, code, password }),
     });
-
     const data = await res.json().catch(() => ({}));
-
     if (!res.ok) {
       setError(data.error || "Verification failed.");
       setBusy(false);
       return;
     }
+    setStep("username");
+    setBusy(false);
+  };
 
-    // Account created — sign in immediately.
+  const saveUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+
+    // Sign in first so we have a session to PATCH against.
+    const signInResult = await signIn("credentials", { email, password, redirect: false });
+    if (signInResult?.error) {
+      setError("Account was created but sign-in failed. Go to login.");
+      setBusy(false);
+      return;
+    }
+
+    const res = await fetch("/api/user/username", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || "Couldn't save username.");
+      setBusy(false);
+      return;
+    }
+
+    router.push("/");
+    router.refresh();
+  };
+
+  const skipUsername = async () => {
+    setBusy(true);
     const result = await signIn("credentials", { email, password, redirect: false });
     if (result?.error) {
-      // Shouldn't happen (we just created the account), but fall back gracefully.
-      router.push("/login?created=1");
-    } else {
-      router.push("/");
-      router.refresh();
+      setError("Sign-in failed. Go to login page.");
+      setBusy(false);
+      return;
     }
+    router.push("/");
+    router.refresh();
   };
 
   return (
@@ -73,10 +100,9 @@ export default function SetupPage() {
       <div className="max-w-xs w-full">
         <h1 className="text-2xl font-display font-bold text-primary tracking-tight mb-1">SONIQ</h1>
 
-        {step === "email" ? (
+        {step === "email" && (
           <>
             <p className="text-secondary text-sm mb-8">Create an account.</p>
-
             <form onSubmit={requestCode}>
               <input
                 type="email"
@@ -96,9 +122,7 @@ export default function SetupPage() {
                 placeholder="Password (min. 8 characters)"
                 className="w-full bg-surface border border-border rounded-md px-4 py-3 text-sm text-primary focus:border-border-strong outline-none mb-3"
               />
-
               {error && <p className="text-xs text-error mb-3">{error}</p>}
-
               <button
                 type="submit"
                 disabled={busy || !email || password.length < 8}
@@ -130,19 +154,18 @@ export default function SetupPage() {
 
             <p className="text-center text-xs text-tertiary mt-6">
               Already have an account?{" "}
-              <a href="/login" className="text-secondary hover:text-primary underline">
-                Sign in
-              </a>
+              <a href="/login" className="text-secondary hover:text-primary underline">Sign in</a>
             </p>
           </>
-        ) : (
+        )}
+
+        {step === "verify" && (
           <>
             <p className="text-secondary text-sm mb-2">Check your email.</p>
             <p className="text-tertiary text-xs mb-8">
               We sent a 6-digit code to <span className="text-secondary">{email}</span>. It expires in 10 minutes.
             </p>
-
-            <form onSubmit={verifyAndCreate}>
+            <form onSubmit={verifyCode}>
               <input
                 type="text"
                 autoFocus
@@ -154,28 +177,58 @@ export default function SetupPage() {
                 maxLength={6}
                 className="w-full bg-surface border border-border rounded-md px-4 py-3 text-sm text-primary focus:border-border-strong outline-none mb-3 tracking-widest text-center font-mono"
               />
-
               {error && <p className="text-xs text-error mb-3">{error}</p>}
-
               <button
                 type="submit"
                 disabled={busy || code.length !== 6}
                 className="w-full bg-accent text-canvas text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
               >
-                {busy ? "Verifying..." : "Create account"}
+                {busy ? "Verifying..." : "Verify"}
               </button>
             </form>
-
             <button
-              type="button"
-              onClick={() => {
-                setStep("email");
-                setCode("");
-                setError(null);
-              }}
+              onClick={() => { setStep("email"); setCode(""); setError(null); }}
               className="w-full text-center text-xs text-tertiary hover:text-secondary mt-4 transition-colors"
             >
               Wrong email? Go back
+            </button>
+          </>
+        )}
+
+        {step === "username" && (
+          <>
+            <p className="text-secondary text-sm mb-2">One last thing.</p>
+            <p className="text-tertiary text-xs mb-8">Pick a username for your profile.</p>
+            <form onSubmit={saveUsername}>
+              <div className="relative mb-3">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-tertiary text-sm select-none">@</span>
+                <input
+                  type="text"
+                  autoFocus
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                  placeholder="yourname"
+                  maxLength={20}
+                  className="w-full bg-surface border border-border rounded-md pl-7 pr-4 py-3 text-sm text-primary focus:border-border-strong outline-none"
+                />
+              </div>
+              <p className="text-xs text-tertiary mb-4">3–20 characters, letters, numbers, underscores.</p>
+              {error && <p className="text-xs text-error mb-3">{error}</p>}
+              <button
+                type="submit"
+                disabled={busy || username.length < 3}
+                className="w-full bg-accent text-canvas text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50 mb-3"
+              >
+                {busy ? "Saving..." : "Set username"}
+              </button>
+            </form>
+            <button
+              onClick={skipUsername}
+              disabled={busy}
+              className="w-full text-center text-xs text-tertiary hover:text-secondary transition-colors"
+            >
+              Skip for now
             </button>
           </>
         )}

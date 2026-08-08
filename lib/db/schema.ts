@@ -11,9 +11,10 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull(),
   // Set the first time a Google sign-in is matched to an existing
   // password account. Used to show a one-time "accounts linked" toast.
-  // Null means either a Google-only account, or a password account
-  // that has never signed in via Google.
+  // Nullable until the user completes the username setup step.
+  // Unique constraint enforced at DB level.
   googleLinkedAt: timestamp("google_linked_at"),
+  username: text("username").unique(),
 });
 
 export const folders = pgTable("folders", {
@@ -95,19 +96,23 @@ export const shareLinks = pgTable("share_links", {
 // anyone with a share token can view it. That's an acceptable bar for a
 // personal tool with random, unguessable nanoid IDs, but it would NOT be
 // an acceptable bar if this app ever had untrusted/adversarial users.
-// Ephemeral OTP codes used during signup. A row is created when someone
-// requests a code, and deleted (or expired) after verify. No user row is
-// created until the code is confirmed — this ensures we never store an
-// account for an email address the person doesn't own.
-// attempts tracks failed verify tries — after 5, the code is voided to
-// prevent brute-force on a 6-digit space.
 export const otpCodes = pgTable("otp_codes", {
   id: text("id").primaryKey(),
   email: text("email").notNull(),
-  codeHash: text("code_hash").notNull(), // bcrypt hash of the 6-digit code
+  codeHash: text("code_hash").notNull(),
   expiresAt: timestamp("expires_at").notNull(),
   attempts: smallint("attempts").notNull().default(0),
   createdAt: timestamp("created_at").notNull(),
+});
+
+// One row per play event. Debounced server-side: a new row is only
+// inserted if the last play_event for this user+track was > 60s ago,
+// so scrubbing and replay within a session don't inflate counts.
+export const playEvents = pgTable("play_events", {
+  id: text("id").primaryKey(),
+  trackId: text("track_id").notNull(),
+  userId: text("user_id").notNull(),
+  playedAt: timestamp("played_at").notNull(),
 });
 
 export const comments = pgTable("comments", {

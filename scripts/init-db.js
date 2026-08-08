@@ -123,6 +123,16 @@ async function main() {
 
   // Additive migration: first-Google-link timestamp for one-time toast.
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_linked_at TIMESTAMP;`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE;`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS play_events (
+      id TEXT PRIMARY KEY,
+      track_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      played_at TIMESTAMP NOT NULL
+    );
+  `;
 
   console.log("Postgres schema ready");
   await sql.end();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Link2, Check, Download, Trash2 } from "lucide-react";
 import type { Track } from "./PlayerProvider";
@@ -41,6 +41,14 @@ export default function TrackDetail({
   const [detecting, setDetecting] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [playCount, setPlayCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/tracks/${track.id}/play`)
+      .then((r) => r.json())
+      .then((d) => setPlayCount(d.count ?? null))
+      .catch(() => {});
+  }, [track.id]);
 
   const saveField = async (fields: Record<string, unknown>) => {
     setSaving(true);
@@ -199,6 +207,9 @@ export default function TrackDetail({
             />
             {(saving || saved) && (
               <p className="text-xs text-tertiary">{saving ? "Saving..." : "Saved"}</p>
+            )}
+            {playCount !== null && (
+              <p className="text-xs text-tertiary">{playCount} play{playCount === 1 ? "" : "s"}</p>
             )}
           </div>
           <button onClick={onClose} className="text-tertiary hover:text-primary transition-colors shrink-0">

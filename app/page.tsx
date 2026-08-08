@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus } from "lucide-react";
+import { Plus, Search, X as XIcon } from "lucide-react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import UploadButton from "@/components/UploadButton";
 import UploadDropZone from "@/components/UploadDropZone";
@@ -16,6 +16,7 @@ import NewAlbumModal from "@/components/NewAlbumModal";
 import LyricsSidebar from "@/components/LyricsSidebar";
 import CreateFolderModal from "@/components/CreateFolderModal";
 import SelectionToolbar from "@/components/SelectionToolbar";
+import UsernamePrompt from "@/components/UsernamePrompt";
 import { groupVersions } from "@/lib/groupVersions";
 import { fetchArray } from "@/lib/apiFetch";
 import { computeSelection } from "@/lib/selection";
@@ -26,6 +27,7 @@ export default function Home() {
   const isMobile = useIsMobile();
   const [tracks, setTracks] = useState<Track[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
+  const [query, setQuery] = useState("");
   const [detailTrack, setDetailTrack] = useState<Track | null>(null);
   const [showNewAlbum, setShowNewAlbum] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -51,6 +53,17 @@ export default function Home() {
   const unsorted = tracks.filter((t: any) => !t.albumId);
   const groups = groupVersions(unsorted as any);
   const countInAlbum = (albumId: string) => tracks.filter((t: any) => t.albumId === albumId).length;
+
+  const q = query.trim().toLowerCase();
+  const filteredGroups = q
+    ? groups.filter((g) =>
+        g.latest.title.toLowerCase().includes(q) ||
+        (g.latest.artist || "").toLowerCase().includes(q)
+      )
+    : groups;
+  const filteredAlbums = q
+    ? albums.filter((a) => a.name.toLowerCase().includes(q))
+    : albums;
 
   const clearSelection = () => {
     setSelectedIds(new Set());
@@ -148,10 +161,11 @@ export default function Home() {
 
   return (
     <UploadDropZone onUploaded={load}>
+    <UsernamePrompt />
     <div className="flex">
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
     <main className="max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-16 pt-8 sm:pt-16 flex-1 min-w-0">
-      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10 sm:mb-16">
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 sm:mb-12">
         <div>
           <h1 className="text-2xl sm:text-3xl font-display font-bold text-primary tracking-tight">SONIQ</h1>
           <p className="text-secondary text-sm sm:text-base mt-2">
@@ -159,6 +173,25 @@ export default function Home() {
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Search */}
+          <div className="relative flex items-center">
+            <Search size={14} strokeWidth={1.5} className="absolute left-3 text-tertiary pointer-events-none" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search tracks, albums..."
+              className="bg-surface border border-border rounded-md pl-8 pr-8 py-2 text-sm text-primary focus:border-border-strong outline-none w-48 sm:w-56 transition-all"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-2 text-tertiary hover:text-primary"
+              >
+                <XIcon size={13} strokeWidth={1.5} />
+              </button>
+            )}
+          </div>
           <AmbientToggle />
           <ThemeToggle />
           <LogoutButton />
@@ -174,16 +207,16 @@ export default function Home() {
         </div>
       </header>
 
-      {albums.length > 0 && (
+      {filteredAlbums.length > 0 && (
         <section className="mb-12 sm:mb-16">
           <h2 className="text-xs uppercase tracking-wide text-tertiary mb-5">
             Albums
-            {!isMobile && (
+            {!isMobile && !query && (
               <span className="normal-case text-tertiary/70"> — drag a track here to sort it, or drag one album onto another to create a folder</span>
             )}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6 lg:gap-8">
-            {albums.map((a, i) => (
+            {filteredAlbums.map((a, i) => (
               <motion.div
                 key={a.id}
                 initial={{ opacity: 0, y: 12 }}
@@ -200,7 +233,7 @@ export default function Home() {
       <section>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xs uppercase tracking-wide text-tertiary">
-            {albums.length > 0 ? "Unsorted tracks" : "Tracks"}
+            {q ? `${filteredGroups.length} result${filteredGroups.length === 1 ? "" : "s"}` : albums.length > 0 ? "Unsorted tracks" : "Tracks"}
           </h2>
           {isMobile && selectionMode && (
             <button onClick={clearSelection} className="text-xs text-secondary hover:text-primary transition-colors">
@@ -209,14 +242,23 @@ export default function Home() {
           )}
         </div>
 
-        {groups.length === 0 ? (
+        {filteredGroups.length === 0 ? (
           <div className="border border-dashed border-border rounded-lg py-16 sm:py-24 text-center">
-            <p className="text-secondary text-base">Nothing here yet.</p>
-            <p className="text-tertiary text-sm mt-1">Add your first track to get started.</p>
+            {q ? (
+              <>
+                <p className="text-secondary text-base">No results for "{query}"</p>
+                <button onClick={() => setQuery("")} className="text-tertiary text-sm mt-2 hover:text-secondary transition-colors">Clear search</button>
+              </>
+            ) : (
+              <>
+                <p className="text-secondary text-base">Nothing here yet.</p>
+                <p className="text-tertiary text-sm mt-1">Add your first track to get started.</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-1" onClick={() => !isMobile && setSelectedIds(new Set())}>
-            {groups.map((g, i) => (
+            {filteredGroups.map((g, i) => (
               <motion.div
                 key={g.key}
                 initial={{ opacity: 0, y: 8 }}
@@ -226,12 +268,14 @@ export default function Home() {
                 <TrackRowGroup
                 group={g}
                 onOpenDetail={setDetailTrack}
-                queueTracks={groups.map((gr) => gr.latest)}
+                queueTracks={filteredGroups.map((gr) => gr.latest)}
                 queueIndex={i}
                 isSelected={selectedIds.has(g.latest.id)}
                 dragEnabled={true}
                 isMobile={isMobile}
                 selectionMode={selectionMode}
+                albums={albums}
+                onDeleteSuccess={load}
                 onLongPressSelect={() => {
                   setSelectionMode(true);
                   setSelectedIds(new Set([g.latest.id]));
@@ -245,8 +289,8 @@ export default function Home() {
                   });
                 }}
                 onSelect={(mods) => {
-                  if (isMobile) return; // mobile uses long-press, not click
-                  const orderedIds = groups.map((gr) => gr.latest.id);
+                  if (isMobile) return;
+                  const orderedIds = filteredGroups.map((gr) => gr.latest.id);
                   const { next, newLastSelected } = computeSelection(
                     g.latest.id, orderedIds, selectedIds, lastSelectedId, mods
                   );

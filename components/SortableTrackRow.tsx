@@ -6,6 +6,7 @@ import { GripVertical } from "lucide-react";
 import TrackRowGroup from "./TrackRow";
 import type { TrackGroup } from "@/lib/groupVersions";
 import type { Track } from "./PlayerProvider";
+import type { Album } from "./AlbumCard";
 
 export default function SortableTrackRow({
   group,
@@ -14,6 +15,8 @@ export default function SortableTrackRow({
   queueIndex,
   isSelected,
   onSelect,
+  albums,
+  onDeleteSuccess,
 }: {
   group: TrackGroup;
   onOpenDetail: (t: Track) => void;
@@ -21,6 +24,8 @@ export default function SortableTrackRow({
   queueIndex: number;
   isSelected: boolean;
   onSelect: (mods: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void;
+  albums?: Album[];
+  onDeleteSuccess?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.latest.id });
 
@@ -48,6 +53,8 @@ export default function SortableTrackRow({
           queueIndex={queueIndex}
           isSelected={isSelected}
           onSelect={onSelect}
+          albums={albums}
+          onDeleteSuccess={onDeleteSuccess}
         />
       </div>
     </div>
