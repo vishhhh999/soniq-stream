@@ -382,6 +382,24 @@ now always draggable on desktop regardless of album count, and rows show
 an actual grab cursor now so it's visually obvious they can be dragged
 (they didn't before, which was its own small gap in discoverability).
 
+## This round: drag files from your computer to upload
+
+**New — drag audio files in from your OS anywhere on the library or an
+album page to upload them.** This is the native browser file-drag API
+(`dragenter`/`dragover`/`drop`, reading `e.dataTransfer.files`) — entirely
+separate from dnd-kit, which only handles dragging already-uploaded
+tracks/albums around inside the app. The two don't conflict: OS file
+drags carry a `Files` entry in `dataTransfer.types` that in-app drags
+never do, so the drop zone only activates for real file drags. Dropping
+on the library page uploads to Unsorted; dropping on an album page
+uploads directly into that album.
+
+Extracted the upload pipeline (presign → PUT → finalize → BPM/key
+detection, duplicate-choice handling) out of `UploadButton` into a shared
+`useTrackUpload` hook, so the button and the new drop zone run the exact
+same tested logic rather than two copies of it. Verified the shared
+pipeline still works correctly post-refactor against real Postgres.
+
 ## Explicitly deferred — not started, not partial
 
 Lyrics + sync (was on this list) is done — see above. What remains, still

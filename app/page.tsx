@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import UploadButton from "@/components/UploadButton";
+import UploadDropZone from "@/components/UploadDropZone";
 import ThemeToggle from "@/components/ThemeToggle";
 import AmbientToggle from "@/components/AmbientToggle";
 import LogoutButton from "@/components/LogoutButton";
@@ -146,6 +147,7 @@ export default function Home() {
   };
 
   return (
+    <UploadDropZone onUploaded={load}>
     <div className="flex">
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
     <main className="max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-16 pt-8 sm:pt-16 flex-1 min-w-0">
@@ -313,5 +315,6 @@ export default function Home() {
 
     <LyricsSidebar onExpand={() => window.dispatchEvent(new CustomEvent("soniq:expand-lyrics"))} />
     </div>
+    </UploadDropZone>
   );
 }

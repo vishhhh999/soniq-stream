@@ -7,6 +7,7 @@ import { ArrowLeft, Disc3, Pencil, Share2, ImagePlus, Trash2 } from "lucide-reac
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import UploadButton from "@/components/UploadButton";
+import UploadDropZone from "@/components/UploadDropZone";
 import TrackDetail from "@/components/TrackDetail";
 import SortableTrackRow from "@/components/SortableTrackRow";
 import ShareModal from "@/components/ShareModal";
@@ -123,6 +124,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   };
 
   return (
+    <UploadDropZone albumId={params.id} onUploaded={load}>
     <div className="flex">
     <main className="relative max-w-[1600px] mx-auto px-8 lg:px-16 pt-16 flex-1 min-w-0">
       {/* Full-bleed hero wash behind the header — blurred cover art if one
@@ -311,5 +313,6 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
     </main>
     <LyricsSidebar onExpand={() => window.dispatchEvent(new CustomEvent("soniq:expand-lyrics"))} />
     </div>
+    </UploadDropZone>
   );
 }
