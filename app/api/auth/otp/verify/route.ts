@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
 import { otpCodes, users } from "@/lib/db/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, desc } from "drizzle-orm";
 import { signIn } from "@/auth";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       .select()
       .from(otpCodes)
       .where(and(eq(otpCodes.email, normalizedEmail), gt(otpCodes.expiresAt, now)))
-      .orderBy(otpCodes.createdAt)
+      .orderBy(desc(otpCodes.createdAt))
       // Most recent first — take the last one issued.
       .limit(1);
 

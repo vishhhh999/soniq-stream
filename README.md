@@ -27,36 +27,64 @@ R2 → your bucket → Settings → CORS Policy → add a rule:
 ```json
 [
   {
-    "AllowedOrigins": ["https://your-app.vercel.app", "http://localhost:3000"],
+    "AllowedOrigins": ["https://www.soniq.lol", "https://soniq.lol", "http://localhost:3000"],
     "AllowedMethods": ["PUT", "GET"],
     "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["Content-Range", "Accept-Ranges", "Content-Length", "ETag"],
     "MaxAgeSeconds": 3600
   }
 ]
 ```
-Replace the domain with your real one. Without this, uploads will fail in
-the browser with a CORS error at the PUT step, even though everything else
-(presign, R2 credentials) is configured correctly.
+Replace the domains with your real ones. Without `AllowedOrigins`/`AllowedMethods`,
+uploads fail in the browser with a CORS error at the PUT step even though
+everything else is configured correctly. **`ExposeHeaders` matters
+specifically for playback of large files** — the `<audio>` element loads
+tracks in CORS mode (needed so the ambient background's audio analyser can
+read real frequency data instead of silence), and CORS mode hides
+response headers from the browser unless the server explicitly exposes
+them. Without `Content-Range`/`Accept-Ranges` exposed, the browser can't
+properly negotiate progressive range-request streaming and may pull much
+more of a large file before playback starts. If large files are loading
+slowly, this is almost certainly why — check this is actually set, not
+just the other three fields.
 
 ## Auth — how it actually works
-Not open signup. First run with an empty `users` table sends you to
-`/setup` to create the one account; after that `/setup` refuses to create
-another. `/login` offers email+password (bcrypt, stored in your Postgres)
-and Google sign-in (deny-by-default allowlist via `ALLOWED_EMAILS` — an
-unconfigured allowlist blocks everyone, not "anyone with a Google account").
+Signup is open — anyone can create an account — but email/password signup
+requires proving you own the email first. `/setup` sends a 6-digit code
+via Resend (`RESEND_API_KEY` required); the account is only created after
+the code is verified (`/api/auth/otp/verify`), so you can't register an
+email you don't control. `/api/setup`'s old direct-signup POST is closed
+(`410 Gone`) — OTP is the only way in for email/password.
+
+Google sign-in has no allowlist — any Google account can sign in. If a
+Google sign-in matches an email that already has a password account, it's
+treated as the same person and linked automatically (not a separate
+account) — safe now that email/password signup requires OTP verification,
+since both paths prove ownership of the email before an account can exist
+under it. A one-time toast confirms the first link.
+
+Everyone gets a `username` (optional at signup, promptable later if
+skipped) — `GET /api/user/me` / `PATCH /api/user/username`, 3–20 chars,
+letters/numbers/underscores.
 
 ### Setting up Google sign-in
 1. console.cloud.google.com → new project
 2. APIs & Services → OAuth consent screen → External → fill in basics
 3. APIs & Services → Credentials → Create Credentials → OAuth client ID → Web application
-4. Authorized redirect URI: `https://your-app.vercel.app/api/auth/callback/google`
+4. Authorized redirect URI: `https://your-domain/api/auth/callback/google`
 5. Copy Client ID / Secret → `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
-6. Set `ALLOWED_EMAILS=you@gmail.com`
-7. While the consent screen is in Testing mode, also add yourself under
+6. While the consent screen is in Testing mode, also add yourself under
    Test Users on that same screen — Google blocks non-test-users regardless
-   of your app's own allowlist until you publish the app.
+   of anything else until you publish the app.
 
-Skip all of this and email+password still works fine on its own.
+Skip all of this and email+password (with OTP) still works fine on its own.
+
+### Setting up Resend (required for signup)
+1. resend.com → create an API key → `RESEND_API_KEY`
+2. Verify a sending domain (or use Resend's own for testing) — the app
+   sends from `onboarding@soniq.lol` in `lib/email.ts`; change that address
+   to match whatever domain you've actually verified in Resend, or OTP
+   emails will fail to send.
 
 ## Env vars
 
@@ -64,9 +92,9 @@ Skip all of this and email+password still works fine on its own.
 DATABASE_URL=postgres://...
 AUTH_SECRET=...                # openssl rand -hex 32
 AUTH_TRUST_HOST=true
-GOOGLE_CLIENT_ID=...           # optional
+GOOGLE_CLIENT_ID=...           # optional — enables Google sign-in
 GOOGLE_CLIENT_SECRET=...       # optional
-ALLOWED_EMAILS=you@gmail.com   # optional — controls both Google sign-in AND email/password signup; unset = open
+RESEND_API_KEY=...             # required — signup is OTP-only now, no path in without it
 R2_ACCOUNT_ID=...
 R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
@@ -75,7 +103,9 @@ R2_PUBLIC_URL=https://pub-xxxxxxxx.r2.dev
 ```
 
 `APP_PASSWORD` / `APP_SECRET` from earlier versions are gone — safe to
-delete from Vercel if still present.
+delete from Vercel if still present. `ALLOWED_EMAILS` is also gone as of
+this round — signup (both Google and email/password) is open to anyone;
+email/password signup is gated by OTP verification instead (see below).
 
 ## This round: lyrics + sync
 

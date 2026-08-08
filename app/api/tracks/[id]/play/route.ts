@@ -12,10 +12,17 @@ async function getUserId() {
   return session?.user && (session.user as any).id;
 }
 
-// GET — returns total play count for this track (all users).
+// GET — returns total play count for this track (all users who played it,
+// but only if the requesting user actually owns the track).
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+
+  const [track] = await db
+    .select({ id: tracks.id })
+    .from(tracks)
+    .where(and(eq(tracks.id, params.id), eq(tracks.userId, userId)));
+  if (!track) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
   const [row] = await db
     .select({ count: count() })
