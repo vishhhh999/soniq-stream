@@ -2,26 +2,56 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useDraggable } from "@dnd-kit/core";
 import { Play, Pause, MoreHorizontal, ChevronDown } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
 import PlayingIndicator from "./PlayingIndicator";
+import { useLongPress } from "@/lib/useLongPress";
 import type { TrackGroup } from "@/lib/groupVersions";
 
+// Two interaction models:
+// Desktop: single click selects (shift/ctrl for range/toggle), double
+//   click plays, three-dot opens the panel, drag-and-drop moves tracks.
+// Mobile: tap plays (no double-tap — unreliable on touch), long-press
+//   enters selection mode and selects that track, subsequent taps toggle
+//   selection while in that mode. No drag-and-drop — moving tracks between
+//   albums on mobile goes through the bulk-action toolbar instead, which
+//   is more reliable on touch than pointer-drag fighting with scroll.
 function Row({
   track,
   onOpenDetail,
   versionBadge,
   queueTracks,
   queueIndex,
+  isSelected,
+  onSelect,
+  dragEnabled,
+  isMobile,
+  selectionMode,
+  onLongPressSelect,
+  onToggleSelect,
 }: {
   track: Track;
   onOpenDetail: (t: Track) => void;
   versionBadge?: number;
   queueTracks: Track[];
   queueIndex: number;
+  isSelected: boolean;
+  onSelect: (e: React.MouseEvent) => void;
+  dragEnabled?: boolean;
+  isMobile?: boolean;
+  selectionMode?: boolean;
+  onLongPressSelect?: () => void;
+  onToggleSelect?: () => void;
 }) {
   const { current, isPlaying, playQueue, toggle } = usePlayer();
   const isCurrent = current?.id === track.id;
+
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `track:${track.id}`,
+    data: { type: "track", track },
+    disabled: !dragEnabled || isMobile,
+  });
 
   const fmt = (s?: number | null) => {
     if (!s) return "—";
@@ -32,18 +62,27 @@ function Row({
 
   const handlePlay = () => {
     if (isCurrent) toggle();
-    // Play with the full visible list as queue context — this is what
-    // makes skip forward/back and auto-advance-on-end actually mean
-    // something, instead of the buttons doing nothing at all.
     else playQueue(queueTracks, queueIndex);
   };
 
+  const longPress = useLongPress(
+    () => onLongPressSelect?.(),
+    () => (selectionMode ? onToggleSelect?.() : handlePlay())
+  );
+
+  const desktopProps = !isMobile
+    ? { onClick: onSelect, onDoubleClick: handlePlay }
+    : longPress;
+
   return (
     <div
-      className={`group flex items-center gap-4 px-4 py-3 rounded-md hover:bg-surface transition-colors cursor-pointer ${
-        isCurrent ? "bg-surface" : ""
-      }`}
-      onClick={() => onOpenDetail(track)}
+      ref={dragEnabled && !isMobile ? setNodeRef : undefined}
+      {...(dragEnabled && !isMobile ? attributes : {})}
+      {...(dragEnabled && !isMobile ? listeners : {})}
+      {...desktopProps}
+      className={`group flex items-center gap-4 px-4 py-3 rounded-md transition-colors cursor-pointer select-none ${
+        isSelected ? "bg-accent/15" : isCurrent ? "bg-surface" : "hover:bg-surface"
+      } ${isDragging ? "opacity-40" : ""}`}
     >
       <button
         onClick={(e) => {
@@ -74,7 +113,15 @@ function Row({
 
       <span className="text-xs text-tertiary tabular-nums w-12 text-right">{fmt(track.durationSec)}</span>
 
-      <MoreHorizontal size={16} strokeWidth={1.5} className="text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenDetail(track);
+        }}
+        className="text-tertiary opacity-0 group-hover:opacity-100 hover:text-primary transition-opacity p-1 -m-1"
+      >
+        <MoreHorizontal size={16} strokeWidth={1.5} />
+      </button>
     </div>
   );
 }
@@ -84,11 +131,25 @@ export default function TrackRowGroup({
   onOpenDetail,
   queueTracks,
   queueIndex,
+  isSelected,
+  onSelect,
+  dragEnabled,
+  isMobile,
+  selectionMode,
+  onLongPressSelect,
+  onToggleSelect,
 }: {
   group: TrackGroup;
   onOpenDetail: (t: Track) => void;
   queueTracks: Track[];
   queueIndex: number;
+  isSelected: boolean;
+  onSelect: (e: React.MouseEvent) => void;
+  dragEnabled?: boolean;
+  isMobile?: boolean;
+  selectionMode?: boolean;
+  onLongPressSelect?: () => void;
+  onToggleSelect?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasVersions = group.olderVersions.length > 0;
@@ -103,11 +164,21 @@ export default function TrackRowGroup({
             versionBadge={group.latest.versionNumber ?? undefined}
             queueTracks={queueTracks}
             queueIndex={queueIndex}
+            isSelected={isSelected}
+            onSelect={onSelect}
+            dragEnabled={dragEnabled}
+            isMobile={isMobile}
+            selectionMode={selectionMode}
+            onLongPressSelect={onLongPressSelect}
+            onToggleSelect={onToggleSelect}
           />
         </div>
         {hasVersions && (
           <button
-            onClick={() => setExpanded((v) => !v)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
             className="text-tertiary hover:text-primary transition-colors px-2 shrink-0"
             title={`${group.olderVersions.length} older version${group.olderVersions.length > 1 ? "s" : ""}`}
           >
@@ -126,9 +197,16 @@ export default function TrackRowGroup({
             className="overflow-hidden pl-8 border-l border-border ml-8"
           >
             {group.olderVersions.map((v) => (
-              // Older versions play standalone, not part of the main queue —
-              // they're a deliberate deviation from the main track list.
-              <Row key={v.id} track={v} onOpenDetail={onOpenDetail} versionBadge={v.versionNumber ?? undefined} queueTracks={[v]} queueIndex={0} />
+              <Row
+                key={v.id}
+                track={v}
+                onOpenDetail={onOpenDetail}
+                versionBadge={v.versionNumber ?? undefined}
+                queueTracks={[v]}
+                queueIndex={0}
+                isSelected={false}
+                onSelect={() => {}}
+              />
             ))}
           </motion.div>
         )}

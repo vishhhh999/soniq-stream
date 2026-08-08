@@ -179,6 +179,77 @@ or blocks; any restriction now surfaces as a normal form error on submit.
 **Removed the BPM/key display from the player bar** — redundant clutter,
 still visible in the track panel where it's actually useful.
 
+## This round: duplicate-upload choice, inline lyrics sidebar, cross-container drag-and-drop
+
+**Duplicate-upload choice prompt.** New `/api/tracks/check-duplicate` runs
+before the file even uploads — approximates the title from the filename
+(the real ID3-tag title isn't known until the file is parsed server-side
+during finalize, which happens after upload; this matches finalize's own
+fallback behavior for untagged files). If a match is found in the same
+scope, you get an actual choice: group as a new version, or keep both as
+fully independent tracks (`independent: true` skips the version-grouping
+query entirely on the server). Verified against real Postgres — confirmed
+two same-named tracks end up with genuinely different `versionGroupId`s
+when "keep both" is chosen, not silently merged.
+
+**Inline lyrics sidebar**, not just the fullscreen modal. A persistent
+right column appears automatically when the currently playing track has
+synced lyrics — no click needed — and collapses to nothing when it
+doesn't, per spec. The sidebar's expand button and the player's mic button
+both open the same fullscreen `LyricsView` now, sharing one trigger
+(`soniq:expand-lyrics` event) instead of two separate code paths.
+
+**Cross-container drag-and-drop.** Drag a track from Unsorted onto an
+album to assign it there. Drag one album onto another and you're asked
+whether to group them into a folder. Both `AlbumCard` (drag source *and*
+drop target — same id serves both roles in dnd-kit, which is correct, not
+a bug) and track rows on the home page are wired into one shared
+`DndContext`. Required opening up two PATCH endpoints that didn't allow
+it before: `albumId` on tracks, `folderId` on albums. Verified end-to-end
+against real Postgres — confirmed a track's `albumId` actually changes on
+drop, and confirmed two albums end up sharing the same real folder id
+after the folder-creation flow.
+
+## This round: real mobile support, bulk actions, BPM hypothesis narrowed
+
+**Mobile gets a genuinely different player, not a shrunk desktop one.**
+`AuthedPlayerShell` now renders `MobilePlayerBar` instead of `PlayerBar`
+below the `md` breakpoint (768px) — two distinct states (collapsed
+full-width mini-bar with a thin progress line, expanding to a full-screen
+sheet on tap) rather than trying to cram nine desktop controls into a
+smaller viewport. Desktop `PlayerBar` is unchanged except the waveform bar
+is shorter (`h-8` → `h-5`), as asked.
+
+**Selection now has a destination.** New `SelectionToolbar` — appears
+whenever tracks are selected, with "move to album" (opens a picker) and
+"delete" (with confirm). Works on both desktop and mobile since it's the
+same underlying bulk-PATCH/DELETE logic either way. Verified end-to-end
+against real Postgres: two tracks correctly reassigned to a target album,
+a third correctly deleted, confirmed by re-fetching afterward.
+
+**Mobile gets its own interaction model, not desktop patterns squeezed
+down.** Desktop keeps click-to-select/shift-ctrl/double-click/drag-and-drop
+exactly as before. Mobile: tap plays, long-press enters selection mode
+(same pattern as Photos/Files apps), subsequent taps toggle selection,
+and moving tracks goes through the bulk toolbar instead of drag-and-drop
+— pointer-drag is unreliable on touch and fights with scrolling, so it's
+disabled entirely on mobile (`dragDisabled` prop on `AlbumCard`, `isMobile`
+gating in `TrackRow`) rather than left in as a worse experience.
+
+**Multi-track drag** — dragging one track that's part of a larger
+selection now moves the whole selection to the drop target, not just the
+one physically dragged.
+
+**BPM — narrower hypothesis, not a fix.** Both playback and download
+work, and both go through plain `fetch()` — ruling out CORS as the
+remaining cause. The one thing BPM detection does that neither of those
+does is call `decodeAudioData()`, which is notably stricter than `<audio>`
+tag playback. Files from third-party converters/rippers often have
+subtly malformed encoding that a tolerant player accepts but a strict
+decoder rejects — a real, different failure mode with no code fix if
+that's what's happening. Still waiting on the actual error text from a
+failed re-detect attempt to confirm.
+
 ## Explicitly deferred — not started, not partial
 
 Lyrics + sync (was on this list) is done — see above. What remains, still

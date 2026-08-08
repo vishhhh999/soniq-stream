@@ -12,11 +12,15 @@ export default function SortableTrackRow({
   onOpenDetail,
   queueTracks,
   queueIndex,
+  isSelected,
+  onSelect,
 }: {
   group: TrackGroup;
   onOpenDetail: (t: Track) => void;
   queueTracks: Track[];
   queueIndex: number;
+  isSelected: boolean;
+  onSelect: (e: React.MouseEvent) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.latest.id });
 
@@ -37,7 +41,14 @@ export default function SortableTrackRow({
         <GripVertical size={14} strokeWidth={1.5} />
       </button>
       <div className="flex-1 min-w-0">
-        <TrackRowGroup group={group} onOpenDetail={onOpenDetail} queueTracks={queueTracks} queueIndex={queueIndex} />
+        <TrackRowGroup
+          group={group}
+          onOpenDetail={onOpenDetail}
+          queueTracks={queueTracks}
+          queueIndex={queueIndex}
+          isSelected={isSelected}
+          onSelect={onSelect}
+        />
       </div>
     </div>
   );

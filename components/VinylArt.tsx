@@ -6,14 +6,22 @@ type VinylArtProps = {
   size?: number;
   gradientFrom?: string;
   gradientTo?: string;
+  // When provided, overrides the CSS spin animation with a manual rotation
+  // (degrees) — used while a drag-to-scrub gesture is in progress, so the
+  // disc tracks the pointer instead of spinning on its own timer.
+  rotationOverride?: number;
 };
 
-export default function VinylArt({ coverUrl, spinning, size = 48, gradientFrom, gradientTo }: VinylArtProps) {
+export default function VinylArt({ coverUrl, spinning, size = 48, gradientFrom, gradientTo, rotationOverride }: VinylArtProps) {
   const labelSize = size * 0.42;
   return (
     <div
-      className={`relative shrink-0 rounded-full ${spinning ? "vinyl-spinning" : ""}`}
-      style={{ width: size, height: size }}
+      className={`relative shrink-0 rounded-full ${spinning && rotationOverride === undefined ? "vinyl-spinning" : ""}`}
+      style={{
+        width: size,
+        height: size,
+        transform: rotationOverride !== undefined ? `rotate(${rotationOverride}deg)` : undefined,
+      }}
     >
       <svg width={size} height={size} viewBox="0 0 100 100" className="absolute inset-0">
         <circle cx="50" cy="50" r="49" fill="#0a0a0a" />

@@ -10,8 +10,11 @@ import UploadButton from "@/components/UploadButton";
 import TrackDetail from "@/components/TrackDetail";
 import SortableTrackRow from "@/components/SortableTrackRow";
 import ShareModal from "@/components/ShareModal";
+import LyricsSidebar from "@/components/LyricsSidebar";
 import { groupVersions } from "@/lib/groupVersions";
 import { fetchArray } from "@/lib/apiFetch";
+import { computeSelection } from "@/lib/selection";
+import { gradientFromSeed } from "@/lib/gradient";
 import type { Track } from "@/components/PlayerProvider";
 
 export default function AlbumPage({ params }: { params: { id: string } }) {
@@ -24,6 +27,8 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   const [showShare, setShowShare] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -118,16 +123,47 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   };
 
   return (
-    <main className="max-w-[1600px] mx-auto px-8 lg:px-16 pt-16">
+    <div className="flex">
+    <main className="relative max-w-[1600px] mx-auto px-8 lg:px-16 pt-16 flex-1 min-w-0">
+      {/* Full-bleed hero wash behind the header — blurred cover art if one
+         exists, or the same deterministic per-album gradient used for the
+         ambient background otherwise, so an album without art still feels
+         intentional rather than blank. The "left-1/2 -translate-x-1/2
+         w-screen" trick breaks out of this container's max-width/padding
+         to go edge-to-edge behind the constrained content. */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-screen h-[360px] overflow-hidden -z-10 pointer-events-none">
+        {album?.coverUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={album.coverUrl}
+            alt=""
+            className="w-full h-full object-cover scale-125 blur-3xl opacity-40"
+          />
+        ) : (
+          album && (
+            <div
+              className="w-full h-full opacity-30"
+              style={{
+                background: `linear-gradient(135deg, ${gradientFromSeed(album.id).from}, ${gradientFromSeed(album.id).to})`,
+              }}
+            />
+          )
+        )}
+        <div
+          className="absolute inset-0"
+          style={{ background: "linear-gradient(to bottom, transparent 0%, var(--bg-base) 90%)" }}
+        />
+      </div>
+
       <button
         onClick={() => router.push("/")}
-        className="flex items-center gap-2 text-sm text-secondary hover:text-primary transition-colors mb-10"
+        className="relative flex items-center gap-2 text-sm text-secondary hover:text-primary transition-colors mb-10"
       >
         <ArrowLeft size={15} strokeWidth={1.5} />
         Library
       </button>
 
-      <div className="flex items-end gap-6 mb-16">
+      <div className="relative flex items-end gap-6 mb-16">
         <button
           onClick={() => coverInputRef.current?.click()}
           disabled={uploadingCover}
@@ -223,7 +259,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={groups.map((g) => g.latest.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-1">
+            <div className="space-y-1" onClick={() => setSelectedIds(new Set())}>
               {groups.map((g, i) => (
                 <motion.div
                   key={g.key}
@@ -236,6 +272,16 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
                     onOpenDetail={setDetailTrack}
                     queueTracks={groups.map((gr) => gr.latest)}
                     queueIndex={i}
+                    isSelected={selectedIds.has(g.latest.id)}
+                    onSelect={(e) => {
+                      e.stopPropagation();
+                      const orderedIds = groups.map((gr) => gr.latest.id);
+                      const { next, newLastSelected } = computeSelection(
+                        g.latest.id, orderedIds, selectedIds, lastSelectedId, e
+                      );
+                      setSelectedIds(next);
+                      setLastSelectedId(newLastSelected);
+                    }}
                   />
                 </motion.div>
               ))}
@@ -263,5 +309,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
         <ShareModal title={album.name} albumId={params.id} onClose={() => setShowShare(false)} />
       )}
     </main>
+    <LyricsSidebar onExpand={() => window.dispatchEvent(new CustomEvent("soniq:expand-lyrics"))} />
+    </div>
   );
 }

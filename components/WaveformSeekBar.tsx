@@ -18,7 +18,7 @@ export default function WaveformSeekBar({
   const playedRatio = duration ? Math.min(1, progress / duration) : 0;
 
   return (
-    <div className="relative flex-1 h-8 flex items-center group">
+    <div className="relative flex-1 h-5 flex items-center group">
       {/* Bars colored by played/unplayed position, not one flat grey —
          var(--text-primary) and var(--text-tertiary) already have correct,
          separate values for light and dark mode in globals.css, so this

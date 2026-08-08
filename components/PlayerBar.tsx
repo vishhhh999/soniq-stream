@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { usePlayer } from "./PlayerProvider";
-import VinylArt from "./VinylArt";
+import InteractiveVinyl from "./InteractiveVinyl";
 import WaveformSeekBar from "./WaveformSeekBar";
 import LyricsView from "./LyricsView";
 import SortableQueueItem from "./SortableQueueItem";
@@ -54,6 +54,15 @@ export default function PlayerBar() {
     audioRef.current.src = current.fileUrl;
     audioRef.current.play().catch(() => {});
   }, [current]);
+
+  // The sidebar's expand button (LyricsSidebar, on the main library pages)
+  // dispatches this same event so both it and the mic button open the one
+  // fullscreen view — no separate code path for "expand from sidebar."
+  useEffect(() => {
+    const onExpand = () => setShowLyrics(true);
+    window.addEventListener("soniq:expand-lyrics", onExpand);
+    return () => window.removeEventListener("soniq:expand-lyrics", onExpand);
+  }, []);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -153,9 +162,8 @@ export default function PlayerBar() {
          clip past the container edge the way it did in the full-width bar. */}
       <div className="h-16 bg-elevated/95 backdrop-blur border border-border rounded-full flex items-center px-5 gap-4 shadow-xl">
         <div className="w-44 min-w-0 flex items-center gap-2.5 shrink-0">
-          <VinylArt
+          <InteractiveVinyl
             coverUrl={current?.albumCoverUrl}
-            spinning={isPlaying}
             size={40}
             gradientFrom={gradient?.from}
             gradientTo={gradient?.to}

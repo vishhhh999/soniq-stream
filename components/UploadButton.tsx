@@ -5,6 +5,7 @@ import { Plus, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { detectBPM } from "@/lib/bpm";
 import { detectKey } from "@/lib/key";
+import DuplicateChoiceModal from "./DuplicateChoiceModal";
 
 export default function UploadButton({
   onUploaded,
@@ -21,14 +22,45 @@ export default function UploadButton({
   const [busy, setBusy] = useState(false);
   const [label, setLabel] = useState(labelProp);
   const [error, setError] = useState<string | null>(null);
+  const [duplicatePrompt, setDuplicatePrompt] = useState<{ filename: string; existingTitle: string } | null>(null);
+  const duplicateChoiceResolver = useRef<((choice: "version" | "independent" | "cancel") => void) | null>(null);
+
+  const askDuplicateChoice = (filename: string, existingTitle: string) => {
+    return new Promise<"version" | "independent" | "cancel">((resolve) => {
+      duplicateChoiceResolver.current = resolve;
+      setDuplicatePrompt({ filename, existingTitle });
+    });
+  };
 
   const handleFiles = async (files: FileList) => {
     setBusy(true);
     setError(null);
     for (const file of Array.from(files)) {
       try {
-        // Step 1: ask our server for a direct-to-R2 upload URL. Tiny
-        // request/response — the file itself doesn't touch this call.
+        // Approximate title from filename — the real ID3-tag title isn't
+        // known until the file is parsed server-side during finalize,
+        // which happens after upload. Matches finalize's own fallback for
+        // files with no title tag, and covers the common case where the
+        // filename already is the track name.
+        const approxTitle = file.name.replace(/\.[^.]+$/, "");
+        let independent = false;
+
+        setLabel(`Checking ${file.name}...`);
+        const dupRes = await fetch("/api/tracks/check-duplicate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: approxTitle, albumId, folderId }),
+        });
+        if (dupRes.ok) {
+          const dup = await dupRes.json();
+          if (dup.duplicate) {
+            const choice = await askDuplicateChoice(file.name, dup.existingTitle);
+            setDuplicatePrompt(null);
+            if (choice === "cancel") continue;
+            independent = choice === "independent";
+          }
+        }
+
         setLabel(`Preparing ${file.name}...`);
         const presignRes = await fetch("/api/upload/presign", {
           method: "POST",
@@ -41,10 +73,6 @@ export default function UploadButton({
         }
         const { uploadUrl, publicUrl } = await presignRes.json();
 
-        // Step 2: browser uploads the actual file straight to R2. This is
-        // the step that used to go through our Vercel function and hit its
-        // hard 4.5MB body-size limit on any real audio file. Now it goes
-        // directly to storage instead.
         setLabel(`Uploading ${file.name}...`);
         const putRes = await fetch(uploadUrl, {
           method: "PUT",
@@ -55,9 +83,6 @@ export default function UploadButton({
           throw new Error(`Storage rejected the upload (${putRes.status}). Check your R2 bucket's CORS policy.`);
         }
 
-        // Step 3: tell our server the file landed — it fetches it back from
-        // R2 (server-to-server, no size limit) to extract metadata and run
-        // duplicate detection, then writes the DB row.
         setLabel(`Processing ${file.name}...`);
         const finalizeRes = await fetch("/api/upload/finalize", {
           method: "POST",
@@ -69,6 +94,7 @@ export default function UploadButton({
             fileSize: file.size,
             albumId,
             folderId,
+            independent,
           }),
         });
         if (!finalizeRes.ok) {
@@ -129,6 +155,17 @@ export default function UploadButton({
         <Plus size={16} strokeWidth={2} />
         {label}
       </button>
+
+      {duplicatePrompt && (
+        <DuplicateChoiceModal
+          filename={duplicatePrompt.filename}
+          existingTitle={duplicatePrompt.existingTitle}
+          onChoose={(choice) => {
+            duplicateChoiceResolver.current?.(choice);
+            duplicateChoiceResolver.current = null;
+          }}
+        />
+      )}
 
       <AnimatePresence>
         {error && (

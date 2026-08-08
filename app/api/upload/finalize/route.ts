@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const userId = session?.user && (session.user as any).id;
     if (!userId) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
 
-    const { publicUrl, filename, contentType, fileSize, albumId, folderId } = await req.json();
+    const { publicUrl, filename, contentType, fileSize, albumId, folderId, independent } = await req.json();
     if (!publicUrl || !filename) {
       return NextResponse.json({ error: "publicUrl and filename are required" }, { status: 400 });
     }
@@ -81,10 +81,12 @@ export async function POST(req: NextRequest) {
       ? and(isNull(tracks.albumId), eq(tracks.folderId, folderId), eq(tracks.userId, userId))
       : and(isNull(tracks.albumId), isNull(tracks.folderId), eq(tracks.userId, userId));
 
-    const siblings = await db
-      .select()
-      .from(tracks)
-      .where(and(scopeCondition, sql`lower(trim(${tracks.title})) = ${normalizeTitle(title)}`));
+    const siblings = independent
+      ? []
+      : await db
+          .select()
+          .from(tracks)
+          .where(and(scopeCondition, sql`lower(trim(${tracks.title})) = ${normalizeTitle(title)}`));
 
     let versionGroupId: string;
     let versionNumber: number;
