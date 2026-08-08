@@ -3,6 +3,24 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Play } from "lucide-react";
+import { gradientFromSeed } from "@/lib/gradient";
+
+type TrackStat = { trackId: string; title: string; plays: number };
+type ListenerStat = { userId: string | null; username: string | null; plays: number };
+type InsightsData = { totalPlays: number; byTrack: TrackStat[]; byListener: ListenerStat[] };
+
+function Avatar({ userId, username }: { userId: string | null; username: string | null }) {
+  const { from, to } = gradientFromSeed(userId ?? "anon");
+  const label = username ? username[0].toUpperCase() : "?";
+  return (
+    <div
+      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium text-white shrink-0"
+      style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
+    >
+      {label}
+    </div>
+  );
+}
 
 export default function AlbumInsightsModal({
   albumId,
@@ -13,8 +31,9 @@ export default function AlbumInsightsModal({
   albumName: string;
   onClose: () => void;
 }) {
-  const [data, setData] = useState<{ totalPlays: number; byTrack: { trackId: string; title: string; plays: number }[] } | null>(null);
+  const [data, setData] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"tracks" | "listeners">("tracks");
 
   useEffect(() => {
     fetch(`/api/albums/${albumId}/insights`)
@@ -24,7 +43,7 @@ export default function AlbumInsightsModal({
       .finally(() => setLoading(false));
   }, [albumId]);
 
-  const maxPlays = data?.byTrack.reduce((m, t) => Math.max(m, t.plays), 0) || 1;
+  const maxTrackPlays = data?.byTrack.reduce((m, t) => Math.max(m, t.plays), 0) || 1;
 
   return (
     <AnimatePresence>
@@ -65,35 +84,69 @@ export default function AlbumInsightsModal({
                   <p className="text-xs text-tertiary uppercase tracking-wide mt-1">Total plays</p>
                 </div>
 
-                {data.byTrack.length === 0 ? (
-                  <p className="text-sm text-tertiary text-center py-4">No tracks in this album yet.</p>
+                {/* Tabs */}
+                <div className="flex gap-1 mb-5 bg-surface rounded-md p-1">
+                  {(["tracks", "listeners"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTab(t)}
+                      className={`flex-1 text-xs py-1.5 rounded transition-colors capitalize ${
+                        tab === t
+                          ? "bg-elevated text-primary shadow-sm"
+                          : "text-tertiary hover:text-secondary"
+                      }`}
+                    >
+                      By {t === "tracks" ? "track" : "listener"}
+                    </button>
+                  ))}
+                </div>
+
+                {tab === "tracks" ? (
+                  data.byTrack.length === 0 ? (
+                    <p className="text-sm text-tertiary text-center py-4">No tracks yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {data.byTrack.map((t) => (
+                        <div key={t.trackId}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-primary truncate mr-2">{t.title}</span>
+                            <span className="text-xs text-tertiary tabular-nums shrink-0 flex items-center gap-1">
+                              <Play size={10} strokeWidth={2} />
+                              {t.plays}
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-surface rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-accent rounded-full transition-all"
+                              style={{ width: `${(t.plays / maxTrackPlays) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
                 ) : (
-                  <div className="space-y-3">
-                    {data.byTrack.map((t) => (
-                      <div key={t.trackId}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-primary truncate mr-2">{t.title}</span>
-                          <span className="text-xs text-tertiary tabular-nums shrink-0 flex items-center gap-1">
+                  data.byListener.length === 0 ? (
+                    <p className="text-sm text-tertiary text-center py-4">No plays recorded yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {data.byListener.map((l, i) => (
+                        <div key={l.userId ?? "anon"} className="flex items-center gap-3">
+                          <Avatar userId={l.userId} username={l.username} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-primary truncate">
+                              {l.username ? `@${l.username}` : "Anonymous"}
+                            </p>
+                          </div>
+                          <span className="text-xs text-tertiary tabular-nums flex items-center gap-1 shrink-0">
                             <Play size={10} strokeWidth={2} />
-                            {t.plays}
+                            {l.plays}
                           </span>
                         </div>
-                        <div className="h-1.5 bg-surface rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-accent rounded-full transition-all"
-                            style={{ width: `${(t.plays / maxPlays) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )
                 )}
-
-                <p className="text-xs text-tertiary text-center mt-6 pt-4 border-t border-border">
-                  Per-listener attribution (who played what) needs share-page play
-                  tracking, which isn't built yet — this shows total plays across
-                  all sources.
-                </p>
               </>
             )}
           </div>

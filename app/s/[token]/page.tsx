@@ -212,6 +212,12 @@ export default function SharePage({ params }: { params: { token: string } }) {
       .catch((e) => setError(e.message));
   }, [params.token]);
 
+  // Create a content_follow row when a logged-in user views someone else's share.
+  useEffect(() => {
+    if (!data || !userId) return;
+    fetch(`/api/share/${params.token}/follow`, { method: "POST" }).catch(() => {});
+  }, [data, userId]);
+
   // Sync audio src when track changes.
   useEffect(() => {
     if (!tracks[currentTrackIndex]) return;
@@ -370,7 +376,7 @@ export default function SharePage({ params }: { params: { token: string } }) {
               <p className="text-xs uppercase tracking-wide text-tertiary mb-2">
                 {data.type === "album" ? "Shared album" : "Shared track"}
               </p>
-              <h1 className="text-2xl font-display font-bold text-primary tracking-tight truncate mb-1">
+              <h1 className="text-2xl font-display font-bold text-primary tracking-tight mb-1 break-words">
                 {title}
               </h1>
               <p className="text-secondary text-sm mb-6">{subtitle}</p>

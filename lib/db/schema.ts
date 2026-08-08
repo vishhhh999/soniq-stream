@@ -125,3 +125,31 @@ export const comments = pgTable("comments", {
   body: text("body").notNull(),
   createdAt: timestamp("created_at").notNull(),
 });
+
+// Created when a logged-in user opens someone else's share link.
+// Represents "I am watching this owner's content."
+// One row per viewer+album pair — idempotent on insert.
+export const contentFollows = pgTable("content_follows", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),    // the watcher
+  ownerId: text("owner_id").notNull(),  // whose content
+  albumId: text("album_id"),
+  trackId: text("track_id"),
+  createdAt: timestamp("created_at").notNull(),
+});
+
+// Titles/names/usernames are denormalized at insert time so notifications
+// survive track deletions and username changes without broken joins.
+export const notifications = pgTable("notifications", {
+  id: text("id").primaryKey(),
+  recipientUserId: text("recipient_user_id").notNull(),
+  actorUserId: text("actor_user_id"),       // null = anonymous
+  type: text("type").notNull(),             // track_added | version_added | track_removed | track_played
+  albumId: text("album_id"),
+  trackId: text("track_id"),
+  trackTitle: text("track_title"),
+  albumName: text("album_name"),
+  actorUsername: text("actor_username"),    // null = anonymous
+  seen: boolean("seen").notNull().default(false),
+  createdAt: timestamp("created_at").notNull(),
+});

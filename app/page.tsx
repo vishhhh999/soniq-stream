@@ -16,6 +16,7 @@ import LyricsSidebar from "@/components/LyricsSidebar";
 import CreateFolderModal from "@/components/CreateFolderModal";
 import SelectionToolbar from "@/components/SelectionToolbar";
 import UsernamePrompt from "@/components/UsernamePrompt";
+import NotificationsBell from "@/components/NotificationsBell";
 import { groupVersions } from "@/lib/groupVersions";
 import { fetchArray } from "@/lib/apiFetch";
 import { computeSelection } from "@/lib/selection";
@@ -209,6 +210,7 @@ export default function Home() {
           >
             <SettingsIcon size={15} strokeWidth={1.5} />
           </button>
+          <NotificationsBell />
           <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
           <button
             onClick={() => setShowNewAlbum(true)}

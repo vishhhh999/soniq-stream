@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { playEvents, shareLinks, tracks } from "@/lib/db/schema";
 import { and, desc, eq, gt } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { notifyOwnerOfPlay, getUsernameById } from "@/lib/notifications";
+import { albums } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +66,30 @@ export async function POST(
     userId,
     playedAt: new Date(),
   });
+
+  // Notify the track owner about the play.
+  try {
+    const [fullTrack] = await db.select({ userId: tracks.userId, title: tracks.title, albumId: tracks.albumId }).from(tracks).where(eq(tracks.id, trackId));
+    if (fullTrack) {
+      let albumName: string | null = null;
+      if (fullTrack.albumId) {
+        const [album] = await db.select({ name: albums.name }).from(albums).where(eq(albums.id, fullTrack.albumId));
+        albumName = album?.name ?? null;
+      }
+      const actorUsername = userId ? await getUsernameById(userId) : null;
+      await notifyOwnerOfPlay({
+        ownerId: fullTrack.userId,
+        actorUserId: userId,
+        actorUsername,
+        trackId,
+        trackTitle: fullTrack.title,
+        albumId: fullTrack.albumId ?? null,
+        albumName,
+      });
+    }
+  } catch (err) {
+    console.error("Play notification failed (non-fatal):", err);
+  }
 
   return NextResponse.json({ ok: true, counted: true });
 }

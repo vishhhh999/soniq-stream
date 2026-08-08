@@ -136,6 +136,34 @@ async function main() {
   // If the table already existed with NOT NULL, drop the constraint.
   await sql`ALTER TABLE play_events ALTER COLUMN user_id DROP NOT NULL;`;
 
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS content_follows (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      album_id TEXT,
+      track_id TEXT,
+      created_at TIMESTAMP NOT NULL
+    );
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      recipient_user_id TEXT NOT NULL,
+      actor_user_id TEXT,
+      type TEXT NOT NULL,
+      album_id TEXT,
+      track_id TEXT,
+      track_title TEXT,
+      album_name TEXT,
+      actor_username TEXT,
+      seen BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMP NOT NULL
+    );
+  `;
+
   console.log("Postgres schema ready");
   await sql.end();
 }

@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { tracks } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { r2, R2_BUCKET } from "@/lib/r2";
+import { albums } from "@/lib/db/schema";
+import { notifyAlbumFollowers, getUsernameById } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +59,26 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   if (!track) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
   await db.delete(tracks).where(eq(tracks.id, params.id));
+
+  // Notify album followers about the removal (non-fatal if it fails).
+  if (track.albumId) {
+    try {
+      const [album] = await db.select({ name: albums.name }).from(albums).where(eq(albums.id, track.albumId));
+      const actorUsername = await getUsernameById(userId as string);
+      await notifyAlbumFollowers({
+        ownerId: track.userId,
+        actorUserId: userId as string,
+        actorUsername,
+        albumId: track.albumId,
+        albumName: album?.name ?? "Unknown album",
+        trackId: track.id,
+        trackTitle: track.title,
+        type: "track_removed",
+      });
+    } catch (err) {
+      console.error("Notification dispatch failed (non-fatal):", err);
+    }
+  }
 
   if (track.fileUrl && R2_BUCKET) {
     try {

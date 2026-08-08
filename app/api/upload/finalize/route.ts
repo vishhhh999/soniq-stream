@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { tracks, albums } from "@/lib/db/schema";
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { notifyAlbumFollowers, getUsernameById } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
