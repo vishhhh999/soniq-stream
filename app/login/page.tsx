@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import Logo from "@/components/Logo";
 
 export default function LoginPage() {
   const [checking, setChecking] = useState(true);
@@ -56,6 +57,7 @@ export default function LoginPage() {
     return (
       <main className="min-h-screen flex items-center justify-center bg-canvas px-6">
         <div className="max-w-sm w-full text-center">
+          <Logo size={32} className="text-primary mx-auto mb-3" />
           <h1 className="text-2xl font-display font-bold text-primary tracking-tight mb-4">SONIQ</h1>
           <p className="text-sm text-error">{checkError}</p>
         </div>
@@ -66,6 +68,7 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-canvas px-6">
       <div className="max-w-xs w-full">
+        <Logo size={30} className="text-primary mb-4" />
         <h1 className="text-2xl font-display font-bold text-primary tracking-tight mb-1">SONIQ</h1>
         <p className="text-secondary text-sm mb-8">Your library, locked to you.</p>
 

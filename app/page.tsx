@@ -7,6 +7,7 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, u
 import UploadButton from "@/components/UploadButton";
 import UploadDropZone from "@/components/UploadDropZone";
 import SettingsModal from "@/components/SettingsModal";
+import Logo from "@/components/Logo";
 import TrackDetail from "@/components/TrackDetail";
 import TrackRowGroup from "@/components/TrackRow";
 import AlbumCard, { Album } from "@/components/AlbumCard";
@@ -172,7 +173,10 @@ export default function Home() {
     <main className="max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-16 pt-8 sm:pt-16 flex-1 min-w-0">
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 sm:mb-12">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-display font-bold text-primary tracking-tight">SONIQ</h1>
+          <div className="flex items-center gap-2.5">
+            <Logo size={26} className="text-primary shrink-0" />
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-primary tracking-tight">SONIQ</h1>
+          </div>
           <p className="text-secondary text-sm sm:text-base mt-2">
             {tracks.length ? `${tracks.length} track${tracks.length === 1 ? "" : "s"}` : "Your library, empty for now."}
           </p>
