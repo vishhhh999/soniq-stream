@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       if (meta.common.title) title = meta.common.title;
       if (meta.common.artist) artist = meta.common.artist;
     } catch (err) {
-      console.warn("Metadata parse failed/timed out, continuing without it:", err);
+      console.error("METADATA ERROR:", err);
     }
 
     // Duplicate/version detection scoped to this user's own tracks —
