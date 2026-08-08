@@ -165,6 +165,48 @@ async function main() {
     );
   `;
 
+
+  // Album sharing columns
+  await sql`ALTER TABLE albums ADD COLUMN IF NOT EXISTS access_mode TEXT DEFAULT 'private';`;
+  await sql`ALTER TABLE albums ADD COLUMN IF NOT EXISTS allow_edit BOOLEAN DEFAULT false;`;
+  await sql`ALTER TABLE albums ADD COLUMN IF NOT EXISTS allow_download BOOLEAN DEFAULT false;`;
+  await sql`ALTER TABLE albums ADD COLUMN IF NOT EXISTS shared_from_album_id TEXT;`;
+  await sql`ALTER TABLE albums ADD COLUMN IF NOT EXISTS shared_by_user_id TEXT;`;
+  await sql`ALTER TABLE albums ADD COLUMN IF NOT EXISTS shared_by_username TEXT;`;
+  await sql`ALTER TABLE albums ADD COLUMN IF NOT EXISTS shared_by_avatar_url TEXT;`;
+
+  // Track original reference for play event forwarding
+  await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS original_track_id TEXT;`;
+
+  // Album members
+  await sql`
+    CREATE TABLE IF NOT EXISTS album_members (
+      id TEXT PRIMARY KEY,
+      album_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      can_edit BOOLEAN DEFAULT false,
+      can_download BOOLEAN DEFAULT false,
+      saved_album_id TEXT,
+      created_at TIMESTAMP NOT NULL
+    );
+  `;
+
+  // Invite links
+  await sql`
+    CREATE TABLE IF NOT EXISTS invite_links (
+      id TEXT PRIMARY KEY,
+      token TEXT NOT NULL UNIQUE,
+      album_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      max_uses INTEGER,
+      used_count INTEGER NOT NULL DEFAULT 0,
+      expires_at TIMESTAMP,
+      active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMP NOT NULL
+    );
+  `;
+
   console.log("Postgres schema ready");
   await sql.end();
 }

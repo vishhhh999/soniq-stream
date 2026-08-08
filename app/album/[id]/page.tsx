@@ -10,7 +10,7 @@ import UploadButton from "@/components/UploadButton";
 import UploadDropZone from "@/components/UploadDropZone";
 import TrackDetail from "@/components/TrackDetail";
 import SortableTrackRow from "@/components/SortableTrackRow";
-import ShareModal from "@/components/ShareModal";
+import AlbumSharePanel from "@/components/AlbumSharePanel";
 import AlbumInsightsModal from "@/components/AlbumInsightsModal";
 import LyricsSidebar from "@/components/LyricsSidebar";
 import SelectionToolbar from "@/components/SelectionToolbar";
@@ -41,6 +41,10 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  // Albums saved from someone else's share are read-only for the receiver.
+  const isReadOnly = !!(album?.sharedFromAlbumId);
+  const sharedBy = isReadOnly ? { username: album?.sharedByUsername, avatarUrl: album?.sharedByAvatarUrl } : null;
 
   const load = () => {
     Promise.all([
@@ -293,6 +297,24 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
             <p className="text-secondary text-sm mt-1">
               {tracks.length} track{tracks.length === 1 ? "" : "s"}
             </p>
+
+            {/* Attribution badge for received albums */}
+            {sharedBy && (
+              <div className="flex items-center gap-2 mt-2">
+                <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 bg-surface">
+                  {sharedBy.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={sharedBy.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : null}
+                </div>
+                <p className="text-xs text-tertiary">
+                  Shared by{" "}
+                  {sharedBy.username ? (
+                    <span className="text-secondary">@{sharedBy.username}</span>
+                  ) : "someone"}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Action buttons */}
@@ -323,17 +345,19 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
 
             <div className="flex-1" />
 
-            {/* Share */}
-            <button
-              onClick={() => setShowShare(true)}
-              className="flex items-center gap-1.5 text-sm text-secondary border border-border rounded-md px-3 py-2 hover:border-border-strong hover:text-primary transition-colors"
-            >
-              <Share2 size={15} strokeWidth={1.5} />
-              <span className="hidden sm:inline">Share</span>
-            </button>
+            {/* Share — owner only */}
+            {!isReadOnly && (
+              <button
+                onClick={() => setShowShare(true)}
+                className="flex items-center gap-1.5 text-sm text-secondary border border-border rounded-md px-3 py-2 hover:border-border-strong hover:text-primary transition-colors"
+              >
+                <Share2 size={15} strokeWidth={1.5} />
+                <span className="hidden sm:inline">Share</span>
+              </button>
+            )}
 
-            {/* Delete */}
-            {!confirmingDelete ? (
+            {/* Delete — owner only */}
+            {!isReadOnly && (!confirmingDelete ? (
               <button
                 onClick={() => setConfirmingDelete(true)}
                 className="flex items-center gap-1.5 text-sm text-error border border-error/40 rounded-md px-3 py-2 hover:bg-error/10 transition-colors"
@@ -351,9 +375,9 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
                   Cancel
                 </button>
               </div>
-            )}
+            ))}
 
-            <UploadButton onUploaded={load} albumId={params.id} label="Add tracks" />
+            {!isReadOnly && <UploadButton onUploaded={load} albumId={params.id} label="Add tracks" />}
 
             <div className="relative">
               <button
@@ -408,7 +432,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
           <p className="text-secondary text-base">No tracks in this album yet.</p>
         </div>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={isReadOnly ? () => {} : handleDragEnd}>
           <SortableContext items={groups.map((g) => g.latest.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-1" onClick={() => setSelectedIds(new Set())}>
               {groups.map((g, i) => (
@@ -456,7 +480,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
       )}
 
       {showShare && album && (
-        <ShareModal title={album.name} albumId={params.id} onClose={() => setShowShare(false)} />
+        <AlbumSharePanel albumId={params.id} albumName={album.name} albumCoverUrl={album.coverUrl} onClose={() => setShowShare(false)} />
       )}
 
       <SelectionToolbar

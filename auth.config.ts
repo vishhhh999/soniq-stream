@@ -17,6 +17,8 @@ export const authConfig = {
         /^\/api\/setup$/,
         /^\/s\//,
         /^\/api\/share\//,
+        /^\/invite\//,         // invite acceptance pages
+        /^\/api\/invite\//,    // invite preview API (GET, no auth needed)
         /^\/api\/auth\//, // NextAuth's own routes: signin, callback, session, csrf, signout
       ];
       if (publicPaths.some((re) => re.test(pathname))) return true;

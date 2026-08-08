@@ -3,7 +3,7 @@ import { CopyObjectCommand } from "@aws-sdk/client-s3";
 import { nanoid } from "nanoid";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { shareLinks, tracks, albums } from "@/lib/db/schema";
+import { shareLinks, tracks, albums, users, albumMembers } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2";
 
@@ -38,7 +38,9 @@ async function copyTrackForUser(
     fileUrl: newFileUrl,
     versionGroupId: newId,
     versionNumber: 1,
-    sortOrder: -Date.now(),
+    // Preserve original sort order so track sequence matches the source album.
+    sortOrder: original.sortOrder,
+    originalTrackId: original.id,
     createdAt: new Date(),
   });
 
@@ -55,11 +57,7 @@ export async function POST(
     return NextResponse.json({ error: "Sign in to save to your library." }, { status: 401 });
   }
 
-  const [link] = await db
-    .select()
-    .from(shareLinks)
-    .where(eq(shareLinks.token, params.token));
-
+  const [link] = await db.select().from(shareLinks).where(eq(shareLinks.token, params.token));
   if (!link) return NextResponse.json({ error: "Not found." }, { status: 404 });
   if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
     return NextResponse.json({ error: "This link has expired." }, { status: 410 });
@@ -67,12 +65,19 @@ export async function POST(
 
   try {
     if (link.albumId) {
-      // Album share: copy the album row + all its tracks.
-      const [originalAlbum] = await db
-        .select()
-        .from(albums)
-        .where(eq(albums.id, link.albumId));
+      const [originalAlbum] = await db.select().from(albums).where(eq(albums.id, link.albumId));
       if (!originalAlbum) return NextResponse.json({ error: "Not found." }, { status: 404 });
+
+      // Don't let the owner save their own album.
+      if (originalAlbum.userId === userId) {
+        return NextResponse.json({ error: "This is your own album." }, { status: 400 });
+      }
+
+      // Get the original owner's profile for attribution.
+      const [owner] = await db
+        .select({ username: users.username, avatarUrl: users.avatarUrl })
+        .from(users)
+        .where(eq(users.id, originalAlbum.userId));
 
       const albumTracks = await db
         .select()
@@ -81,25 +86,41 @@ export async function POST(
 
       const newAlbumId = nanoid();
       await db.insert(albums).values({
-        ...originalAlbum,
         id: newAlbumId,
         userId,
-        coverUrl: originalAlbum.coverUrl, // share the same cover URL, no R2 copy needed
+        folderId: null,
+        name: originalAlbum.name,
+        coverUrl: originalAlbum.coverUrl,
+        accessMode: "private",
+        allowEdit: false,
+        allowDownload: !!originalAlbum.allowDownload,
+        // Attribution — used to show "Shared by X" on the receiver's album page.
+        sharedFromAlbumId: originalAlbum.id,
+        sharedByUserId: originalAlbum.userId,
+        sharedByUsername: owner?.username ?? null,
+        sharedByAvatarUrl: owner?.avatarUrl ?? null,
         createdAt: new Date(),
       });
 
-      await Promise.all(
-        albumTracks.map((t) => copyTrackForUser(t, userId, newAlbumId))
-      );
+      await Promise.all(albumTracks.map((t) => copyTrackForUser(t, userId, newAlbumId)));
+
+      // Record the member so the owner can see who saved their album.
+      await db.insert(albumMembers).values({
+        id: nanoid(),
+        albumId: originalAlbum.id,
+        userId,
+        ownerId: originalAlbum.userId,
+        canEdit: false,
+        canDownload: !!originalAlbum.allowDownload,
+        savedAlbumId: newAlbumId,
+        createdAt: new Date(),
+      });
 
       return NextResponse.json({ ok: true, type: "album", albumId: newAlbumId });
     }
 
     if (link.trackId) {
-      const [original] = await db
-        .select()
-        .from(tracks)
-        .where(eq(tracks.id, link.trackId));
+      const [original] = await db.select().from(tracks).where(eq(tracks.id, link.trackId));
       if (!original) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
       const newId = await copyTrackForUser(original, userId);

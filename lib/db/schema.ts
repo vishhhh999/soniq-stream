@@ -33,6 +33,16 @@ export const albums = pgTable("albums", {
   name: text("name").notNull(),
   coverUrl: text("cover_url"),
   createdAt: timestamp("created_at").notNull(),
+  // Sharing settings — null accessMode means 'private' (default).
+  accessMode: text("access_mode").default("private"), // 'private' | 'invite_only' | 'public'
+  allowEdit: boolean("allow_edit").default(false),
+  allowDownload: boolean("allow_download").default(false),
+  // Set when this album was saved from someone else's share link.
+  // Presence of sharedFromAlbumId = read-only for the receiver.
+  sharedFromAlbumId: text("shared_from_album_id"),
+  sharedByUserId: text("shared_by_user_id"),
+  sharedByUsername: text("shared_by_username"),   // denormalized
+  sharedByAvatarUrl: text("shared_by_avatar_url"), // denormalized
 });
 
 export const tracks = pgTable("tracks", {
@@ -76,6 +86,9 @@ export const tracks = pgTable("tracks", {
   // { time: number, text: string } pairs in playback order.
   lyrics: text("lyrics"),
   lyricsSynced: jsonb("lyrics_synced"),
+  // Set when this track was copied from someone else's library via save-to-library.
+  // Used to forward play events to the original track's owner.
+  originalTrackId: text("original_track_id"),
   createdAt: timestamp("created_at").notNull(),
 });
 
@@ -97,6 +110,33 @@ export const shareLinks = pgTable("share_links", {
 // anyone with a share token can view it. That's an acceptable bar for a
 // personal tool with random, unguessable nanoid IDs, but it would NOT be
 // an acceptable bar if this app ever had untrusted/adversarial users.
+// Tracks who has access to a shared album, and their permissions.
+// Created when someone joins via invite link or saves from share page.
+export const albumMembers = pgTable("album_members", {
+  id: text("id").primaryKey(),
+  albumId: text("album_id").notNull(), // the ORIGINAL album (owner's)
+  userId: text("user_id").notNull(),   // the member
+  ownerId: text("owner_id").notNull(),  // the album owner
+  canEdit: boolean("can_edit").default(false),
+  canDownload: boolean("can_download").default(false),
+  // savedAlbumId: the copy in the member's own library (null if not yet saved)
+  savedAlbumId: text("saved_album_id"),
+  createdAt: timestamp("created_at").notNull(),
+});
+
+// Invite links for album access. Either maxUses OR expiresAt, not both.
+export const inviteLinks = pgTable("invite_links", {
+  id: text("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  albumId: text("album_id").notNull(),
+  ownerId: text("owner_id").notNull(),
+  maxUses: integer("max_uses"),     // null = unlimited
+  usedCount: integer("used_count").notNull().default(0),
+  expiresAt: timestamp("expires_at"), // null = never expires
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull(),
+});
+
 export const otpCodes = pgTable("otp_codes", {
   id: text("id").primaryKey(),
   email: text("email").notNull(),
