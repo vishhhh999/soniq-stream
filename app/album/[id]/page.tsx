@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { ArrowLeft, Disc3, Pencil, Share2, ImagePlus, Trash2, Play, Shuffle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, Disc3, Pencil, Share2, ImagePlus, Trash2, Play, Shuffle, MoreHorizontal, BarChart3, ListPlus } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import UploadButton from "@/components/UploadButton";
@@ -11,6 +11,7 @@ import UploadDropZone from "@/components/UploadDropZone";
 import TrackDetail from "@/components/TrackDetail";
 import SortableTrackRow from "@/components/SortableTrackRow";
 import ShareModal from "@/components/ShareModal";
+import AlbumInsightsModal from "@/components/AlbumInsightsModal";
 import LyricsSidebar from "@/components/LyricsSidebar";
 import SelectionToolbar from "@/components/SelectionToolbar";
 import { groupVersions } from "@/lib/groupVersions";
@@ -23,7 +24,7 @@ import type { Album } from "@/components/AlbumCard";
 
 export default function AlbumPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { playQueue, shuffleOn, toggleShuffle } = usePlayer();
+  const { playQueue, shuffleOn, toggleShuffle, queue, reorderQueue } = usePlayer();
   const [album, setAlbum] = useState<any>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [detailTrack, setDetailTrack] = useState<Track | null>(null);
@@ -32,6 +33,8 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   const [showShare, setShowShare] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const [allAlbums, setAllAlbums] = useState<Album[]>([]);
@@ -351,9 +354,54 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
             )}
 
             <UploadButton onUploaded={load} albumId={params.id} label="Add tracks" />
+
+            <div className="relative">
+              <button
+                onClick={() => setShowMoreMenu((v) => !v)}
+                className="w-9 h-9 flex items-center justify-center rounded-md border border-border hover:border-border-strong transition-colors text-secondary hover:text-primary"
+              >
+                <MoreHorizontal size={16} strokeWidth={1.5} />
+              </button>
+              <AnimatePresence>
+                {showMoreMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    className="absolute top-full right-0 mt-2 w-48 bg-elevated border border-border rounded-lg shadow-xl overflow-hidden z-10"
+                  >
+                    <button
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        setShowInsights(true);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-primary hover:bg-surface transition-colors"
+                    >
+                      <BarChart3 size={14} strokeWidth={1.5} className="text-secondary" />
+                      Insights
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        if (groups.length > 0) reorderQueue([...queue, ...groups.map((g) => g.latest)]);
+                      }}
+                      disabled={groups.length === 0}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-primary hover:bg-surface transition-colors disabled:opacity-40"
+                    >
+                      <ListPlus size={14} strokeWidth={1.5} className="text-secondary" />
+                      Add to queue
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </div>
+
+      {showInsights && album && (
+        <AlbumInsightsModal albumId={params.id} albumName={album.name} onClose={() => setShowInsights(false)} />
+      )}
 
       {groups.length === 0 ? (
         <div className="border border-dashed border-border rounded-lg py-16 sm:py-24 text-center">

@@ -484,6 +484,48 @@ Every existing feature carried over — nothing dropped in the rebuild.
 
 **Version bumped to v6.7**, shown in Settings.
 
+## This round: R2 cleanup fix, lyrics scroll/animation, album insights
+
+**R2 files staying after deletion — real bug, found and fixed.** Key
+extraction relied on an exact string match against the `R2_PUBLIC_URL`
+env var; if that didn't precisely match what was actually stored in
+`fileUrl` (trailing slash, custom domain vs r2.dev, anything), the
+existing guard silently skipped R2 deletion with zero error logged
+anywhere — files stayed in the bucket with no indication why. Replaced
+with proper URL parsing (`new URL(fileUrl).pathname`), which correctly
+extracts the object key regardless of domain format, and failures are
+now logged instead of silent.
+
+**Lyrics scroll was fully blocked, not glitching** — the container used
+`overflow-hidden` for the transform-based auto-scroll, but nothing
+handled wheel/touch input at all, so any attempt to manually scroll did
+nothing. Added manual override: scrolling now directly adjusts position
+and auto-follow pauses for ~2.5s, then resumes — the same pattern Apple
+Music/Spotify use so browsing ahead doesn't get yanked back immediately.
+
+**Lyrics sizing/animation** — the active line was a different font size
+(`text-xl`) than inactive lines (`text-sm`), and that abrupt size jump
+every time the highlighted line changed is what made the whole thing read
+as jagged. Every line is now one consistent size; highlighting is
+color/glow only. Also softened the scroll spring for a smoother feel.
+
+**Album insights** — new `/api/albums/[id]/insights`, total plays and a
+per-track breakdown, using data already being tracked. Verified against
+real seeded play data: 4 total across two tracks, 3/1 split, correctly
+sorted by play count. New three-dot menu on the album page (Insights, Add
+to queue — the latter correctly appends to whatever's already playing
+rather than restarting playback, unlike the existing Play button).
+
+**On "by listener" insights specifically (from your reference image) —
+this needs new work, not just UI.** Right now, only the track owner can
+ever generate a play event at all — other accounts are blocked from
+playing someone else's tracks by the isolation this app enforces
+everywhere, and the public share page doesn't record plays at all. Real
+per-listener attribution needs play-tracking added to the share page plus
+making `play_events.user_id` nullable for anonymous visitors. Not
+attempted this round — flagging the actual gap rather than shipping a
+partial/misleading version of it.
+
 ## Explicitly deferred — not started, not partial
 
 Lyrics + sync (was on this list) is done — see above. What remains, still

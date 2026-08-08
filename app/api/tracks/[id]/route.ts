@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { tracks } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
-import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2";
+import { r2, R2_BUCKET } from "@/lib/r2";
 
 export const dynamic = "force-dynamic";
 
@@ -58,14 +58,22 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   await db.delete(tracks).where(eq(tracks.id, params.id));
 
-  if (track.fileUrl && R2_BUCKET && R2_PUBLIC_URL) {
+  if (track.fileUrl && R2_BUCKET) {
     try {
-      const key = track.fileUrl.replace(`${R2_PUBLIC_URL.replace(/\/$/, "")}/`, "");
-      if (key && key !== track.fileUrl) {
+      // Parsing the actual URL's path is robust regardless of whether
+      // R2_PUBLIC_URL exactly matches what's stored in fileUrl (trailing
+      // slash, custom domain vs r2.dev, etc.) — the previous string-match
+      // approach silently skipped deletion with zero error logged if that
+      // env var didn't match precisely, which is very plausibly why files
+      // were staying in R2 after being deleted from the library.
+      const key = new URL(track.fileUrl).pathname.replace(/^\//, "");
+      if (key) {
         await r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: key }));
+      } else {
+        console.error(`R2 cleanup skipped for track ${track.id}: could not extract a key from fileUrl "${track.fileUrl}"`);
       }
     } catch (err) {
-      console.error("R2 cleanup failed (track still deleted from library):", err);
+      console.error(`R2 cleanup failed for track ${track.id} (track still deleted from library):`, err);
     }
   }
 
