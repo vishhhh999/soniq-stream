@@ -13,10 +13,17 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const { enabled: ambientOn, toggle: toggleAmbient } = useAmbient();
   const [email, setEmail] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [hasPassword, setHasPassword] = useState(false);
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameDraft, setUsernameDraft] = useState("");
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editingPassword, setEditingPassword] = useState(false);
+  const [currentPasswordDraft, setCurrentPasswordDraft] = useState("");
+  const [newPasswordDraft, setNewPasswordDraft] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSaved, setPasswordSaved] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
     fetch("/api/user/me")
@@ -24,6 +31,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       .then((d) => {
         if (d.email) setEmail(d.email);
         setUsername(d.username || null);
+        setHasPassword(!!d.hasPassword);
       })
       .catch(() => {});
   }, []);
@@ -44,6 +52,28 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
     }
     setUsername(data.username);
     setEditingUsername(false);
+  };
+
+  const savePassword = async () => {
+    setSavingPassword(true);
+    setPasswordError(null);
+    const res = await fetch("/api/user/password", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword: currentPasswordDraft, newPassword: newPasswordDraft }),
+    });
+    const data = await res.json();
+    setSavingPassword(false);
+    if (!res.ok) {
+      setPasswordError(data.error || "Could not update password.");
+      return;
+    }
+    setHasPassword(true);
+    setEditingPassword(false);
+    setCurrentPasswordDraft("");
+    setNewPasswordDraft("");
+    setPasswordSaved(true);
+    setTimeout(() => setPasswordSaved(false), 2000);
   };
 
   return (
@@ -123,6 +153,62 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                       {username ? `@${username}` : "Set a username"}
                       <Pencil size={12} strokeWidth={1.5} className="text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
                     </button>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-xs text-tertiary mb-1">Password</p>
+                  {editingPassword ? (
+                    <div className="space-y-2">
+                      {hasPassword && (
+                        <input
+                          type="password"
+                          value={currentPasswordDraft}
+                          onChange={(e) => setCurrentPasswordDraft(e.target.value)}
+                          placeholder="Current password"
+                          className="w-full bg-surface border border-border rounded-md px-3 py-1.5 text-sm text-primary focus:border-border-strong outline-none"
+                        />
+                      )}
+                      <input
+                        type="password"
+                        value={newPasswordDraft}
+                        onChange={(e) => setNewPasswordDraft(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && savePassword()}
+                        placeholder="New password (min. 8 characters)"
+                        className="w-full bg-surface border border-border rounded-md px-3 py-1.5 text-sm text-primary focus:border-border-strong outline-none"
+                      />
+                      {passwordError && <p className="text-xs text-error">{passwordError}</p>}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={savePassword}
+                          disabled={savingPassword || newPasswordDraft.length < 8}
+                          className="text-xs bg-accent text-canvas rounded-md px-3 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
+                        >
+                          {savingPassword ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingPassword(false);
+                            setPasswordError(null);
+                            setCurrentPasswordDraft("");
+                            setNewPasswordDraft("");
+                          }}
+                          className="text-xs text-secondary hover:text-primary transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setEditingPassword(true)}
+                        className="text-sm text-primary hover:text-secondary transition-colors"
+                      >
+                        {hasPassword ? "Change password" : "Set a password"}
+                      </button>
+                      {passwordSaved && <span className="text-xs text-accent flex items-center gap-1"><Check size={12} strokeWidth={2} /> Saved</span>}
+                    </div>
                   )}
                 </div>
               </div>

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Play, ListPlus, Pencil, Share2, Download, FolderInput,
+  Play, ListPlus, Pencil, Share2, Download, FolderInput, Copy,
   Trash2, Check, ChevronRight, X,
 } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
@@ -36,6 +36,7 @@ export default function TrackContextMenu({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [mounted, setMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -113,6 +114,14 @@ export default function TrackContextMenu({
     onClose();
   };
 
+  const duplicate = async () => {
+    setDuplicating(true);
+    await fetch(`/api/tracks/${track.id}/duplicate`, { method: "POST" }).catch(() => {});
+    setDuplicating(false);
+    onDeleteSuccess();
+    onClose();
+  };
+
   const deleteTrack = async () => {
     setDeleting(true);
     await fetch(`/api/tracks/${track.id}`, { method: "DELETE" });
@@ -157,6 +166,12 @@ export default function TrackContextMenu({
           label={downloading ? "Downloading..." : "Download"}
           onClick={download}
           disabled={downloading}
+        />
+        <MenuItem
+          icon={<Copy size={14} strokeWidth={1.5} />}
+          label={duplicating ? "Duplicating..." : "Duplicate"}
+          onClick={duplicate}
+          disabled={duplicating}
         />
       </div>
 

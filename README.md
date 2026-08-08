@@ -430,6 +430,60 @@ detection, duplicate-choice handling) out of `UploadButton` into a shared
 same tested logic rather than two copies of it. Verified the shared
 pipeline still works correctly post-refactor against real Postgres.
 
+## This round (v6.7): the actual BPM bug, duration self-heal, TrackDetail redesign
+
+**Found the real BPM bug — confirmed by reproducing the crash, not
+guessed.** `Math.max(...largeArray)` throws `RangeError: Maximum call
+stack size exceeded` once the array is large enough to exceed the JS
+engine's max argument count — and a real track's sample data (30s+ at a
+real sample rate) is ~1.3 million elements, nowhere near safe. This threw
+on every real upload, silently, explaining "never works, old or new"
+completely. Reproduced the exact crash in isolation before touching any
+code, fixed it with a plain loop (no size limit), and verified the fix
+produces bit-for-bit identical results to the old method on safe input
+while no longer throwing on realistic input.
+
+**Duration self-heals now** — your own suggested fix. The player already
+reads real duration from the browser's native audio decode
+(`audio.duration` via `loadedmetadata`), completely independent of
+whatever's stored in the database. Now, whenever that fires with a real
+value that doesn't match what's stored, it patches the track right then.
+Every track's duration fixes itself the next time it's played — no bulk
+reprocessing needed. Verified the PATCH path against real Postgres:
+`null` before, correct value after.
+
+**Album hero gradient** — the vertical fade existed, but the left/right
+edges had no fade at all, which is what actually read as abrupt. Added a
+horizontal vignette to match.
+
+**Change password** — built and fully verified end-to-end: wrong current
+password rejected, correct one accepted, and the new password confirmed
+to actually work for a subsequent login. Google-only accounts (no
+password yet) get "Set a password" instead and skip the current-password
+check, since there's nothing to verify against — this is the account's
+own owner adding a second sign-in method to their own already-
+authenticated account, not the cross-account-linking scenario `auth.ts`
+guards against elsewhere.
+
+**Duplicate — new feature, done properly.** A real server-side R2 copy
+(`CopyObjectCommand`), not two database rows pointing at the same file —
+sharing one file across two "copies" would mean deleting either one
+deletes the underlying object out from under the other. Wired into both
+the context menu and the new track panel. Verified the ownership/
+existence checks against real data (a track that doesn't exist, and one
+belonging to someone else, both correctly 404); the actual R2 copy
+operation itself can't be verified without real Cloudflare credentials,
+which aren't available here — that part is type-checked and reviewed,
+not run against live storage.
+
+**TrackDetail panel — fully rebuilt**, not patched. Grouped collapsible
+rows (Share, Notes, BPM & Key, Lyrics, Add to queue, Download, Duplicate,
+Delete) replacing the old always-expanded form layout, plus a static
+deterministic waveform preview and a duration/key/BPM subtitle line.
+Every existing feature carried over — nothing dropped in the rebuild.
+
+**Version bumped to v6.7**, shown in Settings.
+
 ## Explicitly deferred — not started, not partial
 
 Lyrics + sync (was on this list) is done — see above. What remains, still

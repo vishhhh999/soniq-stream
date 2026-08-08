@@ -28,7 +28,19 @@ export async function detectBPM(fileUrl: string): Promise<{ bpm: number; confide
   const peaks: number[] = [];
   const minGap = sampleRate * 0.2;
   let lastPeak = -minGap;
-  const threshold = 0.6 * Math.max(...Array.from(data.subarray(0, Math.min(data.length, sampleRate * 30))).map(Math.abs));
+  // Previously: Math.max(...Array.from(...).map(Math.abs)) — spreading a
+  // large array into Math.max() throws RangeError once it exceeds the JS
+  // engine's max argument count, which a real track's sample data always
+  // does (30s at 44.1kHz is ~1.3M samples, the limit is well under that).
+  // This threw on every real upload, silently failing detection every
+  // time — a plain loop has no such limit.
+  const windowEnd = Math.min(data.length, sampleRate * 30);
+  let peakAbs = 0;
+  for (let i = 0; i < windowEnd; i++) {
+    const abs = Math.abs(data[i]);
+    if (abs > peakAbs) peakAbs = abs;
+  }
+  const threshold = 0.6 * peakAbs;
 
   for (let i = 0; i < data.length; i++) {
     if (Math.abs(data[i]) > threshold && i - lastPeak > minGap) {

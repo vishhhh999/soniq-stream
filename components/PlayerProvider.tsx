@@ -50,6 +50,14 @@ function shuffleArray<T>(arr: T[]): T[] {
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [current, setCurrent] = useState<Track | null>(null);
+  // Mirrors `current` for use inside stable-listener effects below, so
+  // those effects don't need `current` in their dependency array (which
+  // would mean detaching/reattaching the audio element's listeners on
+  // every single track change).
+  const currentRef = useRef<Track | null>(null);
+  useEffect(() => {
+    currentRef.current = current;
+  }, [current]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -207,7 +215,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = audioRef.current;
     if (!audio) return;
     const onTime = () => setCurrentTime(audio.currentTime);
-    const onMeta = () => setDuration(audio.duration || 0);
+    const onMeta = () => {
+      const real = audio.duration || 0;
+      setDuration(real);
+      const track = currentRef.current;
+      if (!track || !real || !Number.isFinite(real)) return;
+      const stored = track.durationSec ?? 0;
+      // Only patch when meaningfully different — avoids a write on every
+      // single play for tracks that already have a correct stored value,
+      // and avoids false triggers from floating-point rounding.
+      if (Math.abs(stored - real) > 0.5) {
+        fetch(`/api/tracks/${track.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ durationSec: real }),
+        }).catch(() => {
+          // best-effort — the player itself already has the right value
+          // for this session regardless of whether the save succeeds
+        });
+      }
+    };
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("loadedmetadata", onMeta);
     return () => {

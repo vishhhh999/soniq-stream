@@ -214,6 +214,13 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
           className="absolute inset-0"
           style={{ background: "linear-gradient(to bottom, transparent 0%, var(--bg-base) 90%)" }}
         />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(to right, var(--bg-base) 0%, transparent 18%, transparent 82%, var(--bg-base) 100%)",
+          }}
+        />
       </div>
 
       <button
