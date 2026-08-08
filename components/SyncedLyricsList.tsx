@@ -24,6 +24,7 @@ export default function SyncedLyricsList({
   const containerRef = useRef<HTMLDivElement>(null);
   const activeLineRef = useRef<HTMLParagraphElement>(null);
   const [offset, setOffset] = useState(0);
+  const [isManual, setIsManual] = useState(false);
   const manualOverrideRef = useRef(false);
   const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -45,9 +46,11 @@ export default function SyncedLyricsList({
   // auto-follow pauses while doing so, resuming after a short pause.
   const beginManualOverride = () => {
     manualOverrideRef.current = true;
+    setIsManual(true);
     if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
     resumeTimerRef.current = setTimeout(() => {
       manualOverrideRef.current = false;
+      setIsManual(false);
       if (activeLineRef.current && containerRef.current) {
         const containerHeight = containerRef.current.offsetHeight;
         const lineTop = activeLineRef.current.offsetTop;
@@ -103,7 +106,7 @@ export default function SyncedLyricsList({
     >
       <motion.div
         animate={{ y: -offset }}
-        transition={{ type: "spring", stiffness: 120, damping: 22 }}
+        transition={isManual ? { duration: 0 } : { type: "spring", stiffness: 100, damping: 20 }}
         className={`absolute top-0 left-0 right-0 ${sizing.gap} ${sizing.padY}`}
       >
         {lines.map((line, i) => {
