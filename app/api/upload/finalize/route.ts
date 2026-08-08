@@ -59,18 +59,35 @@ export async function POST(req: NextRequest) {
     let channels: number | null = null;
 
     try {
-      const meta = await withTimeout(parseBuffer(buffer, contentType || undefined), 20000, "Metadata parsing");
-      const finite = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? n : null);
-      durationSec = finite(meta.format.duration);
-      sampleRate = finite(meta.format.sampleRate);
-      bitrate = meta.format.bitrate ? finite(Math.round(meta.format.bitrate / 1000)) : null;
-      channels = finite(meta.format.numberOfChannels);
-      if (meta.common.title) title = meta.common.title;
-      if (meta.common.artist) artist = meta.common.artist;
-    } catch (err) {
-      console.error("METADATA ERROR:", err);
-    }
+  const meta = await withTimeout(
+    parseBuffer(buffer, contentType || undefined),
+    20000,
+    "Metadata parsing"
+  );
 
+  console.log("========== METADATA ==========");
+  console.log(meta.format);
+  console.log(meta.common);
+  console.log("==============================");
+
+  const finite = (n: unknown) =>
+    typeof n === "number" && Number.isFinite(n) ? n : null;
+
+  durationSec = finite(meta.format.duration);
+  sampleRate = finite(meta.format.sampleRate);
+  bitrate = meta.format.bitrate
+    ? finite(Math.round(meta.format.bitrate / 1000))
+    : null;
+  channels = finite(meta.format.numberOfChannels);
+
+  if (meta.common.title) title = meta.common.title;
+  if (meta.common.artist) artist = meta.common.artist;
+
+  console.log("Duration:", durationSec);
+} catch (err) {
+  console.error("METADATA FAILED");
+  console.error(err);
+  }
     // Duplicate/version detection scoped to this user's own tracks —
     // previously scoped only by album/folder, meaning (before the ownership
     // fix) one user's track could get grouped as a "version" of a
