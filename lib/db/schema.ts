@@ -15,6 +15,7 @@ export const users = pgTable("users", {
   // Unique constraint enforced at DB level.
   googleLinkedAt: timestamp("google_linked_at"),
   username: text("username").unique(),
+  avatarUrl: text("avatar_url"),
 });
 
 export const folders = pgTable("folders", {

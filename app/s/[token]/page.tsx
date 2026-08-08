@@ -16,9 +16,11 @@ type Track = {
   coverUrl?: string | null;
 };
 
+type Owner = { username: string | null; avatarUrl: string | null };
+
 type ShareData =
-  | { type: "track"; track: Track; allowDownload: boolean }
-  | { type: "album"; album: { id: string; name: string; coverUrl?: string | null }; tracks: Track[]; allowDownload: boolean };
+  | { type: "track"; track: Track; allowDownload: boolean; owner: Owner }
+  | { type: "album"; album: { id: string; name: string; coverUrl?: string | null }; tracks: Track[]; allowDownload: boolean; owner: Owner };
 
 type Phase = "wrapped" | "unwrapping" | "revealed";
 
@@ -157,6 +159,32 @@ function CellophaneOverlay({ size, onClick }: { size: number; onClick: () => voi
   );
 }
 
+
+// Small avatar + "Shared by @username" row shown on the revealed share page.
+function SharedByBadge({ owner, gradFrom, gradTo }: { owner: Owner; gradFrom: string; gradTo: string }) {
+  if (!owner.username && !owner.avatarUrl) return null;
+  const label = owner.username?.[0]?.toUpperCase() ?? '?';
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <div
+        className="w-6 h-6 rounded-full overflow-hidden shrink-0"
+        style={{ background: owner.avatarUrl ? undefined : `linear-gradient(135deg, ${gradFrom}, ${gradTo})` }}
+      >
+        {owner.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={owner.avatarUrl} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white">{label}</span>
+        )}
+      </div>
+      <span className="text-xs text-tertiary">
+        Shared by{' '}
+        {owner.username ? <span className="text-secondary">@{owner.username}</span> : 'someone'}
+      </span>
+    </div>
+  );
+}
+
 export default function SharePage({ params }: { params: { token: string } }) {
   const { data: session } = useSession();
   const userId = session?.user && (session.user as any).id;
@@ -176,6 +204,8 @@ export default function SharePage({ params }: { params: { token: string } }) {
       ? [data.track]
       : data.tracks
     : [];
+
+  const owner: Owner = data ? (data as any).owner ?? { username: null, avatarUrl: null } : { username: null, avatarUrl: null };
 
   const coverUrl =
     data?.type === "album"
@@ -206,8 +236,9 @@ export default function SharePage({ params }: { params: { token: string } }) {
         return r.json();
       })
       .then((d) => {
-        if (d.track) setData({ type: "track", track: d.track, allowDownload: d.allowDownload });
-        else if (d.album) setData({ type: "album", album: d.album, tracks: d.tracks, allowDownload: d.allowDownload });
+const owner: Owner = { username: d.owner?.username ?? null, avatarUrl: d.owner?.avatarUrl ?? null };
+        if (d.track) setData({ type: "track", track: d.track, allowDownload: d.allowDownload, owner });
+else if (d.album) setData({ type: "album", album: d.album, tracks: d.tracks, allowDownload: d.allowDownload, owner });
       })
       .catch((e) => setError(e.message));
   }, [params.token]);
@@ -373,6 +404,7 @@ export default function SharePage({ params }: { params: { token: string } }) {
 
             {/* Metadata + controls */}
             <div className="flex-1 min-w-0">
+              <SharedByBadge owner={owner} gradFrom={gradFrom} gradTo={gradTo} />
               <p className="text-xs uppercase tracking-wide text-tertiary mb-2">
                 {data.type === "album" ? "Shared album" : "Shared track"}
               </p>

@@ -1,18 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Sun, Moon, Sparkles, LogOut, Check, Pencil } from "lucide-react";
+import { X, Sun, Moon, Sparkles, LogOut, Check, Pencil, Camera } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useTheme } from "./ThemeProvider";
 import { useAmbient } from "./AmbientProvider";
 import { APP_VERSION } from "@/lib/version";
+import { gradientFromSeed } from "@/lib/gradient";
 
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const { theme, toggle: toggleTheme } = useTheme();
   const { enabled: ambientOn, toggle: toggleAmbient } = useAmbient();
   const [email, setEmail] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [hasPassword, setHasPassword] = useState(false);
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameDraft, setUsernameDraft] = useState("");
@@ -24,17 +28,34 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/user/me")
       .then((r) => r.json())
       .then((d) => {
         if (d.email) setEmail(d.email);
+        if (d.id) setUserId(d.id);
         setUsername(d.username || null);
+        setAvatarUrl(d.avatarUrl || null);
         setHasPassword(!!d.hasPassword);
       })
       .catch(() => {});
   }, []);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    const formData = new FormData();
+    formData.append("avatar", file);
+    const res = await fetch("/api/user/avatar", { method: "POST", body: formData });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.avatarUrl) setAvatarUrl(data.avatarUrl);
+    setUploadingAvatar(false);
+    // Reset input so same file can be re-selected.
+    e.target.value = "";
+  };
 
   const saveUsername = async () => {
     setSaving(true);
@@ -76,6 +97,8 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
     setTimeout(() => setPasswordSaved(false), 2000);
   };
 
+  const { from: gradFrom, to: gradTo } = gradientFromSeed(userId ?? "default");
+
   return (
     <AnimatePresence>
       <motion.div
@@ -101,6 +124,56 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="p-6 space-y-8">
+            {/* Profile picture */}
+            <div>
+              <label className="text-xs uppercase tracking-wide text-tertiary mb-3 block">Profile</label>
+              <div className="flex items-center gap-4">
+                <div className="relative group">
+                  <button
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={uploadingAvatar}
+                    className="relative w-16 h-16 rounded-full overflow-hidden shrink-0 focus:outline-none"
+                  >
+                    {avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div
+                        className="w-full h-full flex items-center justify-center text-2xl font-bold text-white"
+                        style={{ background: `linear-gradient(135deg, ${gradFrom}, ${gradTo})` }}
+                      >
+                        {username?.[0]?.toUpperCase() ?? email?.[0]?.toUpperCase() ?? "?"}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-full">
+                      {uploadingAvatar
+                        ? <span className="text-white text-[10px]">...</span>
+                        : <Camera size={16} strokeWidth={1.5} className="text-white" />
+                      }
+                    </div>
+                  </button>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    hidden
+                    onChange={handleAvatarUpload}
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-primary">{username ? `@${username}` : email ?? "—"}</p>
+                  <button
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={uploadingAvatar}
+                    className="text-xs text-tertiary hover:text-secondary transition-colors mt-0.5"
+                  >
+                    {uploadingAvatar ? "Uploading..." : "Change photo"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Account */}
             <div>
               <label className="text-xs uppercase tracking-wide text-tertiary mb-3 block">Account</label>
               <div className="space-y-3">
@@ -132,10 +205,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                           {saving ? "Saving..." : "Save"}
                         </button>
                         <button
-                          onClick={() => {
-                            setEditingUsername(false);
-                            setUsernameError(null);
-                          }}
+                          onClick={() => { setEditingUsername(false); setUsernameError(null); }}
                           className="text-xs text-secondary hover:text-primary transition-colors"
                         >
                           Cancel
@@ -144,10 +214,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                     </div>
                   ) : (
                     <button
-                      onClick={() => {
-                        setUsernameDraft(username || "");
-                        setEditingUsername(true);
-                      }}
+                      onClick={() => { setUsernameDraft(username || ""); setEditingUsername(true); }}
                       className="flex items-center gap-1.5 text-sm text-primary hover:text-secondary transition-colors group"
                     >
                       {username ? `@${username}` : "Set a username"}
@@ -187,12 +254,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                           {savingPassword ? "Saving..." : "Save"}
                         </button>
                         <button
-                          onClick={() => {
-                            setEditingPassword(false);
-                            setPasswordError(null);
-                            setCurrentPasswordDraft("");
-                            setNewPasswordDraft("");
-                          }}
+                          onClick={() => { setEditingPassword(false); setPasswordError(null); setCurrentPasswordDraft(""); setNewPasswordDraft(""); }}
                           className="text-xs text-secondary hover:text-primary transition-colors"
                         >
                           Cancel
@@ -214,6 +276,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
+            {/* Appearance */}
             <div>
               <label className="text-xs uppercase tracking-wide text-tertiary mb-3 block">Appearance</label>
               <div className="space-y-1">

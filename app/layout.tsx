@@ -44,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <GoogleLinkToast />
                 <PlayTracker />
                 <InstallPrompt />
-                <div className="relative z-10 min-h-screen pb-24">{children}</div>
+                <div className="relative z-10 min-h-[calc(100vh-6rem)] pb-24">{children}</div>
               </PlayerProvider>
             </AmbientProvider>
           </ThemeProvider>

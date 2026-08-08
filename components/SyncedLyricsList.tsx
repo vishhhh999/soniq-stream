@@ -5,10 +5,6 @@ import { motion } from "framer-motion";
 import { usePlayer } from "./PlayerProvider";
 import { getCurrentLineIndex, SyncedLine } from "@/lib/lyricsSync";
 
-// How long after the user's last manual scroll/touch input before
-// auto-follow (tracking the active line) resumes — same pattern Apple
-// Music/Spotify use, so scrolling ahead to read upcoming lines doesn't
-// immediately get yanked back to the currently-playing line.
 const RESUME_AUTO_FOLLOW_MS = 2500;
 
 export default function SyncedLyricsList({
@@ -22,6 +18,7 @@ export default function SyncedLyricsList({
 }) {
   const { audioRef } = usePlayer();
   const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const activeLineRef = useRef<HTMLParagraphElement>(null);
   const [offset, setOffset] = useState(0);
   const [isManual, setIsManual] = useState(false);
@@ -30,8 +27,9 @@ export default function SyncedLyricsList({
 
   const activeIndex = getCurrentLineIndex(lines, currentTime);
 
+  // Auto-follow: keep active line centred when not in manual mode.
   useEffect(() => {
-    if (manualOverrideRef.current) return; // user is actively browsing — don't yank them back
+    if (manualOverrideRef.current) return;
     if (!activeLineRef.current || !containerRef.current) return;
     const containerHeight = containerRef.current.offsetHeight;
     const lineTop = activeLineRef.current.offsetTop;
@@ -39,50 +37,87 @@ export default function SyncedLyricsList({
     setOffset(lineTop - containerHeight / 2 + lineHeight / 2);
   }, [activeIndex]);
 
-  // Previously the container was `overflow-hidden` with nothing handling
-  // wheel/touch input at all — any attempt to manually scroll did
-  // nothing, which is exactly what "glitches out when trying to scroll"
-  // describes. Wheel/drag deltas now directly adjust the offset, and
-  // auto-follow pauses while doing so, resuming after a short pause.
+  const resumeAutoFollow = () => {
+    manualOverrideRef.current = false;
+    setIsManual(false);
+    if (activeLineRef.current && containerRef.current) {
+      const h = containerRef.current.offsetHeight;
+      const t = activeLineRef.current.offsetTop;
+      const lh = activeLineRef.current.offsetHeight;
+      setOffset(t - h / 2 + lh / 2);
+    }
+  };
+
   const beginManualOverride = () => {
     manualOverrideRef.current = true;
     setIsManual(true);
     if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
-    resumeTimerRef.current = setTimeout(() => {
-      manualOverrideRef.current = false;
-      setIsManual(false);
-      if (activeLineRef.current && containerRef.current) {
-        const containerHeight = containerRef.current.offsetHeight;
-        const lineTop = activeLineRef.current.offsetTop;
-        const lineHeight = activeLineRef.current.offsetHeight;
-        setOffset(lineTop - containerHeight / 2 + lineHeight / 2);
-      }
-    }, RESUME_AUTO_FOLLOW_MS);
+    resumeTimerRef.current = setTimeout(resumeAutoFollow, RESUME_AUTO_FOLLOW_MS);
   };
 
-  const onWheel = (e: React.WheelEvent) => {
-    // deltaMode 0 = pixels (default, Chrome/Safari), 1 = lines (Firefox),
-    // 2 = pages. Without normalizing, Firefox sends deltaY=3 meaning "3 lines"
-    // which we'd treat as 3px — scroll feels nearly frozen. Multiply out to pixels.
-    const LINE_HEIGHT = 32;
-    const PAGE_HEIGHT = containerRef.current?.offsetHeight ?? 500;
-    let delta = e.deltaY;
-    if (e.deltaMode === 1) delta *= LINE_HEIGHT;
-    else if (e.deltaMode === 2) delta *= PAGE_HEIGHT;
-    beginManualOverride();
-    setOffset((prev) => prev + delta);
+  const clampedOffset = (raw: number): number => {
+    const container = containerRef.current;
+    const content = contentRef.current;
+    if (!container || !content) return Math.max(0, raw);
+    const max = Math.max(0, content.scrollHeight - container.clientHeight);
+    return Math.max(0, Math.min(max, raw));
   };
 
+  // Attach wheel listener as non-passive so we can call preventDefault().
+  // This stops wheel events from bubbling to the page while the cursor is
+  // over the lyrics container — that was the root cause of the page
+  // scroll triggering while scrolling inside the lyrics box.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Normalize deltaMode: Firefox uses LINE (1) not PIXEL (0).
+      const LINE_HEIGHT = 32;
+      const PAGE_HEIGHT = container.offsetHeight;
+      let delta = e.deltaY;
+      if (e.deltaMode === 1) delta *= LINE_HEIGHT;
+      else if (e.deltaMode === 2) delta *= PAGE_HEIGHT;
+
+      beginManualOverride();
+      setOffset((prev) => clampedOffset(prev + delta));
+    };
+
+    // { passive: false } is required — React's synthetic onWheel is passive
+    // by default in modern browsers, so e.preventDefault() there is a no-op.
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Native touch handlers — same passive issue applies.
   const touchStartY = useRef(0);
-  const onTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
-  };
-  const onTouchMove = (e: React.TouchEvent) => {
-    const delta = touchStartY.current - e.touches[0].clientY;
-    touchStartY.current = e.touches[0].clientY;
-    beginManualOverride();
-    setOffset((prev) => prev + delta);
-  };
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      touchStartY.current = e.touches[0].clientY;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      const delta = touchStartY.current - e.touches[0].clientY;
+      touchStartY.current = e.touches[0].clientY;
+      beginManualOverride();
+      setOffset((prev) => clampedOffset(prev + delta));
+    };
+
+    container.addEventListener("touchstart", onTouchStart, { passive: true });
+    container.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => {
+      container.removeEventListener("touchstart", onTouchStart);
+      container.removeEventListener("touchmove", onTouchMove);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -94,11 +129,6 @@ export default function SyncedLyricsList({
     if (audioRef.current) audioRef.current.currentTime = time;
   };
 
-  // Every line is now the same size — the active line was previously
-  // larger (text-xl vs text-sm), and that abrupt font-size jump every
-  // time the highlighted line changed is what made the whole animation
-  // read as jagged. Highlighting is color/glow only now, at one
-  // consistent size (a touch smaller than the old "active" size).
   const sizing =
     variant === "fullscreen"
       ? { size: "text-lg", gap: "space-y-5", padY: "py-[45vh]" }
@@ -108,11 +138,11 @@ export default function SyncedLyricsList({
     <div
       ref={containerRef}
       className="relative h-full overflow-hidden"
-      onWheel={onWheel}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
+      // No onWheel/onTouchMove here — handled by native listeners above
+      // so we can call preventDefault() which React's synthetic events can't.
     >
       <motion.div
+        ref={contentRef}
         animate={{ y: -offset }}
         transition={isManual ? { duration: 0 } : { type: "spring", stiffness: 100, damping: 20 }}
         className={`absolute top-0 left-0 right-0 ${sizing.gap} ${sizing.padY}`}

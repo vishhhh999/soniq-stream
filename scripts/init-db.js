@@ -124,6 +124,7 @@ async function main() {
   // Additive migration: first-Google-link timestamp for one-time toast.
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_linked_at TIMESTAMP;`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE;`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS play_events (
