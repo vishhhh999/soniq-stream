@@ -37,7 +37,7 @@ function Row({
   queueTracks: Track[];
   queueIndex: number;
   isSelected: boolean;
-  onSelect: (e: React.MouseEvent) => void;
+  onSelect: (mods: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void;
   dragEnabled?: boolean;
   isMobile?: boolean;
   selectionMode?: boolean;
@@ -76,13 +76,20 @@ function Row({
   // play also selects the song." Delay the select action briefly; if a
   // second click arrives before it fires, cancel it and let dblclick's
   // play action be the only thing that happens.
+  //
+  // Only the modifier keys survive to the deferred call, not the event
+  // itself — a React SyntheticEvent doesn't survive being held past the
+  // handler that received it (its methods live on the prototype, not as
+  // own properties, so a spread copy silently loses stopPropagation etc,
+  // and calling it later throws). We only ever needed shiftKey/ctrlKey/
+  // metaKey for selection, so capture just those.
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleClick = (e: React.MouseEvent) => {
     if (isMobile) return;
     if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
-    const persisted = { ...e } as React.MouseEvent;
+    const mods = { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey };
     clickTimerRef.current = setTimeout(() => {
-      onSelect(persisted);
+      onSelect(mods);
       clickTimerRef.current = null;
     }, 220);
   };
@@ -174,7 +181,7 @@ export default function TrackRowGroup({
   queueTracks: Track[];
   queueIndex: number;
   isSelected: boolean;
-  onSelect: (e: React.MouseEvent) => void;
+  onSelect: (mods: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void;
   dragEnabled?: boolean;
   isMobile?: boolean;
   selectionMode?: boolean;

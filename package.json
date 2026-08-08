@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "db:push": "dotenv -e .env.local -- node scripts/init-db.js",
+    "db:backfill-metadata": "dotenv -e .env.local -- node scripts/backfill-metadata.js",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

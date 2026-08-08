@@ -12,11 +12,13 @@ import TrackDetail from "@/components/TrackDetail";
 import SortableTrackRow from "@/components/SortableTrackRow";
 import ShareModal from "@/components/ShareModal";
 import LyricsSidebar from "@/components/LyricsSidebar";
+import SelectionToolbar from "@/components/SelectionToolbar";
 import { groupVersions } from "@/lib/groupVersions";
 import { fetchArray } from "@/lib/apiFetch";
 import { computeSelection } from "@/lib/selection";
 import { gradientFromSeed } from "@/lib/gradient";
 import type { Track } from "@/components/PlayerProvider";
+import type { Album } from "@/components/AlbumCard";
 
 export default function AlbumPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -30,6 +32,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
+  const [allAlbums, setAllAlbums] = useState<Album[]>([]);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -38,9 +41,10 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
     Promise.all([
       fetchArray<any>("/api/albums"),
       fetchArray<any>("/api/tracks"),
-    ]).then(([allAlbums, allTracks]) => {
-      const a = allAlbums.find((x: any) => x.id === params.id);
+    ]).then(([fetchedAlbums, allTracks]) => {
+      const a = fetchedAlbums.find((x: any) => x.id === params.id);
       setAlbum(a);
+      setAllAlbums(fetchedAlbums.filter((x: any) => x.id !== params.id));
       const scoped = allTracks
         .filter((t: any) => t.albumId === params.id)
         .map((t: any) => ({ ...t, albumCoverUrl: a?.coverUrl || null }));
@@ -54,6 +58,56 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
     window.addEventListener("soniq:track-deleted", onDeleted);
     return () => window.removeEventListener("soniq:track-deleted", onDeleted);
   }, [params.id]);
+
+  // Keyboard shortcuts. Delete/Backspace removes the current selection —
+  // guarded against firing while typing in an input/textarea (album name
+  // edit, notes, etc) so it doesn't eat a character in a text field. Only
+  // active when something is actually selected, so it's inert otherwise.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isTyping = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+      if (isTyping) return;
+
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size > 0) {
+        e.preventDefault();
+        handleBulkDelete();
+      } else if (e.key === "Escape" && selectedIds.size > 0) {
+        setSelectedIds(new Set());
+        setLastSelectedId(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedIds]);
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    setSelectedIds(new Set());
+    setLastSelectedId(null);
+    // Optimistic — remove locally first, then fire deletes. A failed
+    // delete will resurface on the next load() rather than leaving a
+    // ghost row that looks deleted but isn't.
+    setTracks((prev) => prev.filter((t) => !ids.includes(t.id)));
+    await Promise.all(ids.map((id) => fetch(`/api/tracks/${id}`, { method: "DELETE" })));
+    load();
+  };
+
+  const handleBulkMove = async (targetAlbumId: string) => {
+    const ids = Array.from(selectedIds);
+    setSelectedIds(new Set());
+    setLastSelectedId(null);
+    await Promise.all(
+      ids.map((id) =>
+        fetch(`/api/tracks/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ albumId: targetAlbumId }),
+        })
+      )
+    );
+    load();
+  };
 
   const groups = groupVersions(tracks as any);
 
@@ -275,11 +329,10 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
                     queueTracks={groups.map((gr) => gr.latest)}
                     queueIndex={i}
                     isSelected={selectedIds.has(g.latest.id)}
-                    onSelect={(e) => {
-                      e.stopPropagation();
+                    onSelect={(mods) => {
                       const orderedIds = groups.map((gr) => gr.latest.id);
                       const { next, newLastSelected } = computeSelection(
-                        g.latest.id, orderedIds, selectedIds, lastSelectedId, e
+                        g.latest.id, orderedIds, selectedIds, lastSelectedId, mods
                       );
                       setSelectedIds(next);
                       setLastSelectedId(newLastSelected);
@@ -310,6 +363,17 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
       {showShare && album && (
         <ShareModal title={album.name} albumId={params.id} onClose={() => setShowShare(false)} />
       )}
+
+      <SelectionToolbar
+        count={selectedIds.size}
+        albums={allAlbums}
+        onDelete={handleBulkDelete}
+        onMoveToAlbum={handleBulkMove}
+        onClear={() => {
+          setSelectedIds(new Set());
+          setLastSelectedId(null);
+        }}
+      />
     </main>
     <LyricsSidebar onExpand={() => window.dispatchEvent(new CustomEvent("soniq:expand-lyrics"))} />
     </div>

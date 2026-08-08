@@ -20,7 +20,7 @@ export default function SortableTrackRow({
   queueTracks: Track[];
   queueIndex: number;
   isSelected: boolean;
-  onSelect: (e: React.MouseEvent) => void;
+  onSelect: (mods: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.latest.id });
 

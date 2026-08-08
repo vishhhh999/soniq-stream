@@ -65,11 +65,6 @@ export async function POST(req: NextRequest) {
     "Metadata parsing"
   );
 
-  console.log("========== METADATA ==========");
-  console.log(meta.format);
-  console.log(meta.common);
-  console.log("==============================");
-
   const finite = (n: unknown) =>
     typeof n === "number" && Number.isFinite(n) ? n : null;
 
@@ -82,11 +77,11 @@ export async function POST(req: NextRequest) {
 
   if (meta.common.title) title = meta.common.title;
   if (meta.common.artist) artist = meta.common.artist;
-
-  console.log("Duration:", durationSec);
 } catch (err) {
-  console.error("METADATA FAILED");
-  console.error(err);
+  // Metadata parsing failed (corrupt tags, unsupported container, etc).
+  // Non-fatal — the track still uploads, just without duration/format
+  // fields until the backfill script or a re-upload fills them in.
+  console.error("Metadata parsing failed for", filename, err instanceof Error ? err.message : err);
   }
     // Duplicate/version detection scoped to this user's own tracks —
     // previously scoped only by album/folder, meaning (before the ownership
