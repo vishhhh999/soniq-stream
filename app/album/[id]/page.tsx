@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, Disc3, Pencil, Share2, ImagePlus, Trash2 } from "lucide-react";
+import { ArrowLeft, Disc3, Pencil, Share2, ImagePlus, Trash2, Play, Shuffle } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import UploadButton from "@/components/UploadButton";
@@ -17,11 +17,13 @@ import { groupVersions } from "@/lib/groupVersions";
 import { fetchArray } from "@/lib/apiFetch";
 import { computeSelection } from "@/lib/selection";
 import { gradientFromSeed } from "@/lib/gradient";
+import { usePlayer } from "@/components/PlayerProvider";
 import type { Track } from "@/components/PlayerProvider";
 import type { Album } from "@/components/AlbumCard";
 
 export default function AlbumPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const { playQueue, shuffleOn, toggleShuffle } = usePlayer();
   const [album, setAlbum] = useState<any>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [detailTrack, setDetailTrack] = useState<Track | null>(null);
@@ -180,7 +182,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   return (
     <UploadDropZone albumId={params.id} onUploaded={load}>
     <div className="flex">
-    <main className="relative max-w-[1600px] mx-auto px-8 lg:px-16 pt-16 flex-1 min-w-0">
+    <main className="relative max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-16 pt-8 sm:pt-16 flex-1 min-w-0">
       {/* Full-bleed hero wash behind the header — blurred cover art if one
          exists, or the same deterministic per-album gradient used for the
          ambient background otherwise, so an album without art still feels
@@ -219,11 +221,12 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
         Library
       </button>
 
-      <div className="relative flex items-end gap-6 mb-16">
+      <div className="relative flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 mb-10 sm:mb-16">
+        {/* Cover */}
         <button
           onClick={() => coverInputRef.current?.click()}
           disabled={uploadingCover}
-          className="group relative w-40 h-40 rounded-md overflow-hidden bg-surface border border-border shrink-0"
+          className="group relative w-28 h-28 sm:w-52 sm:h-52 rounded-md overflow-hidden bg-surface border border-border shrink-0 self-start"
         >
           {album?.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -248,68 +251,102 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
           onChange={(e) => e.target.files?.[0] && replaceCover(e.target.files[0])}
         />
 
-        <div className="flex-1 min-w-0">
-          {editingName ? (
-            <input
-              autoFocus
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              onBlur={saveNameEdit}
-              onKeyDown={(e) => e.key === "Enter" && saveNameEdit()}
-              className="text-2xl font-display font-bold text-primary tracking-tight bg-transparent border-b border-border-strong outline-none w-full"
-            />
-          ) : (
+        {/* Metadata + actions */}
+        <div className="flex-1 min-w-0 flex flex-col gap-3 sm:gap-4">
+          <div>
+            {editingName ? (
+              <input
+                autoFocus
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={saveNameEdit}
+                onKeyDown={(e) => e.key === "Enter" && saveNameEdit()}
+                className="text-xl sm:text-2xl font-display font-bold text-primary tracking-tight bg-transparent border-b border-border-strong outline-none w-full"
+              />
+            ) : (
+              <button
+                onClick={() => {
+                  setNameDraft(album?.name || "");
+                  setEditingName(true);
+                }}
+                className="group flex items-center gap-2 text-left w-full"
+              >
+                <h1 className="text-xl sm:text-2xl font-display font-bold text-primary tracking-tight truncate">
+                  {album?.name || "Loading..."}
+                </h1>
+                <Pencil size={14} strokeWidth={1.5} className="text-tertiary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+              </button>
+            )}
+            <p className="text-secondary text-sm mt-1">
+              {tracks.length} track{tracks.length === 1 ? "" : "s"}
+            </p>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Play all */}
+            <button
+              onClick={() => playQueue(groups.map((g) => g.latest), 0)}
+              disabled={groups.length === 0}
+              className="flex items-center gap-1.5 text-sm font-medium bg-accent text-canvas px-4 py-2 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-40"
+            >
+              <Play size={13} strokeWidth={2} className="ml-0.5" />
+              Play
+            </button>
+
+            {/* Shuffle */}
             <button
               onClick={() => {
-                setNameDraft(album?.name || "");
-                setEditingName(true);
+                if (!shuffleOn) toggleShuffle();
+                const shuffled = [...groups].sort(() => Math.random() - 0.5);
+                playQueue(shuffled.map((g) => g.latest), 0);
               }}
-              className="group flex items-center gap-2 text-left"
+              disabled={groups.length === 0}
+              className="flex items-center gap-1.5 text-sm text-secondary border border-border px-4 py-2 rounded-md hover:border-border-strong hover:text-primary transition-colors disabled:opacity-40"
             >
-              <h1 className="text-2xl font-display font-bold text-primary tracking-tight truncate">
-                {album?.name || "Loading..."}
-              </h1>
-              <Pencil size={14} strokeWidth={1.5} className="text-tertiary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+              <Shuffle size={13} strokeWidth={1.5} />
+              Shuffle
             </button>
-          )}
-          <p className="text-secondary text-sm mt-1">
-            {tracks.length} track{tracks.length === 1 ? "" : "s"}
-          </p>
-        </div>
 
-        <button
-          onClick={() => setShowShare(true)}
-          className="flex items-center gap-2 text-sm text-secondary border border-border rounded-md px-4 py-2 hover:border-border-strong hover:text-primary transition-colors"
-        >
-          <Share2 size={15} strokeWidth={1.5} />
-          Share
-        </button>
+            <div className="flex-1" />
 
-        {!confirmingDelete ? (
-          <button
-            onClick={() => setConfirmingDelete(true)}
-            className="flex items-center gap-2 text-sm text-error border border-error/40 rounded-md px-4 py-2 hover:bg-error/10 transition-colors"
-          >
-            <Trash2 size={15} strokeWidth={1.5} />
-            Delete
-          </button>
-        ) : (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-secondary">Delete album? Tracks move to Unsorted.</span>
-            <button onClick={handleDeleteAlbum} className="text-error border border-error/40 rounded-md px-3 py-1.5 hover:bg-error/10 transition-colors">
-              Yes, delete
+            {/* Share */}
+            <button
+              onClick={() => setShowShare(true)}
+              className="flex items-center gap-1.5 text-sm text-secondary border border-border rounded-md px-3 py-2 hover:border-border-strong hover:text-primary transition-colors"
+            >
+              <Share2 size={15} strokeWidth={1.5} />
+              <span className="hidden sm:inline">Share</span>
             </button>
-            <button onClick={() => setConfirmingDelete(false)} className="text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong transition-colors">
-              Cancel
-            </button>
+
+            {/* Delete */}
+            {!confirmingDelete ? (
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                className="flex items-center gap-1.5 text-sm text-error border border-error/40 rounded-md px-3 py-2 hover:bg-error/10 transition-colors"
+              >
+                <Trash2 size={15} strokeWidth={1.5} />
+                <span className="hidden sm:inline">Delete</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 text-xs flex-wrap">
+                <span className="text-secondary hidden sm:inline">Delete album? Tracks move to Unsorted.</span>
+                <button onClick={handleDeleteAlbum} className="text-error border border-error/40 rounded-md px-3 py-1.5 hover:bg-error/10 transition-colors">
+                  Yes, delete
+                </button>
+                <button onClick={() => setConfirmingDelete(false)} className="text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong transition-colors">
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            <UploadButton onUploaded={load} albumId={params.id} label="Add tracks" />
           </div>
-        )}
-
-        <UploadButton onUploaded={load} albumId={params.id} label="Add tracks" />
+        </div>
       </div>
 
       {groups.length === 0 ? (
-        <div className="border border-dashed border-border rounded-lg py-24 text-center">
+        <div className="border border-dashed border-border rounded-lg py-16 sm:py-24 text-center">
           <p className="text-secondary text-base">No tracks in this album yet.</p>
         </div>
       ) : (

@@ -155,7 +155,9 @@ function Row({
           e.stopPropagation();
           onOpenDetail(track);
         }}
-        className="text-tertiary opacity-0 group-hover:opacity-100 hover:text-primary transition-opacity p-1 -m-1"
+        className={`text-tertiary hover:text-primary transition-opacity p-1 -m-1 ${
+          isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        }`}
       >
         <MoreHorizontal size={16} strokeWidth={1.5} />
       </button>

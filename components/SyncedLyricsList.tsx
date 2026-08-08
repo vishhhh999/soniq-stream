@@ -35,7 +35,7 @@ export default function SyncedLyricsList({
 
   const sizing =
     variant === "fullscreen"
-      ? { active: "text-3xl", inactive: "text-xl", gap: "space-y-6", padY: "py-[45vh]" }
+      ? { active: "text-xl", inactive: "text-sm", gap: "space-y-5", padY: "py-[45vh]" }
       : { active: "text-sm font-medium", inactive: "text-sm", gap: "space-y-4", padY: "py-[40vh]" };
 
   return (
