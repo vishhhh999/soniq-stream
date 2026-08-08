@@ -299,6 +299,52 @@ lyrics sidebar is also open, that's a real, narrower issue (viewport
 centering vs. the narrower visible content area next to the sidebar) —
 flag it if so.
 
+## This round: account-linking security fix, smooth synced lyrics
+
+**A sandbox reset happened mid-round — worth documenting honestly.** The
+environment reverted to an earlier file state partway through this
+session, silently losing everything from several prior rounds (mobile
+player, interactive vinyl, album hero, scrollbar fix, the lyrics 405 fix,
+double-click fix, selection visibility fix). Caught it because a file I'd
+verified minutes earlier had vanished. Recovered by restoring from the
+last zip actually shipped (which had all of that intact) rather than
+reconstructing five rounds from memory, then reapplying only this round's
+real new work on top, with full re-verification against the actually-
+current files — not trusting the earlier checks, which had been run
+against a state that no longer existed.
+
+**Real account-linking security gap, fixed.** Google's `signIn` callback
+matched existing users by email and silently reused that account
+regardless of how it was created. Since password signup has no email
+verification, someone could register your email with a password they
+control, and later — when you sign in for real via Google — get merged
+into their account, which they can still access via that password. Fixed:
+`passwordHash` is now nullable (`null` = Google-only account, non-null =
+real password account), and whichever method claims an email first wins —
+the other is rejected outright, no silent merge in either direction.
+Verified both directions against real Postgres: Google sign-in blocked
+for an email with a real password account, and password signup still
+correctly blocked (409) for an email that already has a Google-only
+account.
+
+**On the "Access Denied" you hit testing Google sign-in yourself** — that's
+the `ALLOWED_EMAILS` allowlist working as designed (your own explicit
+request a few rounds back: deny-by-default unless a Gmail is explicitly
+listed). Add your email to `ALLOWED_EMAILS` in Vercel if you want your own
+Google account to work — this wasn't a bug, just needed configuring.
+
+**Synced lyrics — actually smooth now, not just less choppy.** The old
+implementation used native `scrollIntoView` alongside a separate CSS
+`transition-all` on scale/opacity — two different animation systems
+fighting each other is exactly what produced the laggy feel. Replaced
+with a single GPU-accelerated transform (`translateY`) animated by Framer
+Motion spring physics, the same fundamental approach Apple Music/Spotify
+use — no native scroll involved at all. Verified the centering math
+against known line positions (including first/last lines, which are the
+easy place to get this wrong) before trusting it. Added a subtle glow
+(`text-shadow`) on the active line, and every line is now clickable to
+seek directly to that point in the track.
+
 ## Explicitly deferred — not started, not partial
 
 Lyrics + sync (was on this list) is done — see above. What remains, still

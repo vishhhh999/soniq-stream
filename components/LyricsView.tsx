@@ -1,19 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Pencil } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
-import { getCurrentLineIndex, SyncedLine } from "@/lib/lyricsSync";
+import SyncedLyricsList from "./SyncedLyricsList";
+import type { SyncedLine } from "@/lib/lyricsSync";
 
 export default function LyricsView({ track, onClose }: { track: Track; onClose: () => void }) {
   const { currentTime } = usePlayer();
   const [lines, setLines] = useState<SyncedLine[] | null>(null);
   const [rawText, setRawText] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const activeLineRef = useRef<HTMLParagraphElement>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -37,12 +36,6 @@ export default function LyricsView({ track, onClose }: { track: Track; onClose: 
       .finally(() => setLoading(false));
   }, [track.id]);
 
-  const activeIndex = lines ? getCurrentLineIndex(lines, currentTime) : -1;
-
-  useEffect(() => {
-    activeLineRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [activeIndex]);
-
   if (!mounted) return null;
 
   const content = (
@@ -63,34 +56,22 @@ export default function LyricsView({ track, onClose }: { track: Track; onClose: 
           </button>
         </div>
 
-        <div ref={containerRef} className="flex-1 overflow-y-auto px-8 pb-32 flex flex-col items-center">
+        <div className="flex-1 min-h-0 px-8 pb-8">
           {loading ? (
-            <p className="text-secondary text-base mt-24">Loading...</p>
+            <p className="text-secondary text-base text-center mt-24">Loading...</p>
           ) : lines && lines.length > 0 ? (
-            <div className="max-w-2xl w-full py-24 space-y-6">
-              {lines.map((line, i) => (
-                <p
-                  key={i}
-                  ref={i === activeIndex ? activeLineRef : undefined}
-                  className={`text-center transition-all duration-300 ${
-                    i === activeIndex
-                      ? "text-primary text-3xl font-medium scale-100 opacity-100"
-                      : "text-tertiary text-xl scale-95 opacity-50"
-                  }`}
-                >
-                  {line.text}
-                </p>
-              ))}
+            <div className="max-w-2xl mx-auto h-full">
+              <SyncedLyricsList lines={lines} currentTime={currentTime} variant="fullscreen" />
             </div>
           ) : rawText ? (
-            <div className="max-w-2xl w-full py-24 text-center">
+            <div className="max-w-2xl mx-auto py-24 text-center overflow-y-auto no-scrollbar h-full">
               <p className="text-secondary text-base mb-6">
                 Lyrics haven&apos;t been synced to timing yet — showing plain text.
               </p>
               <div className="text-primary text-lg leading-relaxed whitespace-pre-line">{rawText}</div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center flex-1 mt-24 text-center">
+            <div className="flex flex-col items-center justify-center h-full text-center">
               <p className="text-secondary text-base mb-2">No lyrics added yet.</p>
               <p className="text-tertiary text-sm flex items-center gap-1.5">
                 <Pencil size={13} strokeWidth={1.5} />

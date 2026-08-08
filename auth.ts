@@ -21,6 +21,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim()));
         if (!user) return null;
+        if (!user.passwordHash) return null;
 
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
@@ -49,30 +50,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const email = (profile?.email || "").toLowerCase();
       if (!allowed.includes(email)) return false;
 
-      // Google sign-ins never went through /api/setup, so without this
-      // there's no `users` row for them at all — and every piece of data
-      // in this app (tracks, albums) needs a stable owner id to scope by.
-      // Create one on first Google sign-in if it doesn't already exist;
-      // if a credentials account with this email already exists, reuse it
-      // rather than creating a duplicate.
       const [existing] = await db.select().from(users).where(eq(users.email, email));
+      if (existing && existing.passwordHash) {
+        console.warn(`Google sign-in blocked for ${email}: a password account already exists for this email.`);
+        return false;
+      }
       if (!existing) {
         await db.insert(users).values({
           id: nanoid(),
           email,
-          // Google users never authenticate via this hash — it exists only
-          // because the column is NOT NULL. A random value, never usable.
-          passwordHash: await bcrypt.hash(nanoid(32), 10),
+          passwordHash: null,
           createdAt: new Date(),
         });
       }
       return true;
     },
-    // Puts a stable internal user id on the JWT (and from there, the
-    // session) for BOTH providers — Credentials already returns the real
-    // db id from authorize(), Google's own `user.id` is a provider-specific
-    // id that doesn't match our `users` table, so it's looked up by email
-    // instead, using the row the signIn callback above guarantees exists.
     async jwt({ token, user, account }) {
       if (user) {
         if (account?.provider === "google") {

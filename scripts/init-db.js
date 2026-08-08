@@ -17,10 +17,15 @@ async function main() {
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
+      password_hash TEXT,
       created_at TIMESTAMP NOT NULL
     );
   `;
+  // Existing databases already have this column as NOT NULL from before
+  // Google-only accounts (null password) existed as a concept — drop that
+  // constraint so those accounts can actually be created.
+  await sql`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS folders (
       id TEXT PRIMARY KEY,

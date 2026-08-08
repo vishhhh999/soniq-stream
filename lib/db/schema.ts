@@ -3,7 +3,11 @@ import { pgTable, text, integer, real, timestamp, boolean, jsonb } from "drizzle
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  // Nullable — null means this account was created via Google sign-in and
+  // has no password set. A non-null hash means it was created via
+  // email+password signup. This distinction is what prevents the two
+  // paths from silently merging (see auth.ts).
+  passwordHash: text("password_hash"),
   createdAt: timestamp("created_at").notNull(),
 });
 

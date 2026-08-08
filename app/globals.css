@@ -75,3 +75,37 @@ body {
 .vinyl-spinning {
   animation: vinyl-spin 3s linear infinite;
 }
+
+/* Single, thin, custom scrollbar for the whole page — replaces the
+   default browser scrollbar (which was often showing alongside a second,
+   native scrollbar on internally-scrolling panels like the lyrics
+   sidebar, reading as a broken "double scrollbar"). */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+html::-webkit-scrollbar {
+  width: 8px;
+}
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+html::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong);
+  border-radius: 8px;
+}
+html::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-tertiary);
+}
+
+/* For panels that need their OWN internal scroll (the lyrics sidebar,
+   the fullscreen lyrics view) without a second visible scrollbar next to
+   the page's one — still fully scrollable by wheel/trackpad/drag, just no
+   scrollbar chrome drawn for it. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
