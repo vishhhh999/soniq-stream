@@ -65,6 +65,7 @@ export default function AlbumSharePanel({
   onClose: () => void;
 }) {
   const [data, setData] = useState<ShareData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<View>("main");
   const [memberMenuFor, setMemberMenuFor] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -74,11 +75,19 @@ export default function AlbumSharePanel({
   const [useType, setUseType] = useState<"uses" | "expiry" | "unlimited">("unlimited");
   const [saving, setSaving] = useState(false);
 
-  const load = () =>
+  const load = () => {
+    setLoadError(null);
     fetch(`/api/albums/${albumId}/share`)
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body.error || `Couldn't load share settings (${r.status}).`);
+        }
+        return r.json();
+      })
       .then(setData)
-      .catch(() => {});
+      .catch((e) => setLoadError(e.message));
+  };
 
   useEffect(() => { load(); }, [albumId]);
 
@@ -156,7 +165,7 @@ export default function AlbumSharePanel({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="bg-elevated border border-border rounded-t-2xl sm:rounded-2xl w-full max-w-sm max-h-[85vh] overflow-hidden flex flex-col"
+          className="bg-elevated border border-border rounded-t-2xl sm:rounded-2xl w-full max-w-sm min-h-[240px] max-h-[85vh] overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -179,6 +188,23 @@ export default function AlbumSharePanel({
           </div>
 
           <div className="overflow-y-auto flex-1 no-scrollbar">
+
+            {/* Loading / error states — previously the sheet silently
+                rendered as just the header with nothing below it if the
+                fetch failed or hadn't resolved yet. */}
+            {loadError && (
+              <div className="p-6 text-center">
+                <p className="text-sm text-secondary mb-3">{loadError}</p>
+                <button onClick={load} className="text-xs text-accent hover:underline">
+                  Try again
+                </button>
+              </div>
+            )}
+            {!data && !loadError && (
+              <div className="p-10 flex items-center justify-center">
+                <div className="w-5 h-5 border-2 border-border border-t-accent rounded-full animate-spin" />
+              </div>
+            )}
 
             {/* MAIN VIEW */}
             {view === "main" && data && (
