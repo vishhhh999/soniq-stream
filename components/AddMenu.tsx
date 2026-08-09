@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus, AlertCircle, Music, Mic } from "lucide-react";
+import { Plus, AlertCircle, Music, Mic, Film } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTrackUpload } from "@/lib/useTrackUpload";
 import DuplicateChoiceModal from "./DuplicateChoiceModal";
 import RecordModal from "./RecordModal";
+import ConvertModal from "./ConvertModal";
 
 // Replaces the old plain "Add tracks" button with a small menu — Upload
 // audio (the existing flow, unchanged) and Record (new). Structured so
@@ -26,6 +27,7 @@ export default function AddMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [showRecord, setShowRecord] = useState(false);
+  const [showConvert, setShowConvert] = useState(false);
   const { busy, label, error, setError, duplicatePrompt, uploadFiles, resolveDuplicateChoice } = useTrackUpload({
     albumId,
     folderId,
@@ -88,6 +90,16 @@ export default function AddMenu({
               <Mic size={14} strokeWidth={1.5} className="text-secondary" />
               Record
             </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                setShowConvert(true);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-primary hover:bg-surface transition-colors text-left"
+            >
+              <Film size={14} strokeWidth={1.5} className="text-secondary" />
+              Convert (video → audio)
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -98,6 +110,15 @@ export default function AddMenu({
           folderId={folderId}
           onRecorded={onUploaded}
           onClose={() => setShowRecord(false)}
+        />
+      )}
+
+      {showConvert && (
+        <ConvertModal
+          albumId={albumId}
+          folderId={folderId}
+          onConverted={onUploaded}
+          onClose={() => setShowConvert(false)}
         />
       )}
 
