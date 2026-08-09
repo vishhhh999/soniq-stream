@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause, Download, Library, Check, MoreHorizontal, Shuffle } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { useIsMobile } from "@/lib/useMediaQuery";
 import VinylArt from "@/components/VinylArt";
 import { gradientFromSeed } from "@/lib/gradient";
 
@@ -226,7 +227,11 @@ export default function SharePage({ params }: { params: { token: string } }) {
     data?.type === "album" ? data.album.id : data?.type === "track" ? data.track.id : "default"
   );
 
-  const VINYL_SIZE = 280;
+  const isMobile = useIsMobile();
+  // Fixed 280px overflowed narrow phones (px-6 page padding + 280px vinyl
+  // exceeds a 320-375px viewport). Scale it down on mobile so it always
+  // fits with room to spare.
+  const VINYL_SIZE = isMobile ? 220 : 280;
 
   // Load share data.
   useEffect(() => {
@@ -236,11 +241,18 @@ export default function SharePage({ params }: { params: { token: string } }) {
         return r.json();
       })
       .then((d) => {
-const owner: Owner = { username: d.owner?.username ?? null, avatarUrl: d.owner?.avatarUrl ?? null };
-        if (d.track) setData({ type: "track", track: d.track, allowDownload: d.allowDownload, owner });
-else if (d.album) setData({ type: "album", album: d.album, tracks: d.tracks, allowDownload: d.allowDownload, owner });
+        const owner: Owner = { username: d.owner?.username ?? null, avatarUrl: d.owner?.avatarUrl ?? null };
+        if (d.track) {
+          setData({ type: "track", track: d.track, allowDownload: d.allowDownload, owner });
+        } else if (d.album) {
+          setData({ type: "album", album: d.album, tracks: d.tracks ?? [], allowDownload: d.allowDownload, owner });
+        } else {
+          // Response was 200 but had neither shape — surface it instead of
+          // leaving the page blank forever with no feedback.
+          setError(d.error || "This link doesn't point to anything anymore.");
+        }
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e.message || "Couldn't load this link. Check your connection and try again."));
   }, [params.token]);
 
   // Create a content_follow row when a logged-in user views someone else's share.
@@ -328,12 +340,20 @@ else if (d.album) setData({ type: "album", album: d.album, tracks: d.tracks, all
     );
   }
 
-  if (!data) return null;
+  if (!data) {
+    // Was rendering nothing here before — on a slow connection or cold
+    // serverless start this looked exactly like "the page isn't loading."
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-canvas">
+        <div className="w-6 h-6 border-2 border-border border-t-accent rounded-full animate-spin" />
+      </main>
+    );
+  }
 
   const currentTrack = tracks[currentTrackIndex];
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-canvas px-6 py-16 gap-0">
+    <main className="min-h-screen flex flex-col items-center justify-center bg-canvas px-5 sm:px-6 py-12 sm:py-16 gap-0 overflow-x-hidden">
 
       {/* ── Wrapped / unwrapping phase ── */}
       {phase !== "revealed" && (
@@ -372,7 +392,7 @@ else if (d.album) setData({ type: "album", album: d.album, tracks: d.tracks, all
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="text-tertiary text-sm"
+              className="text-tertiary text-sm text-center max-w-[90vw] px-2 truncate"
             >
               {title}
             </motion.p>
@@ -391,11 +411,11 @@ else if (d.album) setData({ type: "album", album: d.album, tracks: d.tracks, all
           >
             {/* Cover / vinyl */}
             <div className="shrink-0 self-center sm:self-start">
-              <TiltCard size={200}>
+              <TiltCard size={isMobile ? 160 : 200}>
                 <VinylArt
                   coverUrl={coverUrl}
                   spinning={playing}
-                  size={200}
+                  size={isMobile ? 160 : 200}
                   gradientFrom={gradFrom}
                   gradientTo={gradTo}
                 />
