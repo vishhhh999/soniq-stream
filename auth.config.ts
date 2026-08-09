@@ -16,6 +16,10 @@ export const authConfig = {
                                 // itself checks auth and renders the real
                                 // library instead once signed in, so this
                                 // doesn't expose anything.
+        /^\/about$/,            // same LandingPage content, but reachable
+                                // regardless of auth state — signed-in users
+                                // have no other way back to it once inside
+                                // the app (see Settings' "About SONIQ" link)
         /^\/login$/,
         /^\/setup$/,
         /^\/api\/setup$/,

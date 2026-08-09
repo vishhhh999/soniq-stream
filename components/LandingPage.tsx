@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useSession } from "next-auth/react";
 import {
   FolderOpen, Share2, GitBranch, Bell, Users, BarChart3, Sparkles, Music2, ShieldCheck,
 } from "lucide-react";
@@ -41,6 +42,14 @@ const FEATURES = [
 ];
 
 export default function LandingPage() {
+  // Previously this component only ever rendered for logged-out visitors
+  // (app/page.tsx redirected anyone signed in straight to the library), so
+  // every CTA on the page unconditionally pointed at sign-in/sign-up. Now
+  // it's also reachable at /about while signed in (see that route, and the
+  // "About SONIQ" link in Settings) — so the CTAs need to reflect that
+  // instead of asking an already-signed-in person to sign in again.
+  const { status } = useSession();
+  const isAuthed = status === "authenticated";
   return (
     <main className="min-h-screen bg-canvas overflow-x-hidden">
       {/* Nav */}
@@ -50,18 +59,29 @@ export default function LandingPage() {
           <span className="text-lg font-display font-bold text-primary tracking-tight">SONIQ</span>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/login"
-            className="text-sm text-secondary hover:text-primary transition-colors px-3 py-2"
-          >
-            Sign in
-          </Link>
-          <Link
-            href="/setup"
-            className="text-sm font-medium bg-accent text-canvas px-4 py-2 rounded-md hover:bg-accent-strong transition-colors"
-          >
-            Get started
-          </Link>
+          {isAuthed ? (
+            <Link
+              href="/"
+              className="text-sm font-medium bg-accent text-canvas px-4 py-2 rounded-md hover:bg-accent-strong transition-colors"
+            >
+              Go to your library
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="text-sm text-secondary hover:text-primary transition-colors px-3 py-2"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/setup"
+                className="text-sm font-medium bg-accent text-canvas px-4 py-2 rounded-md hover:bg-accent-strong transition-colors"
+              >
+                Get started
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -86,18 +106,29 @@ export default function LandingPage() {
             not for streaming to strangers.
           </p>
           <div className="flex items-center justify-center gap-3 mt-9">
-            <Link
-              href="/setup"
-              className="text-sm font-medium bg-accent text-canvas px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
-            >
-              Create your library
-            </Link>
-            <Link
-              href="/login"
-              className="text-sm font-medium text-secondary border border-border px-6 py-3 rounded-md hover:border-border-strong hover:text-primary transition-colors"
-            >
-              Sign in
-            </Link>
+            {isAuthed ? (
+              <Link
+                href="/"
+                className="text-sm font-medium bg-accent text-canvas px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
+              >
+                Go to your library
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/setup"
+                  className="text-sm font-medium bg-accent text-canvas px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
+                >
+                  Create your library
+                </Link>
+                <Link
+                  href="/login"
+                  className="text-sm font-medium text-secondary border border-border px-6 py-3 rounded-md hover:border-border-strong hover:text-primary transition-colors"
+                >
+                  Sign in
+                </Link>
+              </>
+            )}
           </div>
         </motion.div>
       </section>
@@ -205,10 +236,10 @@ export default function LandingPage() {
           Your vault's waiting.
         </h2>
         <Link
-          href="/setup"
+          href={isAuthed ? "/" : "/setup"}
           className="inline-block mt-8 text-sm font-medium bg-accent text-canvas px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
         >
-          Create your library
+          {isAuthed ? "Go to your library" : "Create your library"}
         </Link>
       </section>
 

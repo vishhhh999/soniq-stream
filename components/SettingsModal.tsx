@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Sun, Moon, Sparkles, LogOut, Check, Pencil, Camera } from "lucide-react";
 import { signOut } from "next-auth/react";
@@ -575,7 +576,21 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               </button>
             </div>
 
-            <p className="text-xs text-tertiary text-center pt-2">SONIQ v{APP_VERSION}</p>
+            {/* Previously there was no way back to the marketing page,
+                feature list, pricing, or legal links once signed in —
+                the root path (/) always redirects a signed-in user
+                straight to the library. /about renders the same
+                LandingPage content but is reachable regardless of auth
+                state. */}
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-tertiary pt-2">
+              <Link href="/about" className="hover:text-secondary transition-colors">About SONIQ</Link>
+              <Link href="/terms" className="hover:text-secondary transition-colors">Terms</Link>
+              <Link href="/privacy" className="hover:text-secondary transition-colors">Privacy</Link>
+              <Link href="/cookies" className="hover:text-secondary transition-colors">Cookie Policy</Link>
+              <Link href="/contact" className="hover:text-secondary transition-colors">Contact</Link>
+            </div>
+
+            <p className="text-xs text-tertiary text-center pt-1">SONIQ v{APP_VERSION}</p>
           </div>
         </motion.div>
       </motion.div>
