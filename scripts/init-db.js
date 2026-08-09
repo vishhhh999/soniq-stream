@@ -110,6 +110,7 @@ async function main() {
       created_at TIMESTAMP NOT NULL
     );
   `;
+  await sql`ALTER TABLE share_links ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT true;`;
   await sql`
     CREATE TABLE IF NOT EXISTS otp_codes (
       id TEXT PRIMARY KEY,

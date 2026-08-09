@@ -16,7 +16,7 @@ export async function POST(
   if (!userId) return NextResponse.json({ ok: false, reason: "not_authed" });
 
   const [link] = await db.select().from(shareLinks).where(eq(shareLinks.token, params.token));
-  if (!link) return NextResponse.json({ ok: false, reason: "not_found" });
+  if (!link || !link.active) return NextResponse.json({ ok: false, reason: "not_found" });
 
   // Resolve the owner of this content.
   let ownerId: string | null = null;

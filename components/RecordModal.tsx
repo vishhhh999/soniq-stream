@@ -279,7 +279,7 @@ export default function RecordModal({
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.97 }}
-        className="w-full max-w-xl rounded-2xl border border-border bg-elevated p-6 relative overflow-hidden"
+        className="w-full max-w-xl rounded-2xl border border-border bg-elevated p-4 sm:p-6 relative overflow-hidden"
       >
         <button onClick={discard} className="absolute top-4 right-4 text-tertiary hover:text-primary transition-colors">
           <X size={18} strokeWidth={1.5} />
@@ -345,7 +345,7 @@ export default function RecordModal({
 
             {error && <p className="text-xs text-error">{error}</p>}
 
-            <div className="flex items-center justify-center gap-6">
+            <div className="flex items-center justify-center gap-4 sm:gap-6 flex-wrap">
               {recording ? (
                 <button
                   onClick={stopRecording}

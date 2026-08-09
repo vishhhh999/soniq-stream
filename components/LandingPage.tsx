@@ -53,7 +53,7 @@ export default function LandingPage() {
   return (
     <main className="min-h-screen bg-canvas overflow-x-hidden">
       {/* Nav */}
-      <header className="flex items-center justify-between max-w-5xl mx-auto px-6 py-6">
+      <header className="flex items-center justify-between flex-wrap gap-y-3 max-w-5xl mx-auto px-6 py-6">
         <div className="flex items-center gap-2.5">
           <Logo size={24} className="text-primary" />
           <span className="text-lg font-display font-bold text-primary tracking-tight">SONIQ</span>

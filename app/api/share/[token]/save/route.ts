@@ -58,7 +58,7 @@ export async function POST(
   }
 
   const [link] = await db.select().from(shareLinks).where(eq(shareLinks.token, params.token));
-  if (!link) return NextResponse.json({ error: "Not found." }, { status: 404 });
+  if (!link || !link.active) return NextResponse.json({ error: "Not found." }, { status: 404 });
   if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
     return NextResponse.json({ error: "This link has expired." }, { status: 410 });
   }

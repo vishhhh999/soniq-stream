@@ -245,7 +245,7 @@ export default function LyricsEditor({
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.97 }}
-          className="w-full max-w-2xl rounded-2xl border border-border bg-elevated p-6 relative max-h-[85vh] flex flex-col"
+          className="w-full max-w-2xl rounded-2xl border border-border bg-elevated p-4 sm:p-6 relative max-h-[85vh] flex flex-col"
         >
           <button
             onClick={cancelReview}
@@ -278,26 +278,33 @@ export default function LyricsEditor({
 
           <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1 mt-4">
             {reviewLines.map((line, i) => (
-              <div key={i} className="flex items-center gap-3 text-sm py-1">
-                <span className="text-xs text-tertiary tabular-nums w-16 shrink-0">{fmt(line.time)}</span>
-                <button onClick={() => nudgeLine(i, -0.1)} title="-0.1s" className="p-1.5 rounded hover:bg-surface transition-colors shrink-0">
-                  <ChevronLeft size={14} strokeWidth={2} className="text-tertiary" />
-                </button>
-                <button onClick={() => nudgeLine(i, 0.1)} title="+0.1s" className="p-1.5 rounded hover:bg-surface transition-colors shrink-0">
-                  <ChevronRight size={14} strokeWidth={2} className="text-tertiary" />
-                </button>
-                <button onClick={() => playFromLine(line.time)} title="Play from here" className="p-1.5 rounded hover:bg-surface transition-colors shrink-0">
-                  <Play size={13} strokeWidth={2} className="text-tertiary" />
-                </button>
-                <button onClick={() => retapLine(i)} title="Set to current playhead position" className="p-1.5 rounded hover:bg-surface transition-colors shrink-0">
-                  <Crosshair size={13} strokeWidth={2} className="text-tertiary" />
-                </button>
-                <span className="text-primary flex-1">{line.text}</span>
+              // Column on mobile — a timestamp + 4 icon buttons alone eat
+              // almost the entire width of a phone screen, leaving no
+              // room for the line text (the exact cramping this overlay
+              // was built to fix in the first place). Row on wider
+              // screens, where there's actually space for both.
+              <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 text-sm py-2 sm:py-1 border-b border-border/50 sm:border-none">
+                <div className="flex items-center gap-2 sm:gap-1.5">
+                  <span className="text-xs text-tertiary tabular-nums w-14 sm:w-16 shrink-0">{fmt(line.time)}</span>
+                  <button onClick={() => nudgeLine(i, -0.1)} title="-0.1s" className="p-2 sm:p-1.5 rounded hover:bg-surface transition-colors shrink-0">
+                    <ChevronLeft size={14} strokeWidth={2} className="text-tertiary" />
+                  </button>
+                  <button onClick={() => nudgeLine(i, 0.1)} title="+0.1s" className="p-2 sm:p-1.5 rounded hover:bg-surface transition-colors shrink-0">
+                    <ChevronRight size={14} strokeWidth={2} className="text-tertiary" />
+                  </button>
+                  <button onClick={() => playFromLine(line.time)} title="Play from here" className="p-2 sm:p-1.5 rounded hover:bg-surface transition-colors shrink-0">
+                    <Play size={13} strokeWidth={2} className="text-tertiary" />
+                  </button>
+                  <button onClick={() => retapLine(i)} title="Set to current playhead position" className="p-2 sm:p-1.5 rounded hover:bg-surface transition-colors shrink-0">
+                    <Crosshair size={13} strokeWidth={2} className="text-tertiary" />
+                  </button>
+                </div>
+                <span className="text-primary flex-1 pl-1 sm:pl-0">{line.text}</span>
               </div>
             ))}
           </div>
 
-          <div className="flex items-center gap-3 pt-4 mt-2 border-t border-border shrink-0">
+          <div className="flex items-center gap-3 pt-4 mt-2 border-t border-border shrink-0 flex-wrap">
             <button
               onClick={saveReview}
               disabled={saving}

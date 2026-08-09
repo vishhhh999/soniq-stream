@@ -101,11 +101,29 @@ export default function TrackDetail({
   const [playCount, setPlayCount] = useState<number | null>(null);
   const [openRow, setOpenRow] = useState<string | null>(null);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/tracks/${track.id}/play`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d) setPlayCount(d.count ?? null); })
+      .catch(() => {});
+  }, [track.id]);
+
+  // Previously this only ever lived in local state, set once right after
+  // Generate link was clicked — reopening this panel (or the whole track)
+  // always showed "Private" again even if a real, still-active link
+  // existed. Now it actually checks.
+  useEffect(() => {
+    fetch(`/api/tracks/${track.id}/share`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.link) {
+          setShareUrl(`${window.location.origin}/s/${d.link.token}`);
+          setAllowDownload(!!d.link.allowDownload);
+        }
+      })
       .catch(() => {});
   }, [track.id]);
 
@@ -188,12 +206,51 @@ export default function TrackDetail({
   };
 
   const createShare = async () => {
-    const res = await fetch("/api/share", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trackId: track.id, expiresInDays: expiryDays === 0 ? null : expiryDays, allowDownload }),
-    });
-    const link = await res.json();
-    setShareUrl(`${window.location.origin}/s/${link.token}`);
+    setShareError(null);
+    try {
+      const res = await fetch("/api/share", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackId: track.id, expiresInDays: expiryDays === 0 ? null : expiryDays, allowDownload }),
+      });
+      if (!res.ok) throw new Error();
+      const link = await res.json();
+      setShareUrl(`${window.location.origin}/s/${link.token}`);
+    } catch {
+      setShareError("Couldn't create the share link. Try again.");
+    }
+  };
+
+  // Toggling download AFTER a link already exists — previously this could
+  // only be set once, at creation, with no way to change your mind later.
+  const toggleShareDownload = async (next: boolean) => {
+    const previous = allowDownload;
+    setAllowDownload(next);
+    setShareError(null);
+    try {
+      const res = await fetch(`/api/tracks/${track.id}/share`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allowDownload: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setAllowDownload(previous);
+      setShareError("Couldn't update that. Try again.");
+    }
+  };
+
+  // Previously a share link, once created, lived until its expiry with no
+  // way to kill it early.
+  const revokeShare = async () => {
+    setShareError(null);
+    try {
+      const res = await fetch(`/api/tracks/${track.id}/share`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setShareUrl(null);
+      setConfirmingRevoke(false);
+    } catch {
+      setShareError("Couldn't deactivate the link. Try again.");
+    }
   };
 
   const fmt = (s?: number | null) => {
@@ -339,13 +396,36 @@ export default function TrackDetail({
                       <button onClick={createShare} className="flex items-center gap-2 text-sm text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong hover:text-primary transition-colors">
                         <Link2 size={13} strokeWidth={1.5} /> Generate link
                       </button>
+                      {shareError && <p className="text-xs text-error">{shareError}</p>}
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <input readOnly value={shareUrl} className="flex-1 bg-canvas border border-border rounded-md px-3 py-2 text-xs text-secondary" />
-                      <button onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:border-border-strong shrink-0">
-                        {copied ? <Check size={13} className="text-accent" /> : <Link2 size={13} className="text-secondary" />}
-                      </button>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <input readOnly value={shareUrl} className="flex-1 bg-canvas border border-border rounded-md px-3 py-2 text-xs text-secondary" />
+                        <button onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:border-border-strong shrink-0">
+                          {copied ? <Check size={13} className="text-accent" /> : <Link2 size={13} className="text-secondary" />}
+                        </button>
+                      </div>
+                      <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer w-fit">
+                        <input type="checkbox" checked={allowDownload} onChange={(e) => toggleShareDownload(e.target.checked)} className="accent-[var(--accent)]" />
+                        Allow download
+                      </label>
+                      {shareError && <p className="text-xs text-error">{shareError}</p>}
+                      {!confirmingRevoke ? (
+                        <button onClick={() => setConfirmingRevoke(true)} className="text-xs text-error hover:text-error/80 transition-colors">
+                          Deactivate link
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2 text-xs flex-wrap">
+                          <span className="text-secondary">Deactivate this link? It'll stop working immediately.</span>
+                          <button onClick={revokeShare} className="text-error border border-error/40 rounded-md px-2.5 py-1 hover:bg-error/10 transition-colors">
+                            Yes, deactivate
+                          </button>
+                          <button onClick={() => setConfirmingRevoke(false)} className="text-secondary border border-border rounded-md px-2.5 py-1 hover:border-border-strong transition-colors">
+                            Never mind
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </Row>

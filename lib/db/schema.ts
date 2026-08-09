@@ -110,6 +110,13 @@ export const shareLinks = pgTable("share_links", {
   albumId: text("album_id"),
   expiresAt: timestamp("expires_at"),
   allowDownload: boolean("allow_download").default(false),
+  // Previously there was no way to revoke a track/album share link early,
+  // or to see whether one already existed when reopening the share panel
+  // — every visit looked like "no link yet" even if one was still live,
+  // and old links lived forever until expiresAt. `active` lets a link be
+  // revoked without losing the row (matches inviteLinks' own `active`
+  // flag below).
+  active: boolean("active").default(true),
   createdAt: timestamp("created_at").notNull(),
 });
 

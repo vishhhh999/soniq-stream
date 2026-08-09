@@ -365,7 +365,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                       Plans (RAZORPAY_PLAN_ID_MONTHLY / _YEARLY), these
                       labels are just the marketing framing kept in sync
                       manually. Update both together if pricing changes. */}
-                  <div className="flex gap-1.5 p-0.5 bg-surface rounded-md w-fit">
+                  <div className="flex flex-wrap gap-1.5 p-0.5 bg-surface rounded-md w-fit">
                     <button
                       onClick={() => setBillingInterval("monthly")}
                       className={`text-xs px-3 py-1.5 rounded transition-colors ${billingInterval === "monthly" ? "bg-canvas text-primary" : "text-secondary hover:text-primary"}`}

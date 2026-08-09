@@ -157,7 +157,7 @@ export default function ConvertModal({
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.97 }}
-        className="w-full max-w-md rounded-2xl border border-border bg-elevated p-6 relative"
+        className="w-full max-w-md rounded-2xl border border-border bg-elevated p-4 sm:p-6 relative"
       >
         <button onClick={onClose} className="absolute top-4 right-4 text-tertiary hover:text-primary transition-colors">
           <X size={18} strokeWidth={1.5} />

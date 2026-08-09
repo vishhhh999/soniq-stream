@@ -24,7 +24,7 @@ export async function POST(
     .from(shareLinks)
     .where(eq(shareLinks.token, params.token));
 
-  if (!link) return NextResponse.json({ error: "Not found." }, { status: 404 });
+  if (!link || !link.active) return NextResponse.json({ error: "Not found." }, { status: 404 });
   if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
     return NextResponse.json({ error: "Link expired." }, { status: 410 });
   }
