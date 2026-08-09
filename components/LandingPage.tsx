@@ -73,12 +73,14 @@ export default function LandingPage() {
           transition={{ duration: 0.5 }}
         >
           <h1 className="text-4xl sm:text-6xl font-display font-bold text-primary tracking-tight leading-[1.05]">
-            A private home for the music you're still working on.
+            SONIQ is a private home for the music you're still working on.
           </h1>
           <p className="text-secondary text-base sm:text-lg mt-6 max-w-xl mx-auto leading-relaxed">
-            Upload demos, keep every version, and share them with exactly who
-            you want — with exactly the permissions you choose. Built for
-            work-in-progress, not for streaming to strangers.
+            SONIQ is a personal library for organizing, sharing, and
+            listening to work-in-progress music. Upload demos, keep every
+            version, and share them with exactly who you want — with
+            exactly the permissions you choose. Built for work-in-progress,
+            not for streaming to strangers.
           </p>
           <div className="flex items-center justify-center gap-3 mt-9">
             <Link

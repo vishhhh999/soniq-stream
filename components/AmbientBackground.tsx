@@ -23,11 +23,12 @@ function lerpHex(a: string, b: string, t: number): string {
 }
 
 const DEFAULT_TRANSITION_MS = 1200; // manual skip/jump, no crossfade in progress
+const RETARGET_CATCHUP_MS = 500;    // if the real color resolves mid-flight, correct over this long instead of snapping
 
 export default function AmbientBackground({ scoped = false }: { scoped?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>();
-  const { getFrequencyData, isPlaying, current, crossfadingToTrack, crossfadeDuration } = usePlayer();
+  const { getFrequencyData, isPlaying, current, currentTime, crossfadingToTrack, preloadingTrack, crossfadeDuration } = usePlayer();
   const { enabled } = useAmbient();
   const tRef = useRef(0);
 
@@ -36,7 +37,7 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
   // starting at `transitionStartRef`. All refs (not state) because the draw
   // loop reads them every frame and nothing in this component's JSX depends
   // on them — using state here previously caused the whole animation effect
-  // to tear down and rebuild on every track change (see below).
+  // to tear down and rebuild on every track change.
   const fromColorsRef = useRef<Gradient>({ from: "#888888", to: "#444444" });
   const toColorsRef = useRef<Gradient>({ from: "#888888", to: "#444444" });
   const transitionStartRef = useRef(0);
@@ -54,33 +55,55 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
     transitionMsRef.current = Math.max(1, durationMs);
   };
 
+  // Corrects the transition's destination without snapping — used when an
+  // async color sample resolves after a transition already started toward
+  // a provisional guess. Restarts the interpolation from wherever the
+  // gradient currently sits, over a short catch-up window, instead of
+  // yanking `toColorsRef` directly (which was the actual cause of the
+  // "flash" — the displayed color would jump instantly to the corrected
+  // target on whatever frame the promise happened to resolve, regardless
+  // of how far through the original transition it was).
+  const retarget = (target: Gradient) => {
+    beginTransition(target, RETARGET_CATCHUP_MS);
+  };
+
+  // Warm the color cache well before it's needed — mirrors PlayerProvider's
+  // own audio preloading (which starts ~30s before a crossfade). Previously
+  // nothing sampled the upcoming track's cover art until the crossfade
+  // itself started, so that decode-and-sample work landed right at the
+  // exact moment of the audio swap, and the transition had to guess with a
+  // seed color and correct itself moments later — both of which showed up
+  // as a visible flash right when the crossfade began. Firing this early
+  // means the cache is already warm by the time it's actually needed.
+  useEffect(() => {
+    if (!preloadingTrack?.albumCoverUrl) return;
+    if (peekImageGradient(preloadingTrack.albumCoverUrl) !== undefined) return; // already cached
+    gradientFromImage(preloadingTrack.albumCoverUrl); // fire and forget — just populates the cache
+  }, [preloadingTrack?.albumCoverUrl]);
+
   // Crossfade-synced transition: the instant PlayerProvider starts ramping
   // audio gain toward the next track, kick off a gradient transition of the
   // SAME duration, so by the time the audio swap completes the colors have
-  // already fully arrived — no lag between "sounds like track B" and
-  // "looks like track B". Track's own gradient resolves via the same
-  // seed/cover-sample logic as the normal per-track effect below.
+  // already fully arrived.
   useEffect(() => {
     if (!crossfadingToTrack) return;
     let cancelled = false;
 
-    // Album tracks all resolve to the same cover-derived color anyway — if
-    // it's already been sampled this session, transition straight to it
-    // instead of flashing through a different per-track seed color first.
     const cachedCover = crossfadingToTrack.albumCoverUrl
       ? peekImageGradient(crossfadingToTrack.albumCoverUrl)
       : undefined;
 
     if (cachedCover) {
+      // Common case now that preloading warms this ~30s ahead — the real
+      // color is already known, so this is the ONLY transition that runs
+      // for this track change, no guess-then-correct needed at all.
       beginTransition(cachedCover, crossfadeDuration * 1000);
     } else {
       beginTransition(gradientFromSeed(crossfadingToTrack.id), crossfadeDuration * 1000);
       if (crossfadingToTrack.albumCoverUrl) {
         gradientFromImage(crossfadingToTrack.albumCoverUrl).then((imgGradient) => {
           if (cancelled || !imgGradient) return;
-          // Retarget mid-flight once the sample resolves — keeps the same
-          // start point and elapsed time, just corrects the destination.
-          toColorsRef.current = imgGradient;
+          retarget(imgGradient); // smooth correction, not a snap
         });
       }
     }
@@ -89,10 +112,6 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
   }, [crossfadingToTrack?.id]);
 
   // Normal (non-crossfade) track change — manual skip, jump, first play.
-  // Still transitions smoothly rather than snapping instantly; just uses a
-  // short fixed duration since there's no audio fade to sync against.
-  // Skipped while a crossfade is actively driving the transition above, so
-  // the two don't fight over the same target on the same track change.
   useEffect(() => {
     if (!current || crossfadingToTrack) return;
     let cancelled = false;
@@ -105,13 +124,32 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       beginTransition(gradientFromSeed(current.id), DEFAULT_TRANSITION_MS);
       if (current.albumCoverUrl) {
         gradientFromImage(current.albumCoverUrl).then((imgGradient) => {
-          if (!cancelled && imgGradient) toColorsRef.current = imgGradient;
+          if (!cancelled && imgGradient) retarget(imgGradient);
         });
       }
     }
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id, current?.albumCoverUrl]);
+
+  // Seeking within a track — read every frame by the draw loop via a ref so
+  // a manual scrub is detected as a sudden jump in currentTime, distinct
+  // from normal continuous playback advancing a fraction of a second per
+  // frame. On a big jump, the beat-detection rolling average gets reset:
+  // previously it kept averaging bass energy from wherever you scrubbed
+  // FROM, so the reactive pulse felt disconnected from the music for a
+  // couple of seconds after a seek — it was comparing the new position's
+  // energy against a stale average from a completely different part of
+  // the track. Resetting lets it recalibrate to the new position immediately.
+  const currentTimeRef = useRef(0);
+  const seekResetRef = useRef(false);
+  useEffect(() => {
+    const prev = currentTimeRef.current;
+    if (Math.abs(currentTime - prev) > 1.5) {
+      seekResetRef.current = true; // consumed by the draw loop on its next frame
+    }
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -158,9 +196,7 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
     // Beat-onset detection: track a rolling average of bass energy and treat
     // a sudden spike above it as a "hit" — this is what makes the gradient
     // actually feel synced to the music instead of just smoothly (and
-    // sluggishly) tracking raw amplitude. A continuous glow that rises and
-    // falls with volume reads as "there in the background"; a sharp pulse
-    // that snaps on kick/bass hits and decays reads as "reacting to the beat".
+    // sluggishly) tracking raw amplitude.
     const bassHistory: number[] = [];
     let pulse = 0;
     let lastPulseTime = 0;
@@ -173,6 +209,14 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       const now = performance.now();
 
       ctx.clearRect(0, 0, w, h);
+
+      // A big seek jump was flagged since the last frame — clear the stale
+      // rolling average so beat detection recalibrates to the new position
+      // instead of comparing against energy from wherever playback used to be.
+      if (seekResetRef.current) {
+        bassHistory.length = 0;
+        seekResetRef.current = false;
+      }
 
       // Advance the color transition and read the currently-displayed color.
       const elapsed = now - transitionStartRef.current;
@@ -202,8 +246,10 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
           // Debounced so a single sustained hit doesn't re-trigger every
           // frame — ~180ms minimum gap between pulses, roughly matching the
           // fastest beats a listener perceives as distinct hits rather than
-          // a single sustained sound.
-          if (bass > avgBass * 1.35 && bass > 0.3 && now - lastPulseTime > 180) {
+          // a single sustained sound. Skipped for the first couple of
+          // samples after a reset (bassHistory.length < 4) since an average
+          // of 1-2 samples is too noisy to compare against meaningfully.
+          if (bassHistory.length >= 4 && bass > avgBass * 1.35 && bass > 0.3 && now - lastPulseTime > 180) {
             pulse = 1;
             lastPulseTime = now;
           }
@@ -211,10 +257,6 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       }
       pulse *= 0.87; // decay — fades to near-zero within ~250-300ms
 
-      // Pulse amplitude roughly doubled across radius, alpha, and added a
-      // brightness boost on the gradient's inner stop — previously the
-      // pulse was technically there but subtle enough to read as ambient
-      // noise rather than a beat visibly landing.
       const blobs = [
         { x: w * 0.3 + Math.sin(t) * 60, y: h * (1.05 - bass * 0.1), r: w * (0.32 + pulse * 0.42 + bass * 0.05), color: displayed.from },
         { x: w * 0.7 + Math.cos(t * 0.8) * 80, y: h * (1.1 - mid * 0.08), r: w * (0.28 + pulse * 0.24 + mid * 0.06), color: displayed.to },
@@ -225,10 +267,7 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       for (const b of blobs) {
         try {
           const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
-          // Inner stop brightens toward white on a pulse peak instead of
-          // staying at flat track color the whole time — gives the hit a
-          // visible "flash" core, not just a size change.
-          grad.addColorStop(0, pulse > 0.15 ? lerpHex(b.color, "#ffffff", pulse * 0.35) : b.color);
+          grad.addColorStop(0, b.color);
           grad.addColorStop(0.5, b.color + "88");
           grad.addColorStop(1, "transparent");
           ctx.globalAlpha = 0.28 + pulse * 0.5;

@@ -23,6 +23,12 @@ type PlayerState = {
   // track's colors in lockstep with the audio fade, rather than only
   // finding out a new track is "current" after the swap already happened.
   crossfadingToTrack: Track | null;
+  // Set ~30s before a crossfade, the moment audio preloading begins for the
+  // next track — lets AmbientBackground start warming its color cache
+  // (sampling the album cover, if any) way ahead of time too, so by the
+  // time the actual crossfade fires the color is already known and the
+  // transition can start instantly instead of guessing-then-correcting.
+  preloadingTrack: Track | null;
 };
 
 const PlayerContext = createContext<PlayerState | null>(null);
@@ -93,6 +99,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const crossfadingRef = useRef(false);
   const [crossfadingToTrack, setCrossfadingToTrack] = useState<Track | null>(null);
+  const [preloadingTrack, setPreloadingTrack] = useState<Track | null>(null);
   const xfadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const xfadeRafRef = useRef<number | null>(null);
 
@@ -142,6 +149,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     (incoming as any).preload = "auto";
     incoming.load(); // buffer without playing
     preloadedTrackId.current = nextTrack.id;
+    setPreloadingTrack(nextTrack);
   }, []);
 
   // Direct load + play on active element — used by all public actions.
@@ -171,6 +179,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
     crossfadingRef.current = false;
     setCrossfadingToTrack(null);
+    setPreloadingTrack(null);
   }, []);
 
   const completeCrossfade = useCallback((nextTrack: Track) => {
@@ -201,6 +210,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     preloadedTrackId.current = null;
     crossfadingRef.current = false;
     setCrossfadingToTrack(null);
+    setPreloadingTrack(null);
     // Update UI state only — do NOT touch audio.
     const nextIdx = queueIndexRef.current + 1;
     const q = queueRef.current;
@@ -533,7 +543,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       current, isPlaying, currentTime, duration, audioRef, queue, queueIndex, shuffleOn,
       play, playQueue, toggle, next, previous, toggleShuffle, jumpToQueueIndex, reorderQueue,
       repeatMode, cycleRepeatMode, getFrequencyData, crossfadeEnabled, crossfadeDuration, setCrossfade,
-      crossfadingToTrack,
+      crossfadingToTrack, preloadingTrack,
     }}>
       <audio ref={audioRefA} className="hidden" crossOrigin="anonymous" />
       <audio ref={audioRefB} className="hidden" crossOrigin="anonymous" />

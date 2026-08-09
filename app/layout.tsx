@@ -16,7 +16,7 @@ const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mon
 
 export const metadata: Metadata = {
   title: "SONIQ — your tracks, organized",
-  description: "Personal library for work-in-progress music.",
+  description: "SONIQ is a private library for organizing, sharing, and listening to work-in-progress music — upload demos, keep every version, and control exactly who can access what.",
   manifest: "/manifest.json",
   icons: {
     icon: [{ url: "/favicon.ico" }, { url: "/logo.svg", type: "image/svg+xml" }],
