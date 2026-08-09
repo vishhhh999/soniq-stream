@@ -19,6 +19,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [hasPassword, setHasPassword] = useState(false);
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameDraft, setUsernameDraft] = useState("");
@@ -49,11 +50,18 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingAvatar(true);
+    setAvatarError(null);
     const formData = new FormData();
     formData.append("avatar", file);
     const res = await fetch("/api/user/avatar", { method: "POST", body: formData });
     const data = await res.json().catch(() => ({}));
-    if (res.ok && data.avatarUrl) setAvatarUrl(data.avatarUrl);
+    if (res.ok && data.avatarUrl) {
+      setAvatarUrl(data.avatarUrl);
+    } else {
+      // Previously checked res.ok before applying the new URL, but never
+      // surfaced a failure — the upload just silently did nothing.
+      setAvatarError(data.error || "Couldn't upload that image. Try again.");
+    }
     setUploadingAvatar(false);
     // Reset input so same file can be re-selected.
     e.target.value = "";
@@ -171,6 +179,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                   >
                     {uploadingAvatar ? "Uploading..." : "Change photo"}
                   </button>
+                  {avatarError && <p className="text-xs text-error mt-1">{avatarError}</p>}
                 </div>
               </div>
             </div>

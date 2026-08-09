@@ -19,15 +19,27 @@ export default function LyricsSidebar({ onExpand }: { onExpand: () => void }) {
       return;
     }
     let cancelled = false;
-    fetch(`/api/tracks/${current.id}`)
-      .then((r) => r.json())
-      .then((full) => {
-        if (cancelled) return;
-        setLines(Array.isArray(full.lyricsSynced) && full.lyricsSynced.length > 0 ? full.lyricsSynced : null);
-      })
-      .catch(() => setLines(null));
+    const load = () => {
+      fetch(`/api/tracks/${current.id}`)
+        .then((r) => r.json())
+        .then((full) => {
+          if (cancelled) return;
+          setLines(Array.isArray(full.lyricsSynced) && full.lyricsSynced.length > 0 ? full.lyricsSynced : null);
+        })
+        .catch(() => setLines(null));
+    };
+    load();
+    // LyricsEditor saves/syncs lyrics from a different part of the tree
+    // (TrackDetail) — without this, a fresh sync never showed up here
+    // until a full page reload, since this effect only re-runs on
+    // current.id changing, not on the lyrics themselves changing.
+    const onUpdated = (e: Event) => {
+      if ((e as CustomEvent).detail?.trackId === current.id) load();
+    };
+    window.addEventListener("soniq:lyrics-updated", onUpdated);
     return () => {
       cancelled = true;
+      window.removeEventListener("soniq:lyrics-updated", onUpdated);
     };
   }, [current?.id, isMobile]);
 

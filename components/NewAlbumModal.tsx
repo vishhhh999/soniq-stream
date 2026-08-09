@@ -17,6 +17,7 @@ export default function NewAlbumModal({ onClose, onCreated }: { onClose: () => v
   };
 
   const [error, setError] = useState<string | null>(null);
+  const [albumCreated, setAlbumCreated] = useState(false);
 
   const submit = async () => {
     if (!name.trim()) return;
@@ -27,7 +28,17 @@ export default function NewAlbumModal({ onClose, onCreated }: { onClose: () => v
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: name.trim() }),
     });
+    if (!res.ok) {
+      // Previously unchecked — a failed create (expired session, bad
+      // request) still fell through to onCreated(), closing the modal as
+      // if the album had been made when nothing was actually created.
+      const body = await res.json().catch(() => ({}));
+      setError(body.error || "Could not create the album. Try again.");
+      setBusy(false);
+      return;
+    }
     const album = await res.json();
+    setAlbumCreated(true);
 
     if (coverFile) {
       try {
@@ -127,11 +138,11 @@ export default function NewAlbumModal({ onClose, onCreated }: { onClose: () => v
           )}
 
           <button
-            onClick={error ? onCreated : submit}
+            onClick={error ? (albumCreated ? onCreated : submit) : submit}
             disabled={!name.trim() || busy}
             className="w-full bg-accent text-canvas text-sm font-medium py-2.5 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
           >
-            {busy ? "Creating..." : error ? "Continue without cover" : "Create album"}
+            {busy ? "Creating..." : error ? (albumCreated ? "Continue without cover" : "Try again") : "Create album"}
           </button>
         </motion.div>
       </motion.div>

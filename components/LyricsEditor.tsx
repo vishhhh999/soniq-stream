@@ -28,15 +28,30 @@ export default function LyricsEditor({
   // meaning finishing a sync (or even just saving the text) closed the
   // whole drawer with no warning. Lyrics now confirm locally instead,
   // exactly like the title/artist auto-save fields already do.
+  //
+  // It still needs to tell the REST of the app, though — LyricsSidebar and
+  // LyricsView hold their own separately-fetched copy of lyrics, keyed off
+  // track.id only, so they never refetch on their own after an edit here.
+  // Without this event, newly saved/synced lyrics only appeared after a
+  // full page reload.
+  const notifyLyricsUpdated = () => {
+    window.dispatchEvent(new CustomEvent("soniq:lyrics-updated", { detail: { trackId: track.id } }));
+  };
+
   const saveText = async () => {
     setSaving(true);
-    await fetch(`/api/tracks/${track.id}`, {
+    const res = await fetch(`/api/tracks/${track.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lyrics: text }),
     });
     setSaving(false);
+    if (!res.ok) {
+      alert("Couldn't save the lyrics. Try again.");
+      return;
+    }
     setSaved(true);
+    notifyLyricsUpdated();
     setTimeout(() => setSaved(false), 1500);
   };
 
@@ -63,12 +78,17 @@ export default function LyricsEditor({
 
   const finishSync = async (lines: SyncedLine[]) => {
     setSyncing(false);
-    await fetch(`/api/tracks/${track.id}`, {
+    const res = await fetch(`/api/tracks/${track.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lyricsSynced: lines }),
     });
+    if (!res.ok) {
+      alert("Couldn't save the synced lyrics. Try again.");
+      return;
+    }
     setIsSynced(true);
+    notifyLyricsUpdated();
   };
 
   const cancelSync = () => {

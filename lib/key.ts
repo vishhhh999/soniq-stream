@@ -49,6 +49,7 @@ function pearsonCorrelation(a: number[], b: number[]): number {
 
 export async function detectKey(fileUrl: string): Promise<{ key: string; confidence: number }> {
   const res = await fetch(fileUrl);
+  if (!res.ok) throw new Error(`Could not fetch audio file (${res.status})`);
   const arrayBuffer = await res.arrayBuffer();
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);

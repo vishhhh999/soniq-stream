@@ -125,6 +125,16 @@ export default function SyncedLyricsList({
     };
   }, []);
 
+  // Reset manual-scroll state on a track change — otherwise a scroll from
+  // the previous track could leave `isManual` true (or a stale resume
+  // timer pending) into the new track's lyrics, making auto-follow not
+  // resume until that leftover timer fires.
+  useEffect(() => {
+    if (resumeTimerRef.current) { clearTimeout(resumeTimerRef.current); resumeTimerRef.current = null; }
+    manualOverrideRef.current = false;
+    setIsManual(false);
+  }, [lines]);
+
   const seekTo = (time: number) => {
     if (audioRef.current) audioRef.current.currentTime = time;
   };

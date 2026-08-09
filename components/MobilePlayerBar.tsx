@@ -30,19 +30,31 @@ export default function MobilePlayerBar() {
   // Fetch lyrics for the scrollable section below the player, only while expanded.
   useEffect(() => {
     if (!expanded || !current) return;
-    setLyricsLoading(true);
-    fetch(`/api/tracks/${current.id}`)
-      .then((r) => r.json())
-      .then((full) => {
-        if (Array.isArray(full.lyricsSynced) && full.lyricsSynced.length > 0) {
-          setLines(full.lyricsSynced); setRawText(null);
-        } else if (full.lyrics) {
-          setLines(null); setRawText(full.lyrics);
-        } else {
-          setLines(null); setRawText(null);
-        }
-      })
-      .finally(() => setLyricsLoading(false));
+    const load = () => {
+      setLyricsLoading(true);
+      fetch(`/api/tracks/${current.id}`)
+        .then((r) => {
+          if (!r.ok) throw new Error(`${r.status}`);
+          return r.json();
+        })
+        .then((full) => {
+          if (Array.isArray(full.lyricsSynced) && full.lyricsSynced.length > 0) {
+            setLines(full.lyricsSynced); setRawText(null);
+          } else if (full.lyrics) {
+            setLines(null); setRawText(full.lyrics);
+          } else {
+            setLines(null); setRawText(null);
+          }
+        })
+        .catch(() => { setLines(null); setRawText(null); })
+        .finally(() => setLyricsLoading(false));
+    };
+    load();
+    const onUpdated = (e: Event) => {
+      if ((e as CustomEvent).detail?.trackId === current.id) load();
+    };
+    window.addEventListener("soniq:lyrics-updated", onUpdated);
+    return () => window.removeEventListener("soniq:lyrics-updated", onUpdated);
   }, [expanded, current?.id]);
 
   const fmt = (s: number) => {

@@ -20,18 +20,26 @@ export default function LyricsView({ track, onClose }: { track: Track; onClose: 
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/tracks/${track.id}`)
-      .then(r => r.json())
-      .then(full => {
-        if (Array.isArray(full.lyricsSynced) && full.lyricsSynced.length > 0) {
-          setLines(full.lyricsSynced); setRawText(null);
-        } else if (full.lyrics) {
-          setLines(null); setRawText(full.lyrics);
-        } else {
-          setLines(null); setRawText(null);
-        }
-      })
-      .finally(() => setLoading(false));
+    const load = () => {
+      fetch(`/api/tracks/${track.id}`)
+        .then(r => r.json())
+        .then(full => {
+          if (Array.isArray(full.lyricsSynced) && full.lyricsSynced.length > 0) {
+            setLines(full.lyricsSynced); setRawText(null);
+          } else if (full.lyrics) {
+            setLines(null); setRawText(full.lyrics);
+          } else {
+            setLines(null); setRawText(null);
+          }
+        })
+        .finally(() => setLoading(false));
+    };
+    load();
+    const onUpdated = (e: Event) => {
+      if ((e as CustomEvent).detail?.trackId === track.id) load();
+    };
+    window.addEventListener("soniq:lyrics-updated", onUpdated);
+    return () => window.removeEventListener("soniq:lyrics-updated", onUpdated);
   }, [track.id]);
 
   if (!mounted) return null;

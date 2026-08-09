@@ -4,6 +4,7 @@
 // on ambient/rubato/freeform material. Always surfaced as editable, never as fact.
 export async function detectBPM(fileUrl: string): Promise<{ bpm: number; confidence: number }> {
   const res = await fetch(fileUrl);
+  if (!res.ok) throw new Error(`Could not fetch audio file (${res.status})`);
   const arrayBuffer = await res.arrayBuffer();
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
