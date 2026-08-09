@@ -89,6 +89,7 @@ export default function TrackContextMenu({
     setDownloading(true);
     try {
       const res = await fetch(track.fileUrl);
+      if (!res.ok) throw new Error(`${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -99,7 +100,9 @@ export default function TrackContextMenu({
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-    } catch { /* ignore */ }
+    } catch {
+      alert("Download failed. Try again.");
+    }
     setDownloading(false);
     onClose();
   };

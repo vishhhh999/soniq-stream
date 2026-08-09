@@ -66,6 +66,7 @@ export default function AlbumSharePanel({
 }) {
   const [data, setData] = useState<ShareData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [view, setView] = useState<View>("main");
   const [memberMenuFor, setMemberMenuFor] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -93,34 +94,60 @@ export default function AlbumSharePanel({
 
   const patchSettings = async (patch: Partial<Pick<ShareData, "accessMode" | "allowEdit" | "allowDownload">>) => {
     setSaving(true);
-    await fetch(`/api/albums/${albumId}/share`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
+    setActionError(null);
+    // Optimistic, but reverted if the request actually fails — previously
+    // this applied unconditionally, so a failed toggle (expired session,
+    // transient 500) left the UI showing settings that were never actually
+    // saved on the server.
+    const previous = data;
     setData((d) => d ? { ...d, ...patch } : d);
+    try {
+      const res = await fetch(`/api/albums/${albumId}/share`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setData(previous);
+      setActionError("Couldn't save that change. Try again.");
+    }
     setSaving(false);
   };
 
   const generateInvite = async () => {
     setGeneratingLink(true);
+    setActionError(null);
     const body: Record<string, unknown> = {};
-    if (useType === "uses" && inviteUses) body.maxUses = parseInt(inviteUses);
+    if (useType === "uses" && inviteUses) body.maxUses = parseInt(inviteUses, 10);
     if (useType === "expiry" && inviteExpiry) body.expiresAt = new Date(inviteExpiry).toISOString();
-    const res = await fetch(`/api/albums/${albumId}/invite`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const link = await res.json();
-    setData((d) => d ? { ...d, inviteLink: link } : d);
+    try {
+      const res = await fetch(`/api/albums/${albumId}/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error();
+      const link = await res.json();
+      setData((d) => d ? { ...d, inviteLink: link } : d);
+      setView("main");
+    } catch {
+      setActionError("Couldn't create the invite link. Try again.");
+    }
     setGeneratingLink(false);
-    setView("main");
   };
 
   const deactivateInvite = async () => {
-    await fetch(`/api/albums/${albumId}/invite`, { method: "DELETE" });
+    setActionError(null);
+    const previous = data;
     setData((d) => d ? { ...d, inviteLink: null } : d);
+    try {
+      const res = await fetch(`/api/albums/${albumId}/invite`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+    } catch {
+      setData(previous);
+      setActionError("Couldn't deactivate the link. Try again.");
+    }
   };
 
   const copyInviteLink = () => {
@@ -131,21 +158,37 @@ export default function AlbumSharePanel({
   };
 
   const removeMember = async (userId: string) => {
-    await fetch(`/api/albums/${albumId}/members/${userId}`, { method: "DELETE" });
+    setActionError(null);
+    const previous = data;
     setData((d) => d ? { ...d, members: d.members.filter((m) => m.userId !== userId) } : d);
     setMemberMenuFor(null);
+    try {
+      const res = await fetch(`/api/albums/${albumId}/members/${userId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+    } catch {
+      setData(previous);
+      setActionError("Couldn't remove that member. Try again.");
+    }
   };
 
   const patchMember = async (userId: string, patch: { canEdit?: boolean; canDownload?: boolean }) => {
-    await fetch(`/api/albums/${albumId}/members/${userId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
+    setActionError(null);
+    const previous = data;
     setData((d) => d ? {
       ...d,
       members: d.members.map((m) => m.userId === userId ? { ...m, ...patch } : m),
     } : d);
+    try {
+      const res = await fetch(`/api/albums/${albumId}/members/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setData(previous);
+      setActionError("Couldn't update that member. Try again.");
+    }
   };
 
   const { from: gradFrom, to: gradTo } = gradientFromSeed(albumId);
@@ -188,6 +231,12 @@ export default function AlbumSharePanel({
           </div>
 
           <div className="overflow-y-auto flex-1 no-scrollbar">
+
+            {actionError && (
+              <div className="mx-4 mt-3 px-3 py-2 rounded-lg bg-error/10 border border-error/20 text-xs text-error">
+                {actionError}
+              </div>
+            )}
 
             {/* Loading / error states — previously the sheet silently
                 rendered as just the header with nothing below it if the

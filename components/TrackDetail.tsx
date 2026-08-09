@@ -124,8 +124,18 @@ export default function TrackDetail({
 
   const handleDelete = async () => {
     setDeleting(true);
-    await fetch(`/api/tracks/${track.id}`, { method: "DELETE" });
-    onDeleted();
+    try {
+      const res = await fetch(`/api/tracks/${track.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        alert("Could not delete this track. Try again.");
+        return;
+      }
+      onDeleted();
+    } catch {
+      alert("Could not delete this track. Check your connection and try again.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleDownload = async () => {

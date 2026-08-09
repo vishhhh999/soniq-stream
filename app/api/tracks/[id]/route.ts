@@ -46,6 +46,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const update: Record<string, unknown> = {};
   for (const k of allowed) if (k in body) update[k] = body[k];
 
+  // If albumId is being changed, it must actually belong to this user —
+  // without this, a client could PATCH a track's albumId to any album id
+  // it can guess, associating a foreign track with someone else's album.
+  if ("albumId" in update && update.albumId !== null) {
+    const [targetAlbum] = await db.select({ id: albums.id }).from(albums).where(and(eq(albums.id, update.albumId as string), eq(albums.userId, userId)));
+    if (!targetAlbum) return NextResponse.json({ error: "Album not found." }, { status: 404 });
+  }
+
   await db.update(tracks).set(update).where(eq(tracks.id, params.id));
   const [row] = await db.select().from(tracks).where(eq(tracks.id, params.id));
   return NextResponse.json(row);

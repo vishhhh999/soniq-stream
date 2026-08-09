@@ -75,9 +75,16 @@ export default function PlayerBar() {
     window.dispatchEvent(new CustomEvent("soniq:track-deleted"));
   };
 
+  // Re-applies whenever volume/muted change, AND whenever the current track
+  // changes — a crossfade swaps in the OTHER underlying <audio> element,
+  // which PlayerProvider always resets to .volume = 1 for the ramp/fallback
+  // math (see startCrossfade/completeCrossfade). Without `current?.id` here,
+  // the volume slider silently stopped applying after the first crossfade —
+  // audio would jump back to 100% and stay there until the user touched the
+  // slider again.
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = muted ? 0 : volume;
-  }, [volume, muted]);
+  }, [volume, muted, current?.id]);
   const fmt = (s: number) => {
     if (!s || Number.isNaN(s)) return "0:00";
     const m = Math.floor(s / 60);

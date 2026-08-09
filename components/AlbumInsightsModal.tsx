@@ -37,13 +37,24 @@ export default function AlbumInsightsModal({
 
   useEffect(() => {
     fetch(`/api/albums/${albumId}/insights`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Insights request failed (${r.status})`);
+        return r.json();
+      })
       .then(setData)
-      .catch(() => {})
+      .catch((err) => {
+        // Previously this fell through to setData() with an error-shaped
+        // body ({ error: "..." }) on a non-ok response (e.g. a 403 for a
+        // non-owner). `data.byTrack` was then undefined, and the
+        // maxTrackPlays calc below called .reduce on it directly, which
+        // threw and crashed the modal instead of showing "Couldn't load."
+        console.error("Failed to load insights:", err);
+        setData(null);
+      })
       .finally(() => setLoading(false));
   }, [albumId]);
 
-  const maxTrackPlays = data?.byTrack.reduce((m, t) => Math.max(m, t.plays), 0) || 1;
+  const maxTrackPlays = data?.byTrack?.reduce((m, t) => Math.max(m, t.plays), 0) || 1;
 
   return (
     <AnimatePresence>

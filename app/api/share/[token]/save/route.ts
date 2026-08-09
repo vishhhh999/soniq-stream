@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { shareLinks, tracks, albums, users, albumMembers, contentFollows } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +71,20 @@ export async function POST(
       // Don't let the owner save their own album.
       if (originalAlbum.userId === userId) {
         return NextResponse.json({ error: "This is your own album." }, { status: 400 });
+      }
+
+      // Idempotent — don't create a second copy (and a second album_members
+      // row) if this user already saved this exact album. Without this,
+      // clicking "Save to library" twice created two full duplicate albums
+      // with duplicate tracks, and two album_members rows for the same
+      // (albumId, userId) pair — which then made the upload-finalize sync
+      // logic copy every future upload into this member's library twice.
+      const [alreadyMember] = await db
+        .select()
+        .from(albumMembers)
+        .where(and(eq(albumMembers.albumId, originalAlbum.id), eq(albumMembers.userId, userId)));
+      if (alreadyMember?.savedAlbumId) {
+        return NextResponse.json({ ok: true, type: "album", albumId: alreadyMember.savedAlbumId, alreadySaved: true });
       }
 
       // Get the original owner's profile for attribution.

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,14 @@ export async function GET() {
     .orderBy(desc(notifications.createdAt))
     .limit(50);
 
-  const unseenCount = items.filter((n) => !n.seen).length;
+  // Count unseen across ALL notifications, not just the last-50 page —
+  // filtering `items` directly undercounted the badge for anyone with
+  // more than 50 unread notifications.
+  const [{ value: unseenCount }] = await db
+    .select({ value: count() })
+    .from(notifications)
+    .where(and(eq(notifications.recipientUserId, userId), eq(notifications.seen, false)));
+
   return NextResponse.json({ items, unseenCount });
 }
 
