@@ -15,8 +15,9 @@ const interTight = Inter_Tight({ subsets: ["latin"], variable: "--font-inter-tig
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-display" });
 
 export const metadata: Metadata = {
-  title: "SONIQ — your tracks, organized",
-  description: "SONIQ is a private library for organizing, sharing, and listening to work-in-progress music — upload demos, keep every version, and control exactly who can access what.",
+  title: "SONIQ",
+  applicationName: "SONIQ",
+  description: "SONIQ is a personal library for organizing, sharing, and listening to work-in-progress music — upload demos, keep every version, and control exactly who can access what.",
   manifest: "/manifest.json",
   icons: {
     icon: [{ url: "/favicon.ico" }, { url: "/logo.svg", type: "image/svg+xml" }],
@@ -26,6 +27,18 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "SONIQ",
+  },
+  // No openGraph metadata existed at all before this — Google's OAuth
+  // branding verification cross-checks the app name against machine-
+  // readable signals on the homepage, not just visible body text. og:title
+  // and og:site_name are the clearest, most standard signal for "what is
+  // this app called" that an automated checker would look for.
+  openGraph: {
+    title: "SONIQ",
+    siteName: "SONIQ",
+    description: "SONIQ is a personal library for organizing, sharing, and listening to work-in-progress music.",
+    url: "https://www.soniq.lol",
+    type: "website",
   },
 };
 

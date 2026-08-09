@@ -72,6 +72,9 @@ export default function LandingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
+          <p className="text-xs uppercase tracking-widest text-tertiary mb-4">
+            Music organization &amp; sharing software for unreleased tracks
+          </p>
           <h1 className="text-4xl sm:text-6xl font-display font-bold text-primary tracking-tight leading-[1.05]">
             SONIQ is a private home for the music you're still working on.
           </h1>
