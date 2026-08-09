@@ -354,8 +354,6 @@ export default function SharePage({ params }: { params: { token: string } }) {
     );
   }
 
-  const currentTrack = tracks[currentTrackIndex];
-
   return (
     <main className="min-h-screen flex flex-col items-center justify-center bg-canvas px-5 sm:px-6 py-12 sm:py-16 gap-0 overflow-x-hidden">
 
@@ -474,13 +472,25 @@ export default function SharePage({ params }: { params: { token: string } }) {
                   )}
                 </button>
 
-                {data.allowDownload && currentTrack && (
+                {/* Download — requires sign-in now (was fully anonymous
+                    before, which wasn't safe: anyone with the link could
+                    pull the raw file with no identity behind it). Playback
+                    above stays anonymous. */}
+                {data.allowDownload && userId && (
                   <a
-                    href={currentTrack.fileUrl}
-                    download
+                    href={`/api/share/${params.token}/download`}
                     className="flex items-center gap-2 text-sm text-tertiary hover:text-secondary transition-colors"
                   >
                     <Download size={14} strokeWidth={1.5} />
+                  </a>
+                )}
+                {data.allowDownload && !userId && (
+                  <a
+                    href={`/login?next=/s/${params.token}`}
+                    className="flex items-center gap-2 text-xs text-tertiary hover:text-secondary transition-colors"
+                  >
+                    <Download size={14} strokeWidth={1.5} />
+                    Sign in to download
                   </a>
                 )}
               </div>

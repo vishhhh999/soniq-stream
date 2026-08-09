@@ -349,10 +349,9 @@ export default function InvitePage({ params }: { params: { token: string } }) {
                       </button>
                     )}
 
-                    {info.allowDownload && tracksList[currentTrackIndex] && (
+                    {info.allowDownload && tracksList.length > 0 && (
                       <a
-                        href={tracksList[currentTrackIndex].fileUrl}
-                        download
+                        href={`/api/invite/${params.token}/download`}
                         className="flex items-center gap-2 text-sm text-tertiary hover:text-secondary transition-colors"
                       >
                         <Download size={14} strokeWidth={1.5} />

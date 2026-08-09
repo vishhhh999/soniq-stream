@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { albums, albumMembers, users, inviteLinks } from "@/lib/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
+import { notifyDownloadPermissionChanged, getUsernameById } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -73,5 +74,38 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   for (const k of allowed) if (k in body) update[k] = body[k];
 
   await db.update(albums).set(update).where(eq(albums.id, params.id));
+
+  // Sync allowDownload to every member's saved copy, and notify them —
+  // downloads should stay in lockstep with what the owner actually set,
+  // and members should know their download access changed (was flipping
+  // silently before: their saved copy never got updated at all).
+  if ("allowDownload" in update) {
+    const newValue = Boolean(update.allowDownload);
+    try {
+      const members = await db.select().from(albumMembers).where(eq(albumMembers.albumId, params.id));
+      const ownerUsername = await getUsernameById(userId);
+      for (const member of members) {
+        if (member.savedAlbumId) {
+          await db.update(albums).set({ allowDownload: newValue }).where(eq(albums.id, member.savedAlbumId));
+        }
+        await db.update(albumMembers).set({ canDownload: newValue }).where(eq(albumMembers.id, member.id));
+        try {
+          await notifyDownloadPermissionChanged({
+            recipientUserId: member.userId,
+            ownerId: userId,
+            ownerUsername,
+            albumId: member.savedAlbumId ?? params.id,
+            albumName: album.name,
+            enabled: newValue,
+          });
+        } catch (err) {
+          console.error("Download-permission notification failed (non-fatal):", err);
+        }
+      }
+    } catch (err) {
+      console.error("Member download sync failed (non-fatal):", err);
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }

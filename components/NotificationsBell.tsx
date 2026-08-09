@@ -9,7 +9,7 @@ type NotificationItem = {
   id: string;
   actorUserId: string | null;
   actorUsername: string | null;
-  type: "track_added" | "version_added" | "track_removed" | "track_played";
+  type: "track_added" | "version_added" | "track_removed" | "track_played" | "album_downloaded" | "download_enabled" | "download_disabled";
   albumName: string | null;
   trackTitle: string | null;
   seen: boolean;
@@ -37,6 +37,9 @@ function notifText(n: NotificationItem): string {
     case "version_added":  return `${actor} uploaded a new version of ${track}`;
     case "track_removed":  return `${actor} removed ${track}${album}`;
     case "track_played":   return `${actor} played ${track}`;
+    case "album_downloaded": return `${actor} downloaded ${album ? album.replace(/^ in /, "") : "an album"}`;
+    case "download_enabled": return `${actor} turned on downloads for ${album ? album.replace(/^ in /, "") : "an album"}`;
+    case "download_disabled": return `${actor} turned off downloads for ${album ? album.replace(/^ in /, "") : "an album"}`;
   }
 }
 

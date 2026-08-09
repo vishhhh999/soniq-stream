@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Disc3, Pencil, Share2, ImagePlus, Trash2, Play, Shuffle, MoreHorizontal, BarChart3, ListPlus } from "lucide-react";
+import { ArrowLeft, Disc3, Pencil, Share2, ImagePlus, Trash2, Play, Shuffle, MoreHorizontal, BarChart3, ListPlus, Download } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import UploadButton from "@/components/UploadButton";
@@ -417,6 +417,20 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
                       <ListPlus size={14} strokeWidth={1.5} className="text-secondary" />
                       Add to queue
                     </button>
+                    {/* Owner always sees this; a receiver only when the owner
+                        has allowDownload on (synced onto this album's own
+                        allowDownload field — see the PATCH sync in the share
+                        route and the toggle handler). */}
+                    {(!isReadOnly || album?.allowDownload) && (
+                      <a
+                        href={`/api/albums/${params.id}/download`}
+                        onClick={() => setShowMoreMenu(false)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-primary hover:bg-surface transition-colors"
+                      >
+                        <Download size={14} strokeWidth={1.5} className="text-secondary" />
+                        Download album
+                      </a>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

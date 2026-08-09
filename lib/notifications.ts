@@ -55,6 +55,69 @@ export async function notifyAlbumFollowers({
   );
 }
 
+// Notify the album owner when a receiver downloads their shared album.
+// Skips the owner downloading their own album.
+export async function notifyOwnerOfDownload({
+  ownerId,
+  actorUserId,
+  actorUsername,
+  albumId,
+  albumName,
+}: {
+  ownerId: string;
+  actorUserId: string;
+  actorUsername: string | null;
+  albumId: string;
+  albumName: string;
+}) {
+  if (actorUserId === ownerId) return;
+
+  await db.insert(notifications).values({
+    id: nanoid(),
+    recipientUserId: ownerId,
+    actorUserId,
+    type: "album_downloaded",
+    albumId,
+    trackId: null,
+    trackTitle: null,
+    albumName,
+    actorUsername,
+    seen: false,
+    createdAt: new Date(),
+  });
+}
+
+// Notify a member when the owner turns downloads on/off for an album
+// they have a saved copy of.
+export async function notifyDownloadPermissionChanged({
+  recipientUserId,
+  ownerId,
+  ownerUsername,
+  albumId,
+  albumName,
+  enabled,
+}: {
+  recipientUserId: string;
+  ownerId: string;
+  ownerUsername: string | null;
+  albumId: string;
+  albumName: string;
+  enabled: boolean;
+}) {
+  await db.insert(notifications).values({
+    id: nanoid(),
+    recipientUserId,
+    actorUserId: ownerId,
+    type: enabled ? "download_enabled" : "download_disabled",
+    albumId,
+    trackId: null,
+    trackTitle: null,
+    albumName,
+    actorUsername: ownerUsername,
+    seen: false,
+    createdAt: new Date(),
+  });
+}
 // Notify the track owner when someone plays their track via a share link.
 // Skips self-plays. Anonymous plays (actorUserId=null) still notify the owner.
 export async function notifyOwnerOfPlay({

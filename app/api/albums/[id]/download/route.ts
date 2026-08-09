@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { albums, tracks } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
+import { notifyOwnerOfDownload, getUsernameById } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -75,6 +76,23 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const zipData = zipSync(files);
   const safeAlbumName = album.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").trim() || "album";
+
+  // Notify the original owner when a receiver downloads their shared album.
+  // (For the owner downloading their own album, ownerId === userId here,
+  // and notifyOwnerOfDownload already skips self-notifications.)
+  try {
+    const ownerId = album.sharedByUserId ?? album.userId;
+    const actorUsername = await getUsernameById(userId);
+    await notifyOwnerOfDownload({
+      ownerId,
+      actorUserId: userId,
+      actorUsername,
+      albumId: album.sharedFromAlbumId ?? album.id,
+      albumName: album.name,
+    });
+  } catch (err) {
+    console.error("Download notification failed (non-fatal):", err);
+  }
 
   return new NextResponse(zipData, {
     headers: {
