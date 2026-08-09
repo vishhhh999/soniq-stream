@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  FolderOpen, Share2, GitBranch, Bell, Users, BarChart3, Sparkles, Music2,
+  FolderOpen, Share2, GitBranch, Bell, Users, BarChart3, Sparkles, Music2, ShieldCheck,
 } from "lucide-react";
 import Logo from "./Logo";
 
@@ -119,6 +119,34 @@ export default function LandingPage() {
               <p className="text-secondary text-sm leading-relaxed">{f.body}</p>
             </motion.div>
           ))}
+        </div>
+      </section>
+
+      {/* Data use — explains what account data is requested and why, a
+          distinct requirement from "what does the app do" per Google's
+          OAuth homepage guidelines (support.google.com/cloud/answer/13807376):
+          "explain with transparency the purpose for which your app requests
+          user data." Previously nowhere on the page. */}
+      <section className="border-t border-border">
+        <div className="max-w-2xl mx-auto px-6 py-16 sm:py-20">
+          <div className="flex items-start gap-4">
+            <ShieldCheck size={22} strokeWidth={1.5} className="text-accent shrink-0 mt-0.5" />
+            <div>
+              <h2 className="text-primary font-medium text-lg mb-2">
+                What SONIQ asks for, and why
+              </h2>
+              <p className="text-secondary text-sm leading-relaxed">
+                You can create a SONIQ account with an email and password, or
+                by signing in with Google. If you use Google sign-in, we
+                only request your <strong className="text-primary font-normal">name, email address, and profile photo</strong> —
+                just enough to create your account and identify you inside
+                the app. We don't request access to your Gmail, Google
+                Drive, contacts, or any other Google data, and we never post
+                or send anything on your behalf. Full details are in our{" "}
+                <Link href="/privacy" className="text-primary underline">Privacy Policy</Link>.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
