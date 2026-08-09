@@ -75,6 +75,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // Crossfade state.
   const crossfadingRef = useRef(false);
+  const preplayingRef = useRef(false); // next track is pre-playing silently before ramp
   const xfadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const xfadeRafRef = useRef<number | null>(null);
 
@@ -142,6 +143,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       ig.gain.cancelScheduledValues(now); ig.gain.setValueAtTime(0, now);
     }
     crossfadingRef.current = false;
+    preplayingRef.current = false;
   }, []);
 
   // Called by setTimeout after crossfadeDuration seconds.
@@ -180,36 +182,56 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const startCrossfade = useCallback((nextTrack: Track) => {
+  // Phase 1: pre-play next track silently so it's buffered before the ramp.
+  // PRE_BUFFER seconds before the crossfade window we start the inactive
+  // element at gain=0. By the time the ramp starts, the browser has already
+  // fetched and buffered the audio — eliminating the loading gap.
+  const PRE_BUFFER = 3; // seconds of headroom before fade window
+
+  const preplayNextTrack = useCallback((nextTrack: Track) => {
+    if (preplayingRef.current || crossfadingRef.current) return;
+    const incoming = getInactive();
+    if (!incoming) return;
+    preplayingRef.current = true;
+    const inGain = getInactiveGain();
+    if (inGain) inGain.gain.value = 0;   // silent — gain node mutes it
+    incoming.volume = 1;
+    incoming.src = nextTrack.fileUrl;
+    incoming.play().catch(() => {});     // start buffering immediately
+  }, []);
+
+  // Phase 2: begin the gain ramp. Incoming is already playing at gain=0.
+  const startCrossfadeRamp = useCallback((nextTrack: Track) => {
     if (crossfadingRef.current) return;
     const outgoing = getActive(); const incoming = getInactive();
     if (!outgoing || !incoming) return;
 
     crossfadingRef.current = true;
+    preplayingRef.current = false;
     const fadeSec = xfadeDurRef.current;
     const fadeMs = fadeSec * 1000;
 
-    // Start the incoming element from the beginning of the next track.
-    incoming.src = nextTrack.fileUrl;
-    incoming.volume = 1;
-    incoming.play().catch(() => {});
+    // If pre-play missed (e.g. short track, or crossfade was disabled then enabled),
+    // load and play now as a fallback — there may be a brief gap in this case.
+    if (!incoming.src || incoming.paused) {
+      incoming.src = nextTrack.fileUrl;
+      incoming.volume = 1;
+      incoming.play().catch(() => {});
+    }
 
     const ctx = audioCtxRef.current;
     const outGain = getActiveGain(); const inGain = getInactiveGain();
 
     if (ctx && outGain && inGain) {
-      // Web Audio path — linear ramps for smooth fade.
       const now = ctx.currentTime;
       outGain.gain.cancelScheduledValues(now);
       outGain.gain.setValueAtTime(outGain.gain.value, now);
       outGain.gain.linearRampToValueAtTime(0, now + fadeSec);
       inGain.gain.cancelScheduledValues(now);
-      inGain.gain.setValueAtTime(0, now);
+      inGain.gain.setValueAtTime(inGain.gain.value, now);
       inGain.gain.linearRampToValueAtTime(1, now + fadeSec);
-      // setTimeout is the sole timing driver — no RAF conflict with the ramps.
       xfadeTimerRef.current = setTimeout(() => completeCrossfade(nextTrack), fadeMs);
     } else {
-      // Fallback: animate element.volume via RAF.
       const start = performance.now();
       const animate = () => {
         if (!crossfadingRef.current) return;
@@ -332,18 +354,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setCurrentTime(t);
 
       if (
-        xfadeEnabledRef.current && !crossfadingRef.current && !el.seeking &&
+        xfadeEnabledRef.current && !el.seeking &&
         repeatModeRef.current !== "one" && el.duration > 0 && Number.isFinite(el.duration)
       ) {
         const remaining = el.duration - t;
         const fadeSec = xfadeDurRef.current;
-        if (remaining > 0 && remaining <= fadeSec) {
-          const nextIdx = queueIndexRef.current + 1;
-          const q = queueRef.current;
-          const hasNext = nextIdx < q.length || repeatModeRef.current === "all";
-          if (hasNext) {
-            const ni = repeatModeRef.current === "all" && nextIdx >= q.length ? 0 : nextIdx;
-            if (q[ni]) startCrossfade(q[ni]);
+        const nextIdx = queueIndexRef.current + 1;
+        const q = queueRef.current;
+        const hasNext = nextIdx < q.length || repeatModeRef.current === "all";
+        if (hasNext && remaining > 0) {
+          const ni = repeatModeRef.current === "all" && nextIdx >= q.length ? 0 : nextIdx;
+          const nextTrack = q[ni];
+          if (nextTrack) {
+            // Phase 1: pre-play silently PRE_BUFFER seconds before fade window.
+            if (!preplayingRef.current && !crossfadingRef.current && remaining <= fadeSec + PRE_BUFFER) {
+              preplayNextTrack(nextTrack);
+            }
+            // Phase 2: start gain ramp at the fade window.
+            if (!crossfadingRef.current && remaining <= fadeSec) {
+              startCrossfadeRamp(nextTrack);
+            }
           }
         }
       }
@@ -366,7 +396,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // Seeking on the active element cancels an in-flight crossfade so the
     // inactive element doesn't keep playing in the background.
     const makeSeeking = (el: HTMLAudioElement) => () => {
-      if (el === getActive() && crossfadingRef.current) cancelCrossfade();
+      if (el === getActive() && (crossfadingRef.current || preplayingRef.current)) cancelCrossfade();
     };
 
     const endA = makeEnded(elA); const endB = makeEnded(elB);
@@ -384,7 +414,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       elA.removeEventListener("loadedmetadata", metaA); elB.removeEventListener("loadedmetadata", metaB);
       elA.removeEventListener("seeking", skA); elB.removeEventListener("seeking", skB);
     };
-  }, [next, startCrossfade, cancelCrossfade]);
+  }, [next, preplayNextTrack, startCrossfadeRamp, cancelCrossfade]);
 
   const getFrequencyData = useCallback(() => {
     if (!analyserRef.current || !dataArrayRef.current) return null;

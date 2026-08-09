@@ -45,7 +45,7 @@ export default function LyricsView({ track, onClose }: { track: Track; onClose: 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-40 flex flex-col relative overflow-hidden"
+        className="fixed inset-0 z-40 flex flex-col overflow-hidden"
       >
         {/* Reactive ambient gradient — same one as the main library page,
             scoped inside this fullscreen overlay so it fills the lyrics view. */}
