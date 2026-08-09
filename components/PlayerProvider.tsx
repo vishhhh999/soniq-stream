@@ -178,6 +178,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // Stop outgoing.
     const outgoing = getActive();
     if (outgoing) { outgoing.pause(); outgoing.volume = 1; }
+    // Grab incoming's duration before the swap — its own "loadedmetadata"
+    // already fired back during preloadNextTrack, while it was still the
+    // inactive element, so makeMeta's `el !== getActive()` guard dropped it.
+    // Without this, `duration` state stays stuck on the outgoing track's
+    // value after the swap, while currentTime keeps climbing on the new
+    // track — that's the "2:51 / 2:35" display bug.
+    const incoming = getInactive();
+    if (incoming && Number.isFinite(incoming.duration) && incoming.duration > 0) {
+      setDuration(incoming.duration);
+    }
     // Swap — incoming is now active and continues playing undisturbed.
     activeLetter.current = activeLetter.current === "A" ? "B" : "A";
     preloadedTrackId.current = null;
