@@ -158,8 +158,7 @@ export default function SyncedLyricsList({
                 variant === "fullscreen" ? "text-center" : ""
               } ${isActive ? "text-primary" : "text-tertiary hover:text-secondary"}`}
               style={{
-                textShadow: isActive ? "0 0 14px var(--accent)" : "none",
-                transition: "text-shadow 400ms ease, color 300ms ease",
+                transition: "color 300ms ease",
               }}
             >
               {line.text}

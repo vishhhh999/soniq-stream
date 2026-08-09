@@ -7,7 +7,7 @@ import {
   Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, ChevronDown, Mic2,
 } from "lucide-react";
 import { usePlayer } from "./PlayerProvider";
-import InteractiveVinyl from "./InteractiveVinyl";
+import AlbumArtMorph from "./AlbumArtMorph";
 import WaveformSeekBar from "./WaveformSeekBar";
 import SyncedLyricsList from "./SyncedLyricsList";
 import type { SyncedLine } from "@/lib/lyricsSync";
@@ -110,7 +110,7 @@ export default function MobilePlayerBar() {
           before lyrics content starts, giving the scroll-down affordance. */}
       <div className="flex flex-col px-6 pb-8" style={{ minHeight: "calc(100dvh - 76px)" }}>
         <div className="flex-1 flex flex-col items-center justify-center min-h-0">
-          <InteractiveVinyl coverUrl={current.albumCoverUrl} size={220} gradientFrom={gradient?.from} gradientTo={gradient?.to} />
+          <AlbumArtMorph coverUrl={current.albumCoverUrl} size={220} gradientFrom={gradient?.from} gradientTo={gradient?.to} />
           <div className="mt-8 text-center w-full">
             <p className="text-lg font-medium text-primary truncate">{current.title}</p>
             <p className="text-sm text-secondary truncate">{current.artist || "Unknown"}</p>
