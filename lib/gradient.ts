@@ -51,6 +51,13 @@ export function gradientFromSeed(seed: string): { from: string; to: string } {
 // network + canvas work for a result that's 100% deterministic per URL.
 const imageGradientCache = new Map<string, { from: string; to: string } | null>();
 
+// Synchronous cache check — lets a caller skip straight to the real
+// album-cover gradient (no seed-color flash first) when it's already been
+// sampled this session, e.g. switching between tracks in the same album.
+export function peekImageGradient(imageUrl: string): { from: string; to: string } | null | undefined {
+  return imageGradientCache.get(imageUrl);
+}
+
 export async function gradientFromImage(imageUrl: string): Promise<{ from: string; to: string } | null> {
   if (imageGradientCache.has(imageUrl)) return imageGradientCache.get(imageUrl)!;
 

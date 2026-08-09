@@ -1,2 +1,2 @@
 // Bumped manually per release. Shown in the settings panel.
-export const APP_VERSION = "7.2.0";
+export const APP_VERSION = "7.3.0";

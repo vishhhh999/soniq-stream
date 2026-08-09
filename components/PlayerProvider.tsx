@@ -17,6 +17,12 @@ type PlayerState = {
   repeatMode: "off" | "all" | "one"; cycleRepeatMode: () => void;
   getFrequencyData: () => Uint8Array | null;
   crossfadeEnabled: boolean; crossfadeDuration: number; setCrossfade: (e: boolean, d: number) => void;
+  // The track being crossfaded INTO, set the instant the gain ramp begins
+  // and cleared once the swap completes (or is cancelled by a seek). Lets
+  // AmbientBackground start transforming its gradient toward the incoming
+  // track's colors in lockstep with the audio fade, rather than only
+  // finding out a new track is "current" after the swap already happened.
+  crossfadingToTrack: Track | null;
 };
 
 const PlayerContext = createContext<PlayerState | null>(null);
@@ -86,6 +92,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const graphReady = useRef(false);
 
   const crossfadingRef = useRef(false);
+  const [crossfadingToTrack, setCrossfadingToTrack] = useState<Track | null>(null);
   const xfadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const xfadeRafRef = useRef<number | null>(null);
 
@@ -163,6 +170,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       ig.gain.cancelScheduledValues(now); ig.gain.setValueAtTime(0, now);
     }
     crossfadingRef.current = false;
+    setCrossfadingToTrack(null);
   }, []);
 
   const completeCrossfade = useCallback((nextTrack: Track) => {
@@ -192,6 +200,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     activeLetter.current = activeLetter.current === "A" ? "B" : "A";
     preloadedTrackId.current = null;
     crossfadingRef.current = false;
+    setCrossfadingToTrack(null);
     // Update UI state only — do NOT touch audio.
     const nextIdx = queueIndexRef.current + 1;
     const q = queueRef.current;
@@ -210,6 +219,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (!outgoing || !incoming) return;
 
     crossfadingRef.current = true;
+    setCrossfadingToTrack(nextTrack);
     const fadeSec = xfadeDur.current;
     const fadeMs = fadeSec * 1000;
 
@@ -523,6 +533,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       current, isPlaying, currentTime, duration, audioRef, queue, queueIndex, shuffleOn,
       play, playQueue, toggle, next, previous, toggleShuffle, jumpToQueueIndex, reorderQueue,
       repeatMode, cycleRepeatMode, getFrequencyData, crossfadeEnabled, crossfadeDuration, setCrossfade,
+      crossfadingToTrack,
     }}>
       <audio ref={audioRefA} className="hidden" crossOrigin="anonymous" />
       <audio ref={audioRefB} className="hidden" crossOrigin="anonymous" />
