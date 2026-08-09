@@ -37,14 +37,16 @@ export default function PlayerBar() {
     reorderQueue(arrayMove(queue, oldIndex, newIndex));
   };
 
+  // NOTE: audio loading/playing is fully owned by PlayerProvider now (play(),
+  // playQueue(), jumpToQueueIndex(), and crossfade completion all load+play
+  // directly on the audio element at the moment of the action). A manual
+  // "load on current change" effect used to live here — it duplicated that
+  // work and, worse, fired again after crossfade swapped the active element,
+  // reloading the just-crossfaded track from 0:00 and causing the replay/
+  // pause-gap bug. Do not reintroduce it.
   useEffect(() => {
-    if (!audioRef.current || !current) return;
-    if (lastTrackIdRef.current === current.id) return;
-    lastTrackIdRef.current = current.id;
     setBrokenTrack(null);
-    audioRef.current.src = current.fileUrl;
-    audioRef.current.play().catch(() => {});
-  }, [current]);
+  }, [current?.id]);
 
   // The sidebar's expand button (LyricsSidebar, on the main library pages)
   // dispatches this same event so both it and the mic button open the one

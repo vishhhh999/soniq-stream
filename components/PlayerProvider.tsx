@@ -392,6 +392,95 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, [next, preloadNextTrack, startCrossfade, cancelCrossfade]);
 
+  // ── Media Session API ───────────────────────────────────────────────────
+  // Without this, iOS/Android treat the tab as a generic page, not an audio
+  // session — the lock screen/dynamic island/notification shows the page
+  // title ("SONIQ") instead of the track, no album art, and critically the
+  // OS is more aggressive about suspending audio when the app is backgrounded
+  // because it doesn't recognize this as active media playback.
+  useEffect(() => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+    if (!current) return;
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: current.title,
+      artist: current.artist || "Unknown artist",
+      album: "SONIQ",
+      artwork: current.albumCoverUrl
+        ? [
+            { src: current.albumCoverUrl, sizes: "96x96", type: "image/png" },
+            { src: current.albumCoverUrl, sizes: "256x256", type: "image/png" },
+            { src: current.albumCoverUrl, sizes: "512x512", type: "image/png" },
+          ]
+        : [],
+    });
+  }, [current?.id, current?.albumCoverUrl]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+  }, [isPlaying]);
+
+  // Action handlers — lets lock-screen/notification controls drive the same
+  // toggle/next/previous the in-app UI uses, and seeking from there too.
+  useEffect(() => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+    const ms = navigator.mediaSession;
+    ms.setActionHandler("play", () => toggle());
+    ms.setActionHandler("pause", () => toggle());
+    ms.setActionHandler("nexttrack", () => next());
+    ms.setActionHandler("previoustrack", () => previous());
+    ms.setActionHandler("seekto", (details) => {
+      const audio = getActive();
+      if (audio && details.seekTime !== undefined) audio.currentTime = details.seekTime;
+    });
+    return () => {
+      ms.setActionHandler("play", null);
+      ms.setActionHandler("pause", null);
+      ms.setActionHandler("nexttrack", null);
+      ms.setActionHandler("previoustrack", null);
+      ms.setActionHandler("seekto", null);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toggle, next, previous]);
+
+  // Keep the lock-screen scrubber position in sync.
+  useEffect(() => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+    if (!duration || !Number.isFinite(duration)) return;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration,
+        playbackRate: 1,
+        position: Math.min(currentTime, duration),
+      });
+    } catch { /* setPositionState can throw if duration/position are inconsistent mid-crossfade */ }
+  }, [currentTime, duration]);
+
+  // ── Background playback ─────────────────────────────────────────────────
+  // Mobile Safari (and some Android browsers) suspend the AudioContext when
+  // the tab/PWA is backgrounded to save power. The <audio> element itself
+  // keeps "playing" internally, but since it's routed through Web Audio
+  // (createMediaElementSource → gain → destination) for crossfade/analysis,
+  // a suspended context means silence even though isPlaying stays true.
+  // Resuming on visibilitychange (and pageshow, for the PWA-relaunch case)
+  // restores sound the instant the app is foregrounded again.
+  useEffect(() => {
+    const resume = () => {
+      if (audioCtxRef.current?.state === "suspended") {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("pageshow", resume);
+    window.addEventListener("focus", resume);
+    return () => {
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("pageshow", resume);
+      window.removeEventListener("focus", resume);
+    };
+  }, []);
+
   const getFrequencyData = useCallback(() => {
     if (!analyserRef.current || !dataArrayRef.current) return null;
     analyserRef.current.getByteFrequencyData(dataArrayRef.current as Uint8Array<ArrayBuffer>);
