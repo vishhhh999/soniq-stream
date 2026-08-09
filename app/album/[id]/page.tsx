@@ -466,6 +466,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
                   <SortableTrackRow
                     group={g}
                     onOpenDetail={setDetailTrack}
+                    isReadOnly={isReadOnly}
                     queueTracks={groups.map((gr) => gr.latest)}
                     queueIndex={i}
                     isSelected={selectedIds.has(g.latest.id)}

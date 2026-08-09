@@ -203,6 +203,9 @@ export default function SharePage({ params }: { params: { token: string } }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Tracks which track id has already crossed the minimum-listen threshold
+  // and been counted, so the timeupdate handler doesn't re-fire every tick.
+  const playFiredRef = useRef<string | null>(null);
 
   const tracks: Track[] = data
     ? data.type === "track"
@@ -271,6 +274,7 @@ export default function SharePage({ params }: { params: { token: string } }) {
     if (!audioRef.current) audioRef.current = new Audio();
     const audio = audioRef.current;
     audio.src = tracks[currentTrackIndex].fileUrl;
+    playFiredRef.current = null; // new track — eligible to count again once it's actually played
     audio.onended = () => {
       if (currentTrackIndex < tracks.length - 1) {
         setCurrentTrackIndex((i) => i + 1);
@@ -279,7 +283,30 @@ export default function SharePage({ params }: { params: { token: string } }) {
         setPlaying(false);
       }
     };
+    // Previously fired the play-count POST the instant playback started —
+    // so a track that got skipped a second in, or never actually loaded,
+    // still counted as a play and could still notify the owner. Now
+    // requires real elapsed playback (same threshold as the in-app
+    // PlayTracker) before counting.
+    const MIN_LISTEN_SECONDS = 20;
+    const onTimeUpdate = () => {
+      const track = tracks[currentTrackIndex];
+      if (!track || playFiredRef.current === track.id) return;
+      const threshold =
+        audio.duration > 0 && Number.isFinite(audio.duration)
+          ? Math.min(MIN_LISTEN_SECONDS, audio.duration * 0.8)
+          : MIN_LISTEN_SECONDS;
+      if (audio.currentTime < threshold) return;
+      playFiredRef.current = track.id;
+      fetch(`/api/share/${params.token}/play`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackId: track.id }),
+      }).catch(() => {});
+    };
+    audio.addEventListener("timeupdate", onTimeUpdate);
     if (playing) audio.play().catch(() => {});
+    return () => audio.removeEventListener("timeupdate", onTimeUpdate);
   }, [currentTrackIndex, tracks.length]);
 
   useEffect(() => {
@@ -287,12 +314,6 @@ export default function SharePage({ params }: { params: { token: string } }) {
     if (!audio) return;
     if (playing) {
       audio.play().catch(() => {});
-      // Record play event.
-      fetch(`/api/share/${params.token}/play`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trackId: tracks[currentTrackIndex]?.id }),
-      }).catch(() => {});
     } else {
       audio.pause();
     }

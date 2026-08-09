@@ -66,8 +66,9 @@ export default function NotificationsBell() {
 
   const fetch_ = () =>
     fetch("/api/notifications")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
+        if (!d) return; // failed request — keep showing whatever we last had
         setItems(d.items ?? []);
         setUnseenCount(d.unseenCount ?? 0);
       })

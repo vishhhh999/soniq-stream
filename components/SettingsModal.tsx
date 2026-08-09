@@ -35,8 +35,9 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     fetch("/api/user/me")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
+        if (!d) return; // failed — leave fields blank rather than showing wrong data
         if (d.email) setEmail(d.email);
         if (d.id) setUserId(d.id);
         setUsername(d.username || null);

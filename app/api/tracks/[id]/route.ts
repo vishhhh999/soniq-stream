@@ -41,6 +41,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const [existing] = await db.select().from(tracks).where(and(eq(tracks.id, params.id), eq(tracks.userId, userId)));
   if (!existing) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
+  // Block ANY edit if the track currently lives in a read-only received
+  // album — previously this only checked the *target* album when albumId
+  // was being changed, so a receiver could still rename/re-tag/replace/
+  // relyric a track that was already sitting in a read-only album, just
+  // not move it. The UI never exposed this (edit/delete are hidden for
+  // read-only albums in TrackContextMenu), but nothing stopped a direct
+  // API call from doing it anyway.
+  if (existing.albumId) {
+    const [currentAlbum] = await db
+      .select({ sharedFromAlbumId: albums.sharedFromAlbumId })
+      .from(albums)
+      .where(eq(albums.id, existing.albumId));
+    if (currentAlbum?.sharedFromAlbumId) {
+      return NextResponse.json({ error: "This album is read-only." }, { status: 403 });
+    }
+  }
+
   const body = await req.json();
   const allowed = ["bpm", "bpmConfidence", "key", "notes", "trimStart", "trimEnd", "pitchShift", "title", "artist", "lyrics", "lyricsSynced", "albumId", "durationSec"];
   const update: Record<string, unknown> = {};
@@ -68,6 +85,19 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const [track] = await db.select().from(tracks).where(and(eq(tracks.id, params.id), eq(tracks.userId, userId)));
   if (!track) return NextResponse.json({ error: "Not found." }, { status: 404 });
+
+  // Same read-only guard as PATCH — deleting an individual track from a
+  // received read-only album isn't allowed; the album page's "Remove from
+  // library" is the correct way to detach the whole copy instead.
+  if (track.albumId) {
+    const [currentAlbum] = await db
+      .select({ sharedFromAlbumId: albums.sharedFromAlbumId })
+      .from(albums)
+      .where(eq(albums.id, track.albumId));
+    if (currentAlbum?.sharedFromAlbumId) {
+      return NextResponse.json({ error: "This album is read-only. Remove the whole album from your library instead." }, { status: 403 });
+    }
+  }
 
   await db.delete(tracks).where(eq(tracks.id, params.id));
 

@@ -9,13 +9,23 @@ const ThemeContext = createContext<{ theme: Theme; toggle: () => void }>({
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("dark");
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem("soniq-theme") as Theme | null;
-    const preferred = stored ?? (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-    setTheme(preferred);
-  }, []);
+  // Lazy initializer runs synchronously during the first client render —
+  // before the "apply theme to <html>" effect below ever fires. Previously
+  // this always started at "dark" and only got corrected a useEffect later,
+  // so a light-theme user's ThemeProvider would briefly re-apply "dark"
+  // right after hydration (undoing the blocking pre-hydration script in
+  // layout.tsx) before self-correcting again a render later — a flash on
+  // every load. Resolving it here means both the script and this state
+  // agree from the very first render, nothing to correct.
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "dark"; // SSR — corrected on the client immediately below
+    try {
+      const stored = window.localStorage.getItem("soniq-theme") as Theme | null;
+      return stored ?? (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    } catch {
+      return "dark";
+    }
+  });
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");

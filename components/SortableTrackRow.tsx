@@ -17,6 +17,7 @@ export default function SortableTrackRow({
   onSelect,
   albums,
   onDeleteSuccess,
+  isReadOnly,
 }: {
   group: TrackGroup;
   onOpenDetail: (t: Track) => void;
@@ -26,8 +27,12 @@ export default function SortableTrackRow({
   onSelect: (mods: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void;
   albums?: Album[];
   onDeleteSuccess?: () => void;
+  isReadOnly?: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.latest.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: group.latest.id,
+    disabled: isReadOnly,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -37,14 +42,16 @@ export default function SortableTrackRow({
 
   return (
     <div ref={setNodeRef} style={style} className="flex items-center gap-1">
-      <button
-        {...attributes}
-        {...listeners}
-        className="text-tertiary hover:text-primary cursor-grab active:cursor-grabbing shrink-0 touch-none p-1"
-        title="Drag to reorder"
-      >
-        <GripVertical size={14} strokeWidth={1.5} />
-      </button>
+      {!isReadOnly && (
+        <button
+          {...attributes}
+          {...listeners}
+          className="text-tertiary hover:text-primary cursor-grab active:cursor-grabbing shrink-0 touch-none p-1"
+          title="Drag to reorder"
+        >
+          <GripVertical size={14} strokeWidth={1.5} />
+        </button>
+      )}
       <div className="flex-1 min-w-0">
         <TrackRowGroup
           group={group}
@@ -55,6 +62,7 @@ export default function SortableTrackRow({
           onSelect={onSelect}
           albums={albums}
           onDeleteSuccess={onDeleteSuccess}
+          isReadOnly={isReadOnly}
         />
       </div>
     </div>

@@ -26,6 +26,7 @@ function Row({
   onToggleSelect,
   albums,
   onDeleteSuccess,
+  isReadOnly,
 }: {
   track: Track;
   onOpenDetail: (t: Track) => void;
@@ -41,6 +42,7 @@ function Row({
   onToggleSelect?: () => void;
   albums?: Album[];
   onDeleteSuccess?: () => void;
+  isReadOnly?: boolean;
 }) {
   const { current, isPlaying, playQueue, toggle } = usePlayer();
   const isCurrent = current?.id === track.id;
@@ -169,6 +171,7 @@ function Row({
           onClose={() => setMenuOpen(false)}
           onOpenDetail={onOpenDetail}
           onDeleteSuccess={() => onDeleteSuccess?.()}
+          isReadOnly={isReadOnly}
         />
       )}
     </>
@@ -189,6 +192,7 @@ export default function TrackRowGroup({
   onToggleSelect,
   albums,
   onDeleteSuccess,
+  isReadOnly,
 }: {
   group: TrackGroup;
   onOpenDetail: (t: Track) => void;
@@ -203,6 +207,7 @@ export default function TrackRowGroup({
   onToggleSelect?: () => void;
   albums?: Album[];
   onDeleteSuccess?: () => void;
+  isReadOnly?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasVersions = group.olderVersions.length > 0;
@@ -226,6 +231,7 @@ export default function TrackRowGroup({
             onToggleSelect={onToggleSelect}
             albums={albums}
             onDeleteSuccess={onDeleteSuccess}
+            isReadOnly={isReadOnly}
           />
         </div>
         {hasVersions && (
@@ -260,6 +266,7 @@ export default function TrackRowGroup({
                 onSelect={() => {}}
                 albums={albums}
                 onDeleteSuccess={onDeleteSuccess}
+                isReadOnly={isReadOnly}
               />
             ))}
           </motion.div>

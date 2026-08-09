@@ -104,8 +104,8 @@ export default function TrackDetail({
 
   useEffect(() => {
     fetch(`/api/tracks/${track.id}/play`)
-      .then((r) => r.json())
-      .then((d) => setPlayCount(d.count ?? null))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setPlayCount(d.count ?? null); })
       .catch(() => {});
   }, [track.id]);
 

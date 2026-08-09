@@ -3,7 +3,7 @@ import { CopyObjectCommand } from "@aws-sdk/client-s3";
 import { nanoid } from "nanoid";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { tracks } from "@/lib/db/schema";
+import { tracks, albums } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2";
 
@@ -17,6 +17,18 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const [original] = await db.select().from(tracks).where(and(eq(tracks.id, params.id), eq(tracks.userId, userId)));
   if (!original) return NextResponse.json({ error: "Not found." }, { status: 404 });
+
+  // Duplicating inserts a new track row into the same album — not allowed
+  // if that album is a read-only received copy.
+  if (original.albumId) {
+    const [currentAlbum] = await db
+      .select({ sharedFromAlbumId: albums.sharedFromAlbumId })
+      .from(albums)
+      .where(eq(albums.id, original.albumId));
+    if (currentAlbum?.sharedFromAlbumId) {
+      return NextResponse.json({ error: "This album is read-only." }, { status: 403 });
+    }
+  }
 
   try {
     // A real copy in R2, not a second DB row pointing at the same file —

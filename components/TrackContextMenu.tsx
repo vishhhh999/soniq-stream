@@ -18,6 +18,7 @@ type Props = {
   onClose: () => void;
   onOpenDetail: (t: Track) => void;
   onDeleteSuccess: () => void;
+  isReadOnly?: boolean;
 };
 
 export default function TrackContextMenu({
@@ -28,6 +29,7 @@ export default function TrackContextMenu({
   onClose,
   onOpenDetail,
   onDeleteSuccess,
+  isReadOnly,
 }: Props) {
   const { playQueue, queue, reorderQueue } = usePlayer();
   const [subMenu, setSubMenu] = useState<"move" | "share" | null>(null);
@@ -148,16 +150,22 @@ export default function TrackContextMenu({
         <MenuItem icon={<ListPlus size={14} strokeWidth={1.5} />} label="Add to queue" onClick={addToQueue} />
       </div>
 
-      {/* Group 2: Edit */}
-      <div className="py-1 border-b border-border">
-        <MenuItem
-          icon={<Pencil size={14} strokeWidth={1.5} />}
-          label="Edit details"
-          onClick={() => { onOpenDetail(track); onClose(); }}
-        />
-      </div>
+      {/* Group 2: Edit — not available on a read-only received album. */}
+      {!isReadOnly && (
+        <div className="py-1 border-b border-border">
+          <MenuItem
+            icon={<Pencil size={14} strokeWidth={1.5} />}
+            label="Edit details"
+            onClick={() => { onOpenDetail(track); onClose(); }}
+          />
+        </div>
+      )}
 
-      {/* Group 3: Share & Export */}
+      {/* Group 3: Share & Export. Copy/Download stay available even on a
+          read-only album — the receiver already has this file in their own
+          library, sharing or downloading their own copy doesn't touch the
+          original. Duplicate is blocked since it inserts a new track row
+          into the read-only album. */}
       <div className="py-1 border-b border-border">
         <MenuItem
           icon={copied ? <Check size={14} className="text-accent" /> : <Share2 size={14} strokeWidth={1.5} />}
@@ -170,16 +178,18 @@ export default function TrackContextMenu({
           onClick={download}
           disabled={downloading}
         />
-        <MenuItem
-          icon={<Copy size={14} strokeWidth={1.5} />}
-          label={duplicating ? "Duplicating..." : "Duplicate"}
-          onClick={duplicate}
-          disabled={duplicating}
-        />
+        {!isReadOnly && (
+          <MenuItem
+            icon={<Copy size={14} strokeWidth={1.5} />}
+            label={duplicating ? "Duplicating..." : "Duplicate"}
+            onClick={duplicate}
+            disabled={duplicating}
+          />
+        )}
       </div>
 
-      {/* Group 4: Organize */}
-      {albums.length > 0 && (
+      {/* Group 4: Organize — moving tracks in/out of a read-only album isn't allowed. */}
+      {!isReadOnly && albums.length > 0 && (
         <div className="py-1 border-b border-border">
           {subMenu === "move" ? (
             <>
@@ -210,7 +220,10 @@ export default function TrackContextMenu({
         </div>
       )}
 
-      {/* Group 5: Danger */}
+      {/* Group 5: Danger — deleting an individual track from a read-only
+          album isn't allowed; removing the whole album is done from the
+          album page's "Remove from library" instead. */}
+      {!isReadOnly && (
       <div className="py-1">
         {!confirmDelete ? (
           <MenuItem
@@ -238,6 +251,7 @@ export default function TrackContextMenu({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 

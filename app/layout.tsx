@@ -35,6 +35,25 @@ export const viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Runs before hydration, before ThemeProvider's own effects can —
+            without this, ThemeProvider defaults its state to "dark" and
+            only reads the real stored/system preference in a useEffect,
+            so a light-theme user saw a flash of dark theme on every load
+            before it self-corrected a render later. This just applies the
+            class synchronously, before paint. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var stored = localStorage.getItem("soniq-theme");
+                var theme = stored || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+                if (theme === "dark") document.documentElement.classList.add("dark");
+              } catch (e) {}
+            `,
+          }}
+        />
+      </head>
       <body className={`${interTight.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <AuthSessionProvider>
           <ThemeProvider>

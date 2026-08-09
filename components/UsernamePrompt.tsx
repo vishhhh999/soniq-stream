@@ -17,9 +17,9 @@ export default function UsernamePrompt() {
   useEffect(() => {
     if (status !== "authenticated") return;
     fetch("/api/user/me")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((u) => {
-        if (!u.username) setShow(true);
+        if (u && !u.username) setShow(true);
       })
       .catch(() => {});
   }, [status]);
