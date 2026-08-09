@@ -46,7 +46,7 @@ export default function UsernamePrompt() {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-6">
+    <div className="fixed inset-0 backdrop-ambient-60 z-50 flex items-center justify-center px-6">
       <div className="bg-elevated border border-border rounded-xl p-8 w-full max-w-sm">
         {done ? (
           <div className="text-center">

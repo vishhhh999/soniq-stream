@@ -62,7 +62,7 @@ export default function AlbumInsightsModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center px-6"
+        className="fixed inset-0 backdrop-ambient z-[60] flex items-center justify-center px-6"
         onClick={onClose}
       >
         <motion.div

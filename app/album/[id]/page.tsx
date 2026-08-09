@@ -451,7 +451,8 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
       )}
 
       {groups.length === 0 ? (
-        <div className="border border-dashed border-border rounded-lg py-16 sm:py-24 text-center">
+        <div className="border border-dashed border-border rounded-lg py-16 sm:py-24 text-center flex flex-col items-center gap-3">
+          <Disc3 size={40} strokeWidth={1} className="text-tertiary" />
           <p className="text-secondary text-base">No tracks in this album yet.</p>
         </div>
       ) : (

@@ -11,6 +11,7 @@ import WaveformSeekBar from "./WaveformSeekBar";
 import LyricsView from "./LyricsView";
 import SortableQueueItem from "./SortableQueueItem";
 import { gradientFromSeed } from "@/lib/gradient";
+import { useAmbientPulse } from "@/lib/useAmbientPulse";
 
 export default function PlayerBar() {
   const {
@@ -26,6 +27,8 @@ export default function PlayerBar() {
   const [showVolume, setShowVolume] = useState(false);
   const lastTrackIdRef = useRef<string | null>(null);
   const queueSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const playButtonRef = useRef<HTMLButtonElement>(null);
+  useAmbientPulse(playButtonRef); // glow breathes with the ambient beat pulse
 
   const handleQueueDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -189,6 +192,7 @@ export default function PlayerBar() {
             className={`transition-colors ${hasQueueContext || currentTime > 3 ? "cursor-pointer hover:text-primary" : "opacity-30"}`}
           />
           <button
+            ref={playButtonRef}
             onClick={toggle}
             disabled={!current}
             className="w-8 h-8 rounded-full bg-accent text-canvas flex items-center justify-center disabled:opacity-30 hover:bg-accent-strong transition-colors shrink-0"

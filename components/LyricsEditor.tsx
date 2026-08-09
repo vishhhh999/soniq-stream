@@ -240,7 +240,7 @@ export default function LyricsEditor({
     // cramped in that width, with most lines truncating. z-[60] to sit
     // above TrackDetail's own modal (z-50).
     return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center backdrop-ambient-60 backdrop-blur-sm px-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}

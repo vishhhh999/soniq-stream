@@ -19,8 +19,13 @@ export default {
         error: "var(--error)",
       },
       fontFamily: {
-        sans: ["var(--font-inter-tight)", "sans-serif"],
-        display: ["var(--font-mono-display)", "monospace"],
+        // Both roles resolve to the same family now — General Sans replaced
+        // the old Inter Tight (body) + JetBrains Mono (display) pairing.
+        // `font-display` is kept as a class name (not removed) so every
+        // existing heading usage across the app keeps working unchanged;
+        // it just no longer switches families, weight does the contrast.
+        sans: ["var(--font-general-sans)", "sans-serif"],
+        display: ["var(--font-general-sans)", "sans-serif"],
       },
       fontSize: {
         xs: ["11px", "1.4"],
@@ -40,6 +45,17 @@ export default {
       },
       spacing: {
         18: "72px",
+      },
+      // House easing curve, used everywhere so every hover/fade/color
+      // transition in the app shares one signature feel instead of each
+      // component defaulting to its own timing. This becomes Tailwind's
+      // DEFAULT, so plain `transition-colors` etc. (181 existing usages)
+      // pick it up automatically with no per-component change needed.
+      transitionTimingFunction: {
+        DEFAULT: "cubic-bezier(0.4, 0, 0.2, 1)",
+      },
+      transitionDuration: {
+        DEFAULT: "200ms",
       },
     },
   },

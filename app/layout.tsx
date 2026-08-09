@@ -1,6 +1,25 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Inter_Tight } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
+
+// General Sans, replaces the previous Inter Tight (body) + JetBrains Mono
+// (display/headings) pairing entirely — one family, weight contrast does
+// the hierarchy work instead of a font-family swap between body and
+// headings. Local files (not next/font/google) since this is a licensed
+// Fontshare package, not a Google Fonts family.
+const generalSans = localFont({
+  variable: "--font-general-sans",
+  display: "swap",
+  src: [
+    { path: "../public/fonts/GeneralSans-Extralight.woff2", weight: "200", style: "normal" },
+    { path: "../public/fonts/GeneralSans-Light.woff2", weight: "300", style: "normal" },
+    { path: "../public/fonts/GeneralSans-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../public/fonts/GeneralSans-Italic.woff2", weight: "400", style: "italic" },
+    { path: "../public/fonts/GeneralSans-Medium.woff2", weight: "500", style: "normal" },
+    { path: "../public/fonts/GeneralSans-Semibold.woff2", weight: "600", style: "normal" },
+    { path: "../public/fonts/GeneralSans-Bold.woff2", weight: "700", style: "normal" },
+  ],
+});
 import AuthSessionProvider from "@/components/AuthSessionProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { PlayerProvider } from "@/components/PlayerProvider";
@@ -10,9 +29,6 @@ import GoogleLinkToast from "@/components/GoogleLinkToast";
 import PlayTracker from "@/components/PlayTracker";
 import InstallPrompt from "@/components/InstallPrompt";
 import CookieConsent from "@/components/CookieConsent";
-
-const interTight = Inter_Tight({ subsets: ["latin"], variable: "--font-inter-tight" });
-const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-display" });
 
 export const metadata: Metadata = {
   title: "SONIQ",
@@ -68,7 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className={`${interTight.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+      <body className={`${generalSans.variable} font-sans antialiased`}>
         <AuthSessionProvider>
           <ThemeProvider>
             <AmbientProvider>

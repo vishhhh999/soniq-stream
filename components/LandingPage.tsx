@@ -95,7 +95,7 @@ export default function LandingPage() {
           <p className="text-xs uppercase tracking-widest text-tertiary mb-4">
             Music organization &amp; sharing software for unreleased tracks
           </p>
-          <h1 className="text-4xl sm:text-6xl font-display font-bold text-primary tracking-tight leading-[1.05]">
+          <h1 className="text-2xl sm:text-3xl font-display font-bold text-primary tracking-tight leading-[1.05]">
             SONIQ is a private home for the music you're still working on.
           </h1>
           <p className="text-secondary text-base sm:text-lg mt-6 max-w-xl mx-auto leading-relaxed">

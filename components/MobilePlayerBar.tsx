@@ -12,6 +12,7 @@ import WaveformSeekBar from "./WaveformSeekBar";
 import SyncedLyricsList from "./SyncedLyricsList";
 import type { SyncedLine } from "@/lib/lyricsSync";
 import { gradientFromSeed } from "@/lib/gradient";
+import { useAmbientPulse } from "@/lib/useAmbientPulse";
 
 export default function MobilePlayerBar() {
   const {
@@ -24,6 +25,8 @@ export default function MobilePlayerBar() {
   const [lines, setLines] = useState<SyncedLine[] | null>(null);
   const [rawText, setRawText] = useState<string | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(false);
+  const expandedPlayButtonRef = useRef<HTMLButtonElement>(null);
+  useAmbientPulse(expandedPlayButtonRef); // only the larger expanded-sheet button, not the mini bar one
 
   useEffect(() => setMounted(true), []);
 
@@ -150,7 +153,7 @@ export default function MobilePlayerBar() {
             <button onClick={previous} className="p-2 -m-2">
               <SkipBack size={26} strokeWidth={1.5} className={queue.length > 1 || currentTime > 3 ? "text-primary" : "text-tertiary"} />
             </button>
-            <button onClick={toggle} className="w-16 h-16 rounded-full bg-accent text-canvas flex items-center justify-center shrink-0">
+            <button ref={expandedPlayButtonRef} onClick={toggle} className="w-16 h-16 rounded-full bg-accent text-canvas flex items-center justify-center shrink-0">
               {isPlaying ? <Pause size={24} strokeWidth={2} /> : <Play size={24} strokeWidth={2} className="ml-1" />}
             </button>
             <button onClick={next} className="p-2 -m-2">

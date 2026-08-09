@@ -29,7 +29,7 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>();
   const { getFrequencyData, isPlaying, current, currentTime, crossfadingToTrack, preloadingTrack, crossfadeDuration } = usePlayer();
-  const { enabled } = useAmbient();
+  const { enabled, colorStateRef } = useAmbient();
   const tRef = useRef(0);
 
   // The gradient the draw loop actually paints each frame is the result of
@@ -257,6 +257,12 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       }
       pulse *= 0.87; // decay — fades to near-zero within ~250-300ms
 
+      // Publish this frame's color + pulse for anything outside this
+      // canvas to read (scrubber fill, play-button glow, modal backdrops).
+      // Ref write only, no re-render triggered — consumers read this off
+      // their own rAF loop the same way this component reads player state.
+      colorStateRef.current = { from: displayed.from, to: displayed.to, pulse };
+
       const blobs = [
         { x: w * 0.3 + Math.sin(t) * 60, y: h * (1.05 - bass * 0.1), r: w * (0.32 + pulse * 0.42 + bass * 0.05), color: displayed.from },
         { x: w * 0.7 + Math.cos(t * 0.8) * 80, y: h * (1.1 - mid * 0.08), r: w * (0.28 + pulse * 0.24 + mid * 0.06), color: displayed.to },
@@ -311,8 +317,8 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       aria-hidden
       className={scoped ? "absolute inset-0 pointer-events-none z-0" : "fixed inset-0 pointer-events-none z-0"}
       style={scoped ? undefined : {
-        maskImage: "linear-gradient(to bottom, transparent 0%, transparent 40%, black 65%, black 100%)",
-        WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, transparent 40%, black 65%, black 100%)",
+        maskImage: "linear-gradient(to bottom, transparent 0%, transparent 25%, black 50%, black 50%, transparent 75%, transparent 100%)",
+        WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, transparent 25%, black 50%, black 50%, transparent 75%, transparent 100%)",
       }}
     />
   );

@@ -5,6 +5,7 @@ import AmbientBackground from "./AmbientBackground";
 import PlayerBar from "./PlayerBar";
 import MobilePlayerBar from "./MobilePlayerBar";
 import { useIsMobile } from "@/lib/useMediaQuery";
+import { useAmbientBackdropTint } from "@/lib/useAmbientPulse";
 
 // PlayerBar and AmbientBackground previously rendered unconditionally in the
 // root layout — meaning they showed up even on /login and /setup before
@@ -18,6 +19,7 @@ import { useIsMobile } from "@/lib/useMediaQuery";
 export default function AuthedPlayerShell() {
   const { status } = useSession();
   const isMobile = useIsMobile();
+  useAmbientBackdropTint();
   if (status !== "authenticated") return null;
   return (
     <>

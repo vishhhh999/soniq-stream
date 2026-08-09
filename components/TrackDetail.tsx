@@ -269,7 +269,7 @@ export default function TrackDetail({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 z-40"
+        className="fixed inset-0 backdrop-ambient-60 z-40"
         onClick={onClose}
       />
 

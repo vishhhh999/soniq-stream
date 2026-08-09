@@ -99,6 +99,24 @@ html::-webkit-scrollbar-thumb:hover {
   background-color: var(--text-tertiary);
 }
 
+/* Modal backdrop that picks up a whisper of the ambient track color on
+   top of the same black scrim every modal already used — --ambient-tint
+   is written by useAmbientBackdropTint (lib/useAmbientPulse.ts) as a
+   already-alpha'd rgba/hex string, defaulting to fully transparent so a
+   page with ambient off or no color yet looks identical to plain black/50. */
+.backdrop-ambient {
+  background-color: rgba(0, 0, 0, 0.5);
+  background-image: linear-gradient(var(--ambient-tint, transparent), var(--ambient-tint, transparent));
+}
+
+/* Same idea at the app's other backdrop alpha (0.6, used by modals that
+   also apply a blur) — kept as a second class rather than forcing every
+   modal onto one alpha value. */
+.backdrop-ambient-60 {
+  background-color: rgba(0, 0, 0, 0.6);
+  background-image: linear-gradient(var(--ambient-tint, transparent), var(--ambient-tint, transparent));
+}
+
 /* For panels that need their OWN internal scroll (the lyrics sidebar,
    the fullscreen lyrics view) without a second visible scrollbar next to
    the page's one — still fully scrollable by wheel/trackpad/drag, just no
