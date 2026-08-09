@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import VinylArt from "@/components/VinylArt";
 import { gradientFromSeed } from "@/lib/gradient";
+import { useDeviceTilt } from "@/lib/useDeviceTilt";
 
 type Track = {
   id: string;
@@ -39,11 +40,13 @@ function totalDuration(tracks: Track[]) {
   return `${m} min`;
 }
 
-// 3D tilt card — tracks cursor and applies perspective rotateX/Y.
+// 3D tilt card — mouse-hover perspective tilt on desktop, phone gyroscope
+// tilt on touch devices (there's no hover to drive it there).
 function TiltCard({ children, size }: { children: React.ReactNode; size: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [mouseTilt, setMouseTilt] = useState({ x: 0, y: 0 });
   const [hovered, setHovered] = useState(false);
+  const { tilt: gyroTilt, isTouchDevice, needsPermission, requestPermission } = useDeviceTilt();
 
   const onMove = (e: React.MouseEvent) => {
     const rect = ref.current?.getBoundingClientRect();
@@ -52,30 +55,31 @@ function TiltCard({ children, size }: { children: React.ReactNode; size: number 
     const cy = rect.top + rect.height / 2;
     const dx = (e.clientX - cx) / (rect.width / 2);
     const dy = (e.clientY - cy) / (rect.height / 2);
-    setTilt({ x: -dy * 12, y: dx * 12 });
+    setMouseTilt({ x: -dy * 12, y: dx * 12 });
   };
+
+  const tilt = isTouchDevice ? gyroTilt : mouseTilt;
+  // Gyro tilt is "always on" once permission is granted — no hover state
+  // to gate it behind. Mouse tilt only applies while actively hovering.
+  const tiltActive = isTouchDevice || hovered;
 
   return (
     <div
       ref={ref}
-      onMouseMove={onMove}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setTilt({ x: 0, y: 0 }); }}
-      style={{
-        width: size,
-        height: size,
-        perspective: "800px",
-        cursor: "pointer",
-      }}
+      onMouseMove={isTouchDevice ? undefined : onMove}
+      onMouseEnter={isTouchDevice ? undefined : () => setHovered(true)}
+      onMouseLeave={isTouchDevice ? undefined : () => { setHovered(false); setMouseTilt({ x: 0, y: 0 }); }}
+      onTouchStart={isTouchDevice && needsPermission ? () => requestPermission() : undefined}
+      style={{ width: size, height: size, perspective: "800px", cursor: "pointer" }}
     >
       <div
         style={{
           width: "100%",
           height: "100%",
-          transform: hovered
-            ? `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale(1.03)`
+          transform: tiltActive
+            ? `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale(${!isTouchDevice && hovered ? 1.03 : 1})`
             : "rotateX(0deg) rotateY(0deg) scale(1)",
-          transition: hovered ? "transform 80ms linear" : "transform 400ms ease",
+          transition: isTouchDevice ? "transform 150ms linear" : hovered ? "transform 80ms linear" : "transform 400ms ease",
           transformStyle: "preserve-3d",
         }}
       >
