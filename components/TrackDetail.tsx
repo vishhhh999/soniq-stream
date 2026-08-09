@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { triggerFeedback } from "@/lib/feedback";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, Link2, Check, Download, Trash2, ChevronDown, FileText, Mic2,
@@ -405,7 +406,7 @@ export default function TrackDetail({
                     <div className="space-y-4">
                       <div className="flex items-center gap-2">
                         <input readOnly value={shareUrl} className="flex-1 bg-canvas border border-border rounded-md px-3 py-2.5 text-xs text-secondary" />
-                        <button onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="w-9 h-9 flex items-center justify-center rounded-md border border-border hover:border-border-strong shrink-0">
+                        <button onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); triggerFeedback("tap"); setTimeout(() => setCopied(false), 1500); }} className="w-9 h-9 flex items-center justify-center rounded-md border border-border hover:border-border-strong shrink-0">
                           {copied ? <Check size={13} className="text-accent" /> : <Link2 size={13} className="text-secondary" />}
                         </button>
                       </div>

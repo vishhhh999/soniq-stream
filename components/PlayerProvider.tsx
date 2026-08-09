@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useRef, useState, useCallback, useEffect } from "react";
+import { triggerFeedback } from "@/lib/feedback";
 
 export type Track = {
   id: string; title: string; artist?: string | null; fileUrl: string;
@@ -303,14 +304,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const next = useCallback(() => {
     const q = queueRef.current; const qi = queueIndexRef.current;
     if (!q.length) return;
-    if (qi + 1 < q.length) jumpToQueueIndex(qi + 1);
-    else if (repeatModeRef.current === "all") jumpToQueueIndex(0);
+    if (qi + 1 < q.length) { jumpToQueueIndex(qi + 1); triggerFeedback("skip"); }
+    else if (repeatModeRef.current === "all") { jumpToQueueIndex(0); triggerFeedback("skip"); }
   }, [jumpToQueueIndex]);
 
   const previous = useCallback(() => {
     const audio = getActive();
     if (audio && audio.currentTime > 3) { audio.currentTime = 0; return; }
-    if (queueIndexRef.current > 0) jumpToQueueIndex(queueIndexRef.current - 1);
+    if (queueIndexRef.current > 0) { jumpToQueueIndex(queueIndexRef.current - 1); triggerFeedback("skip"); }
   }, [jumpToQueueIndex]);
 
   const toggleShuffle = useCallback(() => {
@@ -334,8 +335,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = getActive(); if (!audio) return;
     ensureGraph();
     if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
-    if (audio.paused) { audio.play(); setIsPlaying(true); }
-    else { audio.pause(); setIsPlaying(false); }
+    if (audio.paused) { audio.play(); setIsPlaying(true); triggerFeedback("play"); }
+    else { audio.pause(); setIsPlaying(false); triggerFeedback("pause"); }
   }, [ensureGraph]);
 
   const cycleRepeatMode = useCallback(() => {

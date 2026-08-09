@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { triggerFeedback } from "@/lib/feedback";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, Globe, Lock, Users, Link2, Check, ChevronRight, ChevronLeft,
@@ -154,6 +155,7 @@ export default function AlbumSharePanel({
     if (!data?.inviteLink) return;
     navigator.clipboard.writeText(`${window.location.origin}/invite/${data.inviteLink.token}`);
     setCopied(true);
+    triggerFeedback("tap");
     setTimeout(() => setCopied(false), 1500);
   };
 

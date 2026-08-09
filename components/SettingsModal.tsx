@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Sun, Moon, Sparkles, LogOut, Check, Pencil, Camera } from "lucide-react";
+import { X, Sun, Moon, Sparkles, LogOut, Check, Pencil, Camera, Volume2 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useTheme } from "./ThemeProvider";
 import { useAmbient } from "./AmbientProvider";
+import { isFeedbackEnabled, setFeedbackEnabled, triggerFeedback } from "@/lib/feedback";
 import { usePlayer } from "./PlayerProvider";
 import { APP_VERSION } from "@/lib/version";
 import { gradientFromSeed } from "@/lib/gradient";
@@ -15,6 +16,22 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const { theme, toggle: toggleTheme } = useTheme();
   const { enabled: ambientOn, toggle: toggleAmbient } = useAmbient();
   const { crossfadeEnabled, crossfadeDuration, setCrossfade } = usePlayer();
+  // Plain localStorage flag, not context — nothing else needs to react to
+  // this live the way AmbientBackground's canvas does to ambientOn, the
+  // feedback module just reads localStorage directly each time a sound/
+  // haptic moment fires. Starts false (matches the module's off-by-default
+  // read) and syncs to the real stored value once mounted, same SSR-safe
+  // pattern used elsewhere in this app for localStorage-backed state.
+  const [feedbackOn, setFeedbackOnState] = useState(false);
+  useEffect(() => { setFeedbackOnState(isFeedbackEnabled()); }, []);
+  const toggleFeedback = () => {
+    setFeedbackOnState((prev) => {
+      const next = !prev;
+      setFeedbackEnabled(next);
+      if (next) triggerFeedback("tap"); // immediate confirmation it's on
+      return next;
+    });
+  };
   const [email, setEmail] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -225,7 +242,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 backdrop-ambient z-[60] flex items-center justify-center px-6"
+        className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center px-6"
         onClick={onClose}
       >
         <motion.div
@@ -233,7 +250,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
           transition={{ type: "spring", stiffness: 300, damping: 28 }}
-          className="bg-elevated border border-border rounded-lg w-full max-w-lg max-h-[85vh] overflow-y-auto no-scrollbar"
+          className="bg-elevated border border-border rounded-lg w-full max-w-xl max-h-[85vh] overflow-y-auto no-scrollbar"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-6 py-5 border-b border-border">
@@ -558,6 +575,20 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                     Ambient background
                   </span>
                   {ambientOn ? (
+                    <Check size={14} strokeWidth={2} className="text-accent" />
+                  ) : (
+                    <span className="text-xs text-tertiary">Off</span>
+                  )}
+                </button>
+                <button
+                  onClick={toggleFeedback}
+                  className="w-full flex items-center justify-between py-2 text-sm text-primary hover:text-secondary transition-colors"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Volume2 size={15} strokeWidth={1.5} />
+                    Sound &amp; haptics
+                  </span>
+                  {feedbackOn ? (
                     <Check size={14} strokeWidth={2} className="text-accent" />
                   ) : (
                     <span className="text-xs text-tertiary">Off</span>

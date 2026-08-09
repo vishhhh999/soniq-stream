@@ -23,6 +23,48 @@ function lerpHex(a: string, b: string, t: number): string {
   return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
 }
 
+// Shifts a hex color's hue by a small, fixed delta (degrees) while keeping
+// saturation/lightness the same — used so the ambient gradient stays a
+// single hue FAMILY instead of two visibly distinct colors. Per explicit
+// direction: adjacent hues only (toward cyan/blue if the source is warm,
+// toward yellow/lime if it's cool), never an unrelated second color.
+function hexHue(hex: string): number {
+  const p = parseInt(hex.slice(1), 16);
+  const r = ((p >> 16) & 255) / 255, g = ((p >> 8) & 255) / 255, b = (p & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const d = max - min;
+  if (d === 0) return 0;
+  let h: number;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  h *= 60;
+  if (h < 0) h += 360;
+  return h;
+}
+
+function shiftHue(hex: string, degrees: number): string {
+  const p = parseInt(hex.slice(1), 16);
+  const r = ((p >> 16) & 255) / 255, g = ((p >> 8) & 255) / 255, b = (p & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = (hexHue(hex) + degrees + 360) % 360;
+  const l = (max + min) / 2;
+  const d = max - min;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let [r2, g2, b2] = [0, 0, 0];
+  if (h < 60) [r2, g2, b2] = [c, x, 0];
+  else if (h < 120) [r2, g2, b2] = [x, c, 0];
+  else if (h < 180) [r2, g2, b2] = [0, c, x];
+  else if (h < 240) [r2, g2, b2] = [0, x, c];
+  else if (h < 300) [r2, g2, b2] = [x, 0, c];
+  else [r2, g2, b2] = [c, 0, x];
+  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
+  return `#${toHex(r2)}${toHex(g2)}${toHex(b2)}`;
+}
+
 const DEFAULT_TRANSITION_MS = 1200; // manual skip/jump, no crossfade in progress
 const RETARGET_CATCHUP_MS = 500;    // if the real color resolves mid-flight, correct over this long instead of snapping
 
@@ -287,23 +329,28 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       // their own rAF loop the same way this component reads player state.
       colorStateRef.current = { from: displayed.from, to: displayed.to, pulse };
 
-      // Three blobs, positioned to actually spread left/center/right (the
-      // old x: 0.3 / 0.7 / 0.5 set put two of three in the left-center
-      // and only one on the right, reading as left-heavy) and vertically
-      // centered within the mask's now-centered 25%-75% visible band
-      // (previously all three sat at y: 1.05-1.15, i.e. below the
-      // viewport entirely, relying on radius bleed to reach up into a
-      // bottom-weighted mask — that stopped working once the mask became
-      // symmetric, which is why the color read as squeezed into the
-      // middle only). Color also rebalanced: two blobs used `from` and
-      // only one used `to` before, which visually favored `from`'s hue —
-      // now left/right anchor the two sampled colors and center blends
-      // both, so no single color visually dominates.
-      const blended = lerpHex(displayed.from, displayed.to, 0.5);
+      // Bottom-only now, not centered — and single-hue-family, not two
+      // visibly distinct colors. `to` is no longer a separately-sampled
+      // second hue; it's a shifted version of `from` (toward cyan/blue if
+      // warm, or toward yellow/lime if cool — i.e. always an adjacent hue,
+      // never a jump to an unrelated color), so all three blobs read as
+      // one gradient family, not two competing colors. Radius is capped
+      // relative to h (height) instead of w (width) — sizing off width on
+      // a wide/short viewport let the blob bleed vertically well past the
+      // masked band regardless of where its center sat, which is the
+      // actual reason color was visible outside the intended region.
+      // Direction depends on the source hue's warmth, not a fixed shift —
+      // a warm color shifts toward cyan/blue, a cool color shifts toward
+      // yellow/lime, per explicit direction: adjacent hue only, whichever
+      // direction is "away from itself" rather than always the same turn.
+      const srcHue = hexHue(displayed.from);
+      const isWarm = srcHue < 90 || srcHue > 300; // reds/oranges/yellows/magentas
+      const shifted = shiftHue(displayed.from, isWarm ? 30 : -30);
+      const maxR = h * 0.55; // hard cap so blobs can't bleed past the bottom-only mask band below
       const blobs = [
-        { x: w * 0.18 + Math.sin(t) * 60, y: h * (0.5 - bass * 0.08), r: w * (0.34 + pulse * 0.46 + bass * 0.08), color: displayed.from },
-        { x: w * 0.82 + Math.cos(t * 0.8) * 80, y: h * (0.5 - mid * 0.06), r: w * (0.3 + pulse * 0.26 + mid * 0.06), color: displayed.to },
-        { x: w * 0.5 + Math.sin(t * 1.3) * 70, y: h * (0.5 + Math.cos(t * 0.6) * 0.08), r: w * (0.4 + pulse * 0.34 + bass * 0.05), color: blended },
+        { x: w * 0.22 + Math.sin(t) * 50, y: h * (1.02 - bass * 0.05), r: Math.min(maxR, w * 0.3 + pulse * w * 0.12 + bass * w * 0.04), color: displayed.from },
+        { x: w * 0.78 + Math.cos(t * 0.8) * 60, y: h * (1.05 - mid * 0.04), r: Math.min(maxR, w * 0.26 + pulse * w * 0.08 + mid * w * 0.03), color: shifted },
+        { x: w * 0.5 + Math.sin(t * 1.3) * 60, y: h * 1.08, r: Math.min(maxR, w * 0.34 + pulse * w * 0.1 + bass * w * 0.03), color: displayed.from },
       ];
 
       // Blend mode is theme-aware, not fixed to "screen" — screen only
@@ -365,8 +412,8 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       aria-hidden
       className={scoped ? "absolute inset-0 pointer-events-none z-0" : "fixed inset-0 pointer-events-none z-0"}
       style={scoped ? undefined : {
-        maskImage: "linear-gradient(to bottom, transparent 0%, transparent 25%, black 50%, black 50%, transparent 75%, transparent 100%)",
-        WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, transparent 25%, black 50%, black 50%, transparent 75%, transparent 100%)",
+        maskImage: "linear-gradient(to bottom, transparent 0%, transparent 45%, black 70%, black 100%)",
+        WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, transparent 45%, black 70%, black 100%)",
       }}
     />
   );

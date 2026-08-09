@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Play, ListPlus, Pencil, Share2, Download, FolderInput, Copy,
-  Trash2, Check, ChevronRight, X,
+  Play, ListPlus, Pencil, Download, FolderInput, Copy,
+  Trash2, ChevronRight, X,
 } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
 import type { Album } from "./AlbumCard";
@@ -33,8 +33,6 @@ export default function TrackContextMenu({
 }: Props) {
   const { playQueue, queue, reorderQueue } = usePlayer();
   const [subMenu, setSubMenu] = useState<"move" | "share" | null>(null);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -71,20 +69,6 @@ export default function TrackContextMenu({
   const playNow = () => {
     playQueue([track], 0);
     onClose();
-  };
-
-  const generateShare = async () => {
-    const res = await fetch("/api/share", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trackId: track.id, expiresInDays: 30, allowDownload: false }),
-    });
-    const link = await res.json();
-    const url = `${window.location.origin}/s/${link.token}`;
-    setShareUrl(url);
-    await navigator.clipboard.writeText(url).catch(() => {});
-    setCopied(true);
-    setTimeout(() => { setCopied(false); onClose(); }, 1500);
   };
 
   const download = async () => {
@@ -161,17 +145,17 @@ export default function TrackContextMenu({
         </div>
       )}
 
-      {/* Group 3: Share & Export. Copy/Download stay available even on a
-          read-only album — the receiver already has this file in their own
-          library, sharing or downloading their own copy doesn't touch the
-          original. Duplicate is blocked since it inserts a new track row
-          into the read-only album. */}
+      {/* Group 3: Export. Share was removed from here — it created a new,
+          disconnected link every click with no persistence/revoke, bypassing
+          the real share flow in TrackDetail's Share row (Edit details),
+          which actually checks for an existing link, supports revoke, and
+          lets allowDownload be toggled after creation. Two competing share
+          entry points for the same track was the actual bug; collapsing to
+          one correct flow instead of decluttering an equally-good second one.
+          Download stays available even on a read-only album — the receiver
+          already has this file in their own library, downloading their own
+          copy doesn't touch the original. */}
       <div className="py-1 border-b border-border">
-        <MenuItem
-          icon={copied ? <Check size={14} className="text-accent" /> : <Share2 size={14} strokeWidth={1.5} />}
-          label={copied ? "Link copied!" : "Copy share link"}
-          onClick={generateShare}
-        />
         <MenuItem
           icon={<Download size={14} strokeWidth={1.5} />}
           label={downloading ? "Downloading..." : "Download"}

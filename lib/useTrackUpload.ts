@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { detectBPM } from "@/lib/bpm";
 import { detectKey } from "@/lib/key";
+import { triggerFeedback } from "@/lib/feedback";
 
 export function useTrackUpload({
   albumId,
@@ -105,6 +106,7 @@ export function useTrackUpload({
         }
         const track = await finalizeRes.json();
         onUploaded();
+        triggerFeedback("success"); // fires once here, not on the second onUploaded() below — that one is just a metadata refresh after BPM/key analysis, not a new completion event
 
         setLabel(`Analyzing ${file.name} (BPM & key)...`);
         try {

@@ -125,7 +125,7 @@ export default function MobilePlayerBar() {
           before lyrics content starts, giving the scroll-down affordance. */}
       <div className="flex flex-col px-6 pb-8" style={{ minHeight: "calc(100dvh - 76px)" }}>
         <div className="flex-1 flex flex-col items-center justify-center min-h-0">
-          <AlbumArtMorph coverUrl={current.albumCoverUrl} size={220} gradientFrom={gradient?.from} gradientTo={gradient?.to} />
+          <AlbumArtMorph coverUrl={current.albumCoverUrl} size={280} gradientFrom={gradient?.from} gradientTo={gradient?.to} />
           <div className="mt-8 text-center w-full">
             <p className="text-lg font-medium text-primary truncate">{current.title}</p>
             <p className="text-sm text-secondary truncate">{current.artist || "Unknown"}</p>
