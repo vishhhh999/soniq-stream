@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Play, Pause, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RotateCcw, Crosshair } from "lucide-react";
+import { motion } from "framer-motion";
+import { Play, Pause, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RotateCcw, Crosshair, X } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
 import type { SyncedLine } from "@/lib/lyricsSync";
 
@@ -233,78 +234,97 @@ export default function LyricsEditor({
   }
 
   if (mode === "review") {
+    // Rendered as its own wide overlay rather than inline inside
+    // TrackDetail's ~400px sidebar column — a per-line list with a
+    // timestamp, four icon buttons, and the line text was genuinely
+    // cramped in that width, with most lines truncating. z-[60] to sit
+    // above TrackDetail's own modal (z-50).
     return (
-      <div className="border border-border-strong rounded-md p-4 space-y-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <p className="text-xs uppercase tracking-wide text-tertiary">Review timing</p>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-tertiary mr-1">Shift all:</span>
-            <button onClick={() => shiftAll(-1)} title="-1s" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors">
-              <ChevronsLeft size={13} strokeWidth={2} />
-            </button>
-            <button onClick={() => shiftAll(-0.1)} title="-0.1s" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors">
-              <ChevronLeft size={13} strokeWidth={2} />
-            </button>
-            <button onClick={() => shiftAll(0.1)} title="+0.1s" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors">
-              <ChevronRight size={13} strokeWidth={2} />
-            </button>
-            <button onClick={() => shiftAll(1)} title="+1s" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors">
-              <ChevronsRight size={13} strokeWidth={2} />
-            </button>
-            <button onClick={resetCalibration} title="Reset all changes" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors ml-1">
-              <RotateCcw size={13} strokeWidth={2} />
-            </button>
-          </div>
-        </div>
-
-        <div className="max-h-80 overflow-y-auto space-y-1 pr-1">
-          {reviewLines.map((line, i) => (
-            <div key={i} className="flex items-center gap-2 text-sm">
-              <span className="text-xs text-tertiary tabular-nums w-14 shrink-0">{fmt(line.time)}</span>
-              <button onClick={() => nudgeLine(i, -0.1)} title="-0.1s" className="p-1 rounded hover:bg-surface transition-colors shrink-0">
-                <ChevronLeft size={13} strokeWidth={2} className="text-tertiary" />
-              </button>
-              <button onClick={() => nudgeLine(i, 0.1)} title="+0.1s" className="p-1 rounded hover:bg-surface transition-colors shrink-0">
-                <ChevronRight size={13} strokeWidth={2} className="text-tertiary" />
-              </button>
-              <button onClick={() => playFromLine(line.time)} title="Play from here" className="p-1 rounded hover:bg-surface transition-colors shrink-0">
-                <Play size={12} strokeWidth={2} className="text-tertiary" />
-              </button>
-              <button onClick={() => retapLine(i)} title="Set to current playhead position" className="p-1 rounded hover:bg-surface transition-colors shrink-0">
-                <Crosshair size={12} strokeWidth={2} className="text-tertiary" />
-              </button>
-              <span className="text-primary truncate flex-1">{line.text}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-3 pt-1">
-          <button
-            onClick={saveReview}
-            disabled={saving}
-            className="bg-accent text-canvas text-sm font-medium px-4 py-2 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save timing"}
-          </button>
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.97 }}
+          className="w-full max-w-2xl rounded-2xl border border-border bg-elevated p-6 relative max-h-[85vh] flex flex-col"
+        >
           <button
             onClick={cancelReview}
-            className="text-sm text-secondary border border-border rounded-md px-4 py-2 hover:border-border-strong transition-colors"
+            className="absolute top-5 right-5 text-tertiary hover:text-primary transition-colors"
           >
-            Cancel
+            <X size={18} strokeWidth={1.5} />
           </button>
-          {current?.id === track.id && (
+
+          <div className="flex items-center justify-between flex-wrap gap-3 pr-8 shrink-0">
+            <p className="text-sm font-medium text-primary">Review timing</p>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-tertiary mr-1">Shift all:</span>
+              <button onClick={() => shiftAll(-1)} title="-1s" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors">
+                <ChevronsLeft size={13} strokeWidth={2} />
+              </button>
+              <button onClick={() => shiftAll(-0.1)} title="-0.1s" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors">
+                <ChevronLeft size={13} strokeWidth={2} />
+              </button>
+              <button onClick={() => shiftAll(0.1)} title="+0.1s" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors">
+                <ChevronRight size={13} strokeWidth={2} />
+              </button>
+              <button onClick={() => shiftAll(1)} title="+1s" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors">
+                <ChevronsRight size={13} strokeWidth={2} />
+              </button>
+              <button onClick={resetCalibration} title="Reset all changes" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors ml-1">
+                <RotateCcw size={13} strokeWidth={2} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1 mt-4">
+            {reviewLines.map((line, i) => (
+              <div key={i} className="flex items-center gap-3 text-sm py-1">
+                <span className="text-xs text-tertiary tabular-nums w-16 shrink-0">{fmt(line.time)}</span>
+                <button onClick={() => nudgeLine(i, -0.1)} title="-0.1s" className="p-1.5 rounded hover:bg-surface transition-colors shrink-0">
+                  <ChevronLeft size={14} strokeWidth={2} className="text-tertiary" />
+                </button>
+                <button onClick={() => nudgeLine(i, 0.1)} title="+0.1s" className="p-1.5 rounded hover:bg-surface transition-colors shrink-0">
+                  <ChevronRight size={14} strokeWidth={2} className="text-tertiary" />
+                </button>
+                <button onClick={() => playFromLine(line.time)} title="Play from here" className="p-1.5 rounded hover:bg-surface transition-colors shrink-0">
+                  <Play size={13} strokeWidth={2} className="text-tertiary" />
+                </button>
+                <button onClick={() => retapLine(i)} title="Set to current playhead position" className="p-1.5 rounded hover:bg-surface transition-colors shrink-0">
+                  <Crosshair size={13} strokeWidth={2} className="text-tertiary" />
+                </button>
+                <span className="text-primary flex-1">{line.text}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3 pt-4 mt-2 border-t border-border shrink-0">
             <button
-              onClick={toggle}
-              className="ml-auto p-2 rounded-full border border-border hover:border-border-strong transition-colors"
-              title={isPlaying ? "Pause" : "Play"}
+              onClick={saveReview}
+              disabled={saving}
+              className="bg-accent text-canvas text-sm font-medium px-4 py-2 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
             >
-              {isPlaying ? <Pause size={13} strokeWidth={2} /> : <Play size={13} strokeWidth={2} />}
+              {saving ? "Saving..." : "Save timing"}
             </button>
-          )}
-        </div>
-        <p className="text-xs text-tertiary">
-          Nudge a line with the arrows, click the crosshair to re-tap it against wherever the track is currently playing, or shift everything at once above if the whole sync is off by a consistent amount.
-        </p>
+            <button
+              onClick={cancelReview}
+              className="text-sm text-secondary border border-border rounded-md px-4 py-2 hover:border-border-strong transition-colors"
+            >
+              Cancel
+            </button>
+            {current?.id === track.id && (
+              <button
+                onClick={toggle}
+                className="ml-auto p-2 rounded-full border border-border hover:border-border-strong transition-colors"
+                title={isPlaying ? "Pause" : "Play"}
+              >
+                {isPlaying ? <Pause size={13} strokeWidth={2} /> : <Play size={13} strokeWidth={2} />}
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-tertiary pt-3 shrink-0">
+            Nudge a line with the arrows, click the crosshair to re-tap it against wherever the track is currently playing, or shift everything at once above if the whole sync is off by a consistent amount.
+          </p>
+        </motion.div>
       </div>
     );
   }
