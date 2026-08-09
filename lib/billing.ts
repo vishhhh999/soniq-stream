@@ -11,11 +11,33 @@ export const FREE_TIER_STORAGE_BYTES = 500 * 1024 * 1024; // 500MB
 export const PAID_PRICE_USD = 5;
 
 // Statuses that count as "paid" for enforcement purposes. 'past_due' still
-// counts — Stripe keeps retrying the charge for a while before the
-// subscription actually lapses to 'canceled'; cutting access off the
-// instant a single charge attempt fails would be a harsh, premature
-// downgrade for what's usually a transient card issue.
+// counts — Razorpay retries a failed charge for a few days before actually
+// halting the subscription; cutting access off the instant one charge
+// attempt fails would be a harsh, premature downgrade for what's usually a
+// transient card issue.
 const PAID_STATUSES = new Set(["active", "past_due"]);
+
+// Razorpay's own subscription statuses ('created', 'authenticated',
+// 'active', 'pending', 'halted', 'cancelled', 'completed', 'expired') get
+// collapsed onto our smaller internal set here, so the rest of the app
+// only ever deals with 'free' | 'active' | 'past_due' | 'canceled'.
+export function mapRazorpayStatus(razorpayStatus: string): string {
+  switch (razorpayStatus) {
+    case "active":
+      return "active";
+    case "pending":
+    case "halted":
+      return "past_due";
+    case "cancelled":
+    case "completed":
+    case "expired":
+      return "canceled";
+    default:
+      // 'created', 'authenticated' — subscription exists but the first
+      // payment hasn't gone through yet. Not paid yet.
+      return "free";
+  }
+}
 
 export function isPaidStatus(status: string | null | undefined): boolean {
   return !!status && PAID_STATUSES.has(status);
@@ -26,7 +48,7 @@ export async function getUserPlan(userId: string) {
     .select({
       subscriptionStatus: users.subscriptionStatus,
       subscriptionPeriodEnd: users.subscriptionPeriodEnd,
-      stripeCustomerId: users.stripeCustomerId,
+      razorpaySubscriptionId: users.razorpaySubscriptionId,
     })
     .from(users)
     .where(eq(users.id, userId));

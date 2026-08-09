@@ -1,112 +1,103 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { getStripe } from "@/lib/stripe";
-import type Stripe from "stripe";
+import { mapRazorpayStatus } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";
 
-// Requires STRIPE_WEBHOOK_SECRET — from the Stripe dashboard's webhook
-// endpoint config (Developers → Webhooks → your endpoint → Signing
-// secret), NOT the same value as STRIPE_SECRET_KEY. Point the endpoint at
-// https://www.soniq.lol/api/billing/webhook and subscribe it to at least:
-// checkout.session.completed, customer.subscription.updated,
-// customer.subscription.deleted.
+// Requires RAZORPAY_WEBHOOK_SECRET — this is a value YOU make up yourself
+// when setting up the webhook in the Razorpay dashboard (Settings ->
+// Webhooks), unlike Stripe which generates one for you. Point the webhook
+// at https://www.soniq.lol/api/billing/webhook, subscribed to at least:
+// subscription.activated, subscription.charged, subscription.halted,
+// subscription.cancelled.
 //
 // This route reads the RAW request body for signature verification — do
-// not add any body-parsing middleware in front of it, and do not call
-// req.json() before req.text() here.
+// not add body-parsing middleware in front of it, and read the body as
+// text before doing anything else with the request.
 export async function POST(req: NextRequest) {
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
   if (!webhookSecret) {
-    console.error("STRIPE_WEBHOOK_SECRET is not set — rejecting webhook.");
+    console.error("RAZORPAY_WEBHOOK_SECRET is not set — rejecting webhook.");
     return NextResponse.json({ error: "Webhook not configured." }, { status: 500 });
   }
 
-  const signature = req.headers.get("stripe-signature");
+  const signature = req.headers.get("x-razorpay-signature");
   if (!signature) return NextResponse.json({ error: "Missing signature." }, { status: 400 });
 
   const rawBody = await req.text();
-  const stripe = getStripe();
 
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
-  } catch (err) {
-    console.error("Stripe webhook signature verification failed:", err);
+  const expectedSignature = crypto.createHmac("sha256", webhookSecret).update(rawBody).digest("hex");
+  // timingSafeEqual requires equal-length buffers — a plain !== compare
+  // here would leak timing information about how much of the signature
+  // matched, which is exactly what HMAC verification is meant to prevent.
+  const signaturesMatch =
+    signature.length === expectedSignature.length &&
+    crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+
+  if (!signaturesMatch) {
+    console.error("Razorpay webhook signature verification failed.");
     return NextResponse.json({ error: "Invalid signature." }, { status: 400 });
   }
 
+  let event: any;
   try {
-    switch (event.type) {
-      // Fires once, right when checkout succeeds. This is where we learn
-      // the Stripe customer id for the first time and link it to our user.
-      case "checkout.session.completed": {
-        const checkoutSession = event.data.object as Stripe.Checkout.Session;
-        const userId = checkoutSession.client_reference_id || (checkoutSession.subscription as any)?.metadata?.userId;
-        const customerId = typeof checkoutSession.customer === "string" ? checkoutSession.customer : checkoutSession.customer?.id;
-        const subscriptionId = typeof checkoutSession.subscription === "string" ? checkoutSession.subscription : checkoutSession.subscription?.id;
-        if (!userId || !customerId) {
-          console.error("checkout.session.completed missing userId or customerId", { userId, customerId });
-          break;
-        }
+    event = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
+  }
 
-        let periodEnd: Date | null = null;
-        if (subscriptionId) {
-          const sub = await stripe.subscriptions.retrieve(subscriptionId);
-          // This Stripe API version moved current_period_end off the
-          // top-level Subscription object onto its first item (billing
-          // periods became per-item to support multi-price subscriptions).
-          // We only ever create single-item subscriptions, so item 0 is it.
-          periodEnd = subPeriodEnd(sub);
-        }
+  try {
+    const sub = event.payload?.subscription?.entity;
+    if (!sub) {
+      // Some event types (payment.captured etc, if ever subscribed to)
+      // don't carry a subscription payload — nothing to do with those here.
+      return NextResponse.json({ received: true });
+    }
 
+    const userId = await resolveUserId(sub);
+    if (!userId) {
+      console.error(`Could not resolve a user for Razorpay subscription ${sub.id}`);
+      return NextResponse.json({ received: true });
+    }
+
+    switch (event.event) {
+      // Fires once, right when the first payment succeeds.
+      case "subscription.activated":
+      // Fires on every successful renewal charge.
+      case "subscription.charged": {
         await db
           .update(users)
           .set({
-            stripeCustomerId: customerId,
-            stripeSubscriptionId: subscriptionId ?? null,
-            subscriptionStatus: "active",
-            subscriptionPeriodEnd: periodEnd,
+            subscriptionStatus: mapRazorpayStatus(sub.status),
+            subscriptionPeriodEnd: sub.current_end ? new Date(sub.current_end * 1000) : null,
           })
           .where(eq(users.id, userId));
         break;
       }
 
-      // Fires on renewals, plan changes, payment failures (past_due), and
-      // when a cancellation is scheduled (cancel_at_period_end — status
-      // stays 'active' until the period actually ends, which is correct:
-      // they paid for that period, they keep access through it).
-      case "customer.subscription.updated": {
-        const sub = event.data.object as Stripe.Subscription;
-        const userId = await resolveUserId(sub);
-        if (!userId) break;
-
+      // Fires after repeated failed charge attempts — Razorpay has already
+      // retried by this point, this is closer to Stripe's terminal
+      // past_due state than a first-attempt failure.
+      case "subscription.halted": {
         await db
           .update(users)
-          .set({
-            subscriptionStatus: sub.status,
-            subscriptionPeriodEnd: subPeriodEnd(sub),
-          })
+          .set({ subscriptionStatus: "past_due" })
           .where(eq(users.id, userId));
         break;
       }
 
-      // Fires when a subscription is actually gone (immediate cancel, or
-      // the period-end arrives after a cancel_at_period_end). Downgrade to
-      // free — isPaidStatus() only treats 'active'/'past_due' as paid, so
-      // 'canceled' immediately loses the unlimited-storage allowance.
-      case "customer.subscription.deleted": {
-        const sub = event.data.object as Stripe.Subscription;
-        const userId = await resolveUserId(sub);
-        if (!userId) break;
-
+      // Fires when a subscription is actually gone — either cancelled
+      // immediately, or (since our cancel route uses cancelAtCycleEnd)
+      // once the period the user already paid for actually ends.
+      case "subscription.cancelled": {
         await db
           .update(users)
           .set({
             subscriptionStatus: "canceled",
-            stripeSubscriptionId: null,
+            razorpaySubscriptionId: null,
             subscriptionPeriodEnd: null,
           })
           .where(eq(users.id, userId));
@@ -114,43 +105,29 @@ export async function POST(req: NextRequest) {
       }
 
       default:
-        // Not every event type needs handling — Stripe sends many we
-        // don't act on (invoice.created, payment_method.attached, etc).
+        // Not every event type needs handling.
         break;
     }
   } catch (err) {
-    console.error(`Error handling Stripe webhook event ${event.type}:`, err);
-    // Still 200 — returning an error here makes Stripe retry, which is
-    // only useful if the failure was transient (DB blip). Log and move on
-    // rather than getting stuck retrying a permanently-failing event.
+    console.error(`Error handling Razorpay webhook event ${event?.event}:`, err);
+    // Still 200 — Razorpay retries on non-2xx, which only helps for
+    // transient failures (DB blip). Log and move on rather than getting
+    // stuck retrying a permanently-failing event.
   }
 
   return NextResponse.json({ received: true });
 }
 
-// This Stripe API version moved current_period_end off the top-level
-// Subscription object onto each subscription item (billing periods became
-// per-item, to support multi-price subscriptions with different renewal
-// dates per item). We only ever create single-item subscriptions via the
-// checkout route, so item 0's period end is always the right one to use.
-function subPeriodEnd(sub: Stripe.Subscription): Date | null {
-  const item = sub.items.data[0];
-  if (!item) return null;
-  return new Date(item.current_period_end * 1000);
-}
+// Resolves which of our users a Razorpay subscription belongs to. Tries
+// the notes payload stamped at creation first (see the checkout route),
+// falls back to a DB lookup by the subscription id itself for
+// subscriptions that predate that notes field or were modified directly
+// in the Razorpay dashboard.
+async function resolveUserId(sub: any): Promise<string | null> {
+  const notesUserId = sub.notes?.userId;
+  if (notesUserId) return notesUserId;
 
-// Resolves which of our users a Stripe subscription belongs to. Tries the
-// metadata stamped at checkout first (subscription_data.metadata.userId in
-// the checkout route), falls back to looking up by stripeCustomerId for
-// subscriptions that predate that metadata or were modified directly in
-// the Stripe dashboard.
-async function resolveUserId(sub: Stripe.Subscription): Promise<string | null> {
-  const metaUserId = (sub.metadata as any)?.userId;
-  if (metaUserId) return metaUserId;
-
-  const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
-  if (!customerId) return null;
-
-  const [user] = await db.select({ id: users.id }).from(users).where(eq(users.stripeCustomerId, customerId));
+  if (!sub.id) return null;
+  const [user] = await db.select({ id: users.id }).from(users).where(eq(users.razorpaySubscriptionId, sub.id));
   return user?.id ?? null;
 }

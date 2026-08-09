@@ -123,9 +123,13 @@ async function main() {
 
   // Additive migration: first-Google-link timestamp for one-time toast.
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_linked_at TIMESTAMP;`;
-  // Billing — see lib/db/schema.ts for what drives each column.
-  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;`;
-  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;`;
+  // Billing — see lib/db/schema.ts for what drives each column. Switched
+  // from Stripe to Razorpay after finding Stripe is invite-only for
+  // Indian businesses — drop the never-launched Stripe columns if they
+  // exist from an earlier run of this script, add the Razorpay ones.
+  await sql`ALTER TABLE users DROP COLUMN IF EXISTS stripe_customer_id;`;
+  await sql`ALTER TABLE users DROP COLUMN IF EXISTS stripe_subscription_id;`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS razorpay_subscription_id TEXT;`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT 'free';`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_period_end TIMESTAMP;`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE;`;

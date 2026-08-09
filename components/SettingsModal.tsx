@@ -39,9 +39,20 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
     storageCapBytes: number | null;
   } | null>(null);
   const [upgrading, setUpgrading] = useState(false);
-  const [openingPortal, setOpeningPortal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const refetchMe = () => {
+    fetch("/api/user/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return;
+        if (d.plan) setPlan(d.plan);
+      })
+      .catch(() => {});
+  };
 
   useEffect(() => {
     fetch("/api/user/me")
@@ -58,32 +69,73 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       .catch(() => {});
   }, []);
 
+  // Razorpay has no hosted checkout page — it's a client-side modal driven
+  // by checkout.js, loaded on demand rather than in every page's <head>
+  // since most visits never touch billing.
+  const loadRazorpayScript = () =>
+    new Promise<boolean>((resolve) => {
+      if ((window as any).Razorpay) return resolve(true);
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+
   const startUpgrade = async () => {
     setUpgrading(true);
     setBillingError(null);
     try {
-      const res = await fetch("/api/billing/checkout", { method: "POST" });
+      const [scriptLoaded, res] = await Promise.all([
+        loadRazorpayScript(),
+        fetch("/api/billing/checkout", { method: "POST" }),
+      ]);
+      if (!scriptLoaded) throw new Error("Could not load the payment form. Check your connection and try again.");
       const data = await res.json();
-      if (!res.ok || !data.url) throw new Error(data.error || "Could not start checkout.");
-      window.location.href = data.url;
+      if (!res.ok || !data.subscriptionId) throw new Error(data.error || "Could not start checkout.");
+
+      const rzp = new (window as any).Razorpay({
+        key: data.keyId,
+        subscription_id: data.subscriptionId,
+        name: "SONIQ",
+        description: "SONIQ Pro — unlimited storage",
+        theme: { color: "#f2f2f2" },
+        // Fires once the customer completes the authorization payment.
+        // The webhook is still the source of truth for subscriptionStatus
+        // (it can arrive slightly before or after this handler does), so
+        // this just refetches rather than optimistically marking paid.
+        handler: () => {
+          setUpgrading(false);
+          refetchMe();
+        },
+        modal: {
+          ondismiss: () => setUpgrading(false),
+        },
+      });
+      rzp.on("payment.failed", () => {
+        setBillingError("Payment failed. No charge was made — try again or use a different card.");
+        setUpgrading(false);
+      });
+      rzp.open();
     } catch (e: any) {
       setBillingError(e.message || "Could not start checkout. Try again.");
       setUpgrading(false);
     }
   };
 
-  const openBillingPortal = async () => {
-    setOpeningPortal(true);
+  const cancelSubscription = async () => {
+    setCancelling(true);
     setBillingError(null);
     try {
-      const res = await fetch("/api/billing/portal", { method: "POST" });
+      const res = await fetch("/api/billing/cancel", { method: "POST" });
       const data = await res.json();
-      if (!res.ok || !data.url) throw new Error(data.error || "Could not open billing management.");
-      window.location.href = data.url;
+      if (!res.ok) throw new Error(data.error || "Could not cancel.");
+      setConfirmingCancel(false);
+      refetchMe();
     } catch (e: any) {
-      setBillingError(e.message || "Could not open billing management. Try again.");
-      setOpeningPortal(false);
+      setBillingError(e.message || "Could not cancel. Try again.");
     }
+    setCancelling(false);
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -225,9 +277,10 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             </div>
 
             {/* Plan / storage — free tier is a storage cap only, no track
-                or feature gating. Checkout and billing management both
-                hand off to Stripe-hosted pages rather than building any
-                custom card-entry or cancel-flow UI here. */}
+                or feature gating. Checkout opens Razorpay's own hosted
+                checkout.js modal (no redirect page — see startUpgrade);
+                cancellation is a direct API call since Razorpay has no
+                self-serve billing portal for standard accounts. */}
             <div className="px-6 py-5 border-t border-border">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs uppercase tracking-wide text-tertiary">Plan</span>
@@ -261,24 +314,45 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               {billingError && <p className="text-xs text-error mb-2">{billingError}</p>}
 
               {plan?.isPaid ? (
-                <button
-                  onClick={openBillingPortal}
-                  disabled={openingPortal}
-                  className="text-xs text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong transition-colors disabled:opacity-50"
-                >
-                  {openingPortal ? "Opening..." : "Manage billing"}
-                </button>
+                confirmingCancel ? (
+                  <div className="flex items-center gap-2 text-xs flex-wrap">
+                    <span className="text-secondary hidden sm:inline">
+                      Cancel? You'll keep Pro until the current period ends.
+                    </span>
+                    <button
+                      onClick={cancelSubscription}
+                      disabled={cancelling}
+                      className="text-error border border-error/40 rounded-md px-3 py-1.5 hover:bg-error/10 transition-colors disabled:opacity-50"
+                    >
+                      {cancelling ? "Cancelling..." : "Yes, cancel"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmingCancel(false)}
+                      className="text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong transition-colors"
+                    >
+                      Never mind
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmingCancel(true)}
+                    className="text-xs text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong transition-colors"
+                  >
+                    Cancel subscription
+                  </button>
+                )
               ) : (
                 <button
                   onClick={startUpgrade}
                   disabled={upgrading}
                   className="text-xs font-medium text-canvas bg-accent rounded-md px-3 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
                 >
-                  {/* $5/mo hardcoded for display — kept in sync with the
-                      STRIPE_PRICE_ID env var manually, since the actual
-                      Price lives in Stripe's dashboard, not this codebase.
-                      Update both together if the price ever changes. */}
-                  {upgrading ? "Starting checkout..." : "Upgrade — $5/mo"}
+                  {/* Price shown here is whatever's set on the Razorpay
+                      Plan (RAZORPAY_PLAN_ID) — this label is just a
+                      generic prompt so it never drifts out of sync with
+                      the real price, which lives in the Razorpay
+                      dashboard, not this codebase. */}
+                  {upgrading ? "Opening checkout..." : "Upgrade to Pro"}
                 </button>
               )}
             </div>

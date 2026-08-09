@@ -18,10 +18,11 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   // Billing — subscriptionStatus drives all storage-cap enforcement.
   // 'free' (default) | 'active' | 'past_due' | 'canceled'. Kept in sync
-  // via the Stripe webhook (app/api/billing/webhook/route.ts), never set
-  // directly from client-facing routes.
-  stripeCustomerId: text("stripe_customer_id"),
-  stripeSubscriptionId: text("stripe_subscription_id"),
+  // via the Razorpay webhook (app/api/billing/webhook/route.ts), never set
+  // directly from client-facing routes. Razorpay's own subscription
+  // statuses ('authenticated', 'halted', 'completed', 'expired', etc) get
+  // mapped onto this smaller internal set — see lib/billing.ts.
+  razorpaySubscriptionId: text("razorpay_subscription_id"),
   subscriptionStatus: text("subscription_status").default("free"),
   // Nullable — set on any active/past_due subscription, used to show
   // "renews on X" / "access until X" in Settings. Cleared on cancel.
