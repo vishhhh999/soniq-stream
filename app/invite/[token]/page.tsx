@@ -4,12 +4,27 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, LogIn } from "lucide-react";
+import { Check, LogIn, Play, Pause, Shuffle, Download } from "lucide-react";
 import VinylArt from "@/components/VinylArt";
 import { gradientFromSeed } from "@/lib/gradient";
 import { useDeviceTilt } from "@/lib/useDeviceTilt";
 
 type Phase = "wrapped" | "unwrapping" | "revealed";
+
+type InviteTrack = {
+  id: string;
+  title: string;
+  artist?: string | null;
+  fileUrl: string;
+  durationSec?: number | null;
+};
+
+function fmt(s?: number | null) {
+  if (!s) return "";
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60).toString().padStart(2, "0");
+  return `${m}:${sec}`;
+}
 
 // Same 3D tilt interaction as the /s/[token] share page — mouse-hover on
 // desktop, phone gyroscope on touch devices.
@@ -129,6 +144,14 @@ export default function InvitePage({ params }: { params: { token: string } }) {
   const [phase, setPhase] = useState<Phase>("wrapped");
   const [spinning, setSpinning] = useState(false);
 
+  // Playback — anonymous listeners can play the album without an account,
+  // same as the /s/[token] share page. Only "Accept invite" (which saves
+  // the album into the viewer's own library) needs sign-in.
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const tracksList: InviteTrack[] = info?.tracks ?? [];
+
   useEffect(() => {
     fetch(`/api/invite/${params.token}`)
       .then((r) => {
@@ -138,6 +161,46 @@ export default function InvitePage({ params }: { params: { token: string } }) {
       .then(setInfo)
       .catch((e) => setError(e.message));
   }, [params.token]);
+
+  // Sync audio src when the track changes.
+  useEffect(() => {
+    if (!tracksList[currentTrackIndex]) return;
+    if (!audioRef.current) audioRef.current = new Audio();
+    const audio = audioRef.current;
+    audio.src = tracksList[currentTrackIndex].fileUrl;
+    audio.onended = () => {
+      if (currentTrackIndex < tracksList.length - 1) {
+        setCurrentTrackIndex((i) => i + 1);
+        setPlaying(true);
+      } else {
+        setPlaying(false);
+      }
+    };
+    if (playing) audio.play().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTrackIndex, tracksList.length]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) audio.play().catch(() => {});
+    else audio.pause();
+  }, [playing]);
+
+  const toggle = (index?: number) => {
+    if (index !== undefined && index !== currentTrackIndex) {
+      setCurrentTrackIndex(index);
+      setPlaying(true);
+      return;
+    }
+    setPlaying((p) => !p);
+  };
+
+  const shuffle = () => {
+    const randomIndex = Math.floor(Math.random() * tracksList.length);
+    setCurrentTrackIndex(randomIndex);
+    setPlaying(true);
+  };
 
   const handleUnwrap = () => {
     if (phase !== "wrapped") return;
@@ -240,7 +303,7 @@ export default function InvitePage({ params }: { params: { token: string } }) {
                 <TiltCard size={VINYL_SIZE}>
                   <VinylArt
                     coverUrl={info.album.coverUrl}
-                    spinning={false}
+                    spinning={playing}
                     size={VINYL_SIZE}
                     gradientFrom={gradFrom}
                     gradientTo={gradTo}
@@ -263,13 +326,79 @@ export default function InvitePage({ params }: { params: { token: string } }) {
                   )}
                 </div>
 
+                {/* Playback — no sign-in required, matches /s/[token] */}
+                {tracksList.length > 0 && (
+                  <div className="flex items-center gap-3 flex-wrap justify-center">
+                    <button
+                      onClick={() => toggle()}
+                      className="w-11 h-11 rounded-full bg-accent text-canvas flex items-center justify-center hover:bg-accent-strong transition-colors shrink-0"
+                    >
+                      {playing ? (
+                        <Pause size={18} strokeWidth={2} />
+                      ) : (
+                        <Play size={18} strokeWidth={2} className="ml-0.5" />
+                      )}
+                    </button>
+
+                    {tracksList.length > 1 && (
+                      <button
+                        onClick={shuffle}
+                        className="w-10 h-10 rounded-full border border-border text-secondary flex items-center justify-center hover:border-border-strong hover:text-primary transition-colors shrink-0"
+                      >
+                        <Shuffle size={15} strokeWidth={1.5} />
+                      </button>
+                    )}
+
+                    {info.allowDownload && tracksList[currentTrackIndex] && (
+                      <a
+                        href={tracksList[currentTrackIndex].fileUrl}
+                        download
+                        className="flex items-center gap-2 text-sm text-tertiary hover:text-secondary transition-colors"
+                      >
+                        <Download size={14} strokeWidth={1.5} />
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {/* Track list */}
+                {tracksList.length > 1 && (
+                  <div className="w-full space-y-0.5">
+                    {tracksList.map((t, i) => (
+                      <button
+                        key={t.id}
+                        onClick={() => toggle(i)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors group ${
+                          i === currentTrackIndex && playing ? "bg-surface" : "hover:bg-surface"
+                        }`}
+                      >
+                        <span className="text-xs text-tertiary w-4 tabular-nums text-right shrink-0">
+                          {i === currentTrackIndex && playing ? (
+                            <span className="text-accent">▶</span>
+                          ) : (
+                            i + 1
+                          )}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className={`text-sm truncate block ${i === currentTrackIndex ? "text-primary font-medium" : "text-primary"}`}>
+                            {t.title}
+                          </span>
+                          {t.artist && <span className="text-xs text-secondary truncate block">{t.artist}</span>}
+                        </span>
+                        <span className="text-xs text-tertiary tabular-nums shrink-0">{fmt(t.durationSec)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Accept invite — this is the only thing that actually requires sign-in */}
                 {status === "unauthenticated" ? (
                   <button
                     onClick={accept}
                     className="w-full flex items-center justify-center gap-2 bg-accent text-canvas text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors"
                   >
                     <LogIn size={15} strokeWidth={1.5} />
-                    Sign in to accept invite
+                    Sign in to add to your library
                   </button>
                 ) : (
                   <button

@@ -147,6 +147,29 @@ export async function POST(req: NextRequest) {
 
     await db.insert(tracks).values(row);
 
+    // Notify album followers about the addition (non-fatal if it fails).
+    // NOTE: this was previously imported but never actually called here —
+    // that's why removals notified followers but additions/new versions
+    // silently didn't, even after member-sync started copying the file.
+    if (albumId) {
+      try {
+        const [albumForNotify] = await db.select({ name: albums.name }).from(albums).where(eq(albums.id, albumId));
+        const actorUsername = await getUsernameById(userId);
+        await notifyAlbumFollowers({
+          ownerId: userId,
+          actorUserId: userId,
+          actorUsername,
+          albumId,
+          albumName: albumForNotify?.name ?? "Unknown album",
+          trackId: id,
+          trackTitle: title,
+          type: versionNumber > 1 ? "version_added" : "track_added",
+        });
+      } catch (err) {
+        console.error("Notification dispatch failed (non-fatal):", err);
+      }
+    }
+
     // Sync the new track to any receivers who have a saved copy of this album.
     // This keeps their library up-to-date without them needing to re-save.
     if (albumId) {

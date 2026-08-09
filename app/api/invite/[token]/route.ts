@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { inviteLinks, albums, tracks, albumMembers, users, contentFollows } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2";
 
 export const dynamic = "force-dynamic";
@@ -30,11 +30,28 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
     .from(users)
     .where(eq(users.id, album.userId));
 
-  const albumTracks = await db.select({ id: tracks.id, title: tracks.title }).from(tracks).where(eq(tracks.albumId, link.albumId));
+  // Full track rows (not just id/title) — needed so the invite page can
+  // actually play the album before the viewer signs in, same as the
+  // /s/[token] share page already does. Previously only id/title came
+  // back, which is why invite links had no playback at all.
+  const albumTracks = await db
+    .select({
+      id: tracks.id,
+      title: tracks.title,
+      artist: tracks.artist,
+      fileUrl: tracks.fileUrl,
+      durationSec: tracks.durationSec,
+      sortOrder: tracks.sortOrder,
+    })
+    .from(tracks)
+    .where(eq(tracks.albumId, link.albumId))
+    .orderBy(tracks.sortOrder);
 
   return NextResponse.json({
     album: { id: album.id, name: album.name, coverUrl: album.coverUrl },
     owner: { username: owner?.username ?? null, avatarUrl: owner?.avatarUrl ?? null },
+    tracks: albumTracks,
+    allowDownload: album.allowDownload ?? false,
     trackCount: albumTracks.length,
     usesLeft: link.maxUses !== null ? link.maxUses - link.usedCount : null,
   });
@@ -57,11 +74,14 @@ export async function POST(
 
   if (album.userId === userId) return NextResponse.json({ error: "This is your own album." }, { status: 400 });
 
-  // Idempotent: don't create a second copy if already a member.
+  // Idempotent: don't create a second copy if already a member of THIS
+  // album specifically. Previously this only filtered by userId, so being
+  // a member of ANY album would incorrectly short-circuit joining a
+  // different one.
   const [existing] = await db
     .select()
     .from(albumMembers)
-    .where(eq(albumMembers.userId, userId));
+    .where(and(eq(albumMembers.userId, userId), eq(albumMembers.albumId, album.id)));
   if (existing?.savedAlbumId) {
     return NextResponse.json({ ok: true, albumId: existing.savedAlbumId, alreadyMember: true });
   }
