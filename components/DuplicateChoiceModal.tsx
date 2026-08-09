@@ -36,7 +36,7 @@ export default function DuplicateChoiceModal({
           <div className="space-y-2">
             <button
               onClick={() => onChoose("version")}
-              className="w-full text-left bg-accent text-canvas text-sm font-medium px-4 py-3 rounded-md hover:bg-accent-strong transition-colors"
+              className="w-full text-left bg-accent text-on-accent text-sm font-medium px-4 py-3 rounded-md hover:bg-accent-strong transition-colors"
             >
               New version — group with the existing track
             </button>

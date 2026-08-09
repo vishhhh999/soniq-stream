@@ -366,7 +366,7 @@ export default function RecordModal({
                   <button
                     onClick={save}
                     disabled={saving}
-                    className="flex items-center gap-2 text-sm font-medium bg-accent text-canvas rounded-md px-5 py-2.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 text-sm font-medium bg-accent text-on-accent rounded-md px-5 py-2.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
                   >
                     <Save size={14} strokeWidth={2} />
                     {saving ? "Saving..." : "Save"}

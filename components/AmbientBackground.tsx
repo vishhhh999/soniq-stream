@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePlayer } from "./PlayerProvider";
 import { useAmbient } from "./AmbientProvider";
+import { useTheme } from "./ThemeProvider";
 import { gradientFromSeed, gradientFromImage, peekImageGradient } from "@/lib/gradient";
 
 type Gradient = { from: string; to: string };
@@ -30,6 +31,15 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
   const rafRef = useRef<number>();
   const { getFrequencyData, isPlaying, current, currentTime, crossfadingToTrack, preloadingTrack, crossfadeDuration } = usePlayer();
   const { enabled, colorStateRef } = useAmbient();
+  const { theme } = useTheme();
+  // Ref, not a direct closure value, because the draw loop's effect only
+  // re-runs on [enabled, isPlaying, getFrequencyData] (see its own comment
+  // about avoiding teardown-on-every-change) — reading theme via a ref lets
+  // a light/dark toggle take effect on the very next frame without forcing
+  // that whole effect (and its noise-pool setup, resize listener, etc.) to
+  // tear down and rebuild.
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
   const tRef = useRef(0);
 
   // The gradient the draw loop actually paints each frame is the result of
@@ -234,8 +244,17 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       if (isPlaying) {
         const freq = getFrequencyData();
         if (freq) {
-          const bassBins = freq.slice(0, 8);
-          const midBins = freq.slice(8, 40);
+          // fftSize is 256 (see PlayerProvider), giving 128 bins at
+          // ~172Hz/bin at a standard 44.1kHz sample rate. The old range
+          // (bins 0-8, i.e. 0-1378Hz) was actually capturing low-mids and
+          // kick transients, not bass — true sub-bass/bass sits in roughly
+          // 20-250Hz, which is only bins 0-1 at this resolution. Widened
+          // slightly to bins 0-2 (~0-516Hz) purely for signal stability —
+          // 1-2 raw bins are too noisy on their own to average meaningfully
+          // — while staying anchored to the actual bass range instead of
+          // drifting into low-mid/kick-transient territory like before.
+          const bassBins = freq.slice(0, 3);
+          const midBins = freq.slice(3, 24); // roughly 516Hz-4.1kHz, true mids
           bass = (bassBins.reduce((a, b) => a + b, 0) / bassBins.length / 255) * 0.9 + 0.1;
           mid = (midBins.reduce((a, b) => a + b, 0) / midBins.length / 255) * 0.7 + 0.08;
 
@@ -249,7 +268,12 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
           // a single sustained sound. Skipped for the first couple of
           // samples after a reset (bassHistory.length < 4) since an average
           // of 1-2 samples is too noisy to compare against meaningfully.
-          if (bassHistory.length >= 4 && bass > avgBass * 1.35 && bass > 0.3 && now - lastPulseTime > 180) {
+          // Threshold loosened (1.35x -> 1.2x avg, 0.3 -> 0.22 floor) and
+          // the reacted pulse strength increased below — true bass energy
+          // is generally lower-amplitude than the old wider band was
+          // reading, so the old thresholds were tuned for a signal that's
+          // no longer what's being measured.
+          if (bassHistory.length >= 4 && bass > avgBass * 1.2 && bass > 0.22 && now - lastPulseTime > 180) {
             pulse = 1;
             lastPulseTime = now;
           }
@@ -263,20 +287,44 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       // their own rAF loop the same way this component reads player state.
       colorStateRef.current = { from: displayed.from, to: displayed.to, pulse };
 
+      // Three blobs, positioned to actually spread left/center/right (the
+      // old x: 0.3 / 0.7 / 0.5 set put two of three in the left-center
+      // and only one on the right, reading as left-heavy) and vertically
+      // centered within the mask's now-centered 25%-75% visible band
+      // (previously all three sat at y: 1.05-1.15, i.e. below the
+      // viewport entirely, relying on radius bleed to reach up into a
+      // bottom-weighted mask — that stopped working once the mask became
+      // symmetric, which is why the color read as squeezed into the
+      // middle only). Color also rebalanced: two blobs used `from` and
+      // only one used `to` before, which visually favored `from`'s hue —
+      // now left/right anchor the two sampled colors and center blends
+      // both, so no single color visually dominates.
+      const blended = lerpHex(displayed.from, displayed.to, 0.5);
       const blobs = [
-        { x: w * 0.3 + Math.sin(t) * 60, y: h * (1.05 - bass * 0.1), r: w * (0.32 + pulse * 0.42 + bass * 0.05), color: displayed.from },
-        { x: w * 0.7 + Math.cos(t * 0.8) * 80, y: h * (1.1 - mid * 0.08), r: w * (0.28 + pulse * 0.24 + mid * 0.06), color: displayed.to },
-        { x: w * 0.5 + Math.sin(t * 1.3) * 50, y: h * 1.15, r: w * (0.38 + pulse * 0.3), color: displayed.from },
+        { x: w * 0.18 + Math.sin(t) * 60, y: h * (0.5 - bass * 0.08), r: w * (0.34 + pulse * 0.46 + bass * 0.08), color: displayed.from },
+        { x: w * 0.82 + Math.cos(t * 0.8) * 80, y: h * (0.5 - mid * 0.06), r: w * (0.3 + pulse * 0.26 + mid * 0.06), color: displayed.to },
+        { x: w * 0.5 + Math.sin(t * 1.3) * 70, y: h * (0.5 + Math.cos(t * 0.6) * 0.08), r: w * (0.4 + pulse * 0.34 + bass * 0.05), color: blended },
       ];
 
-      ctx.globalCompositeOperation = "screen";
+      // Blend mode is theme-aware, not fixed to "screen" — screen only
+      // brightens, so it did nothing against a light background and read
+      // as nearly invisible whenever the ambient color itself was dark
+      // (dark cover art on dark theme, or vice versa on light theme,
+      // exactly the cases flagged as "not prominent enough"). Multiply
+      // darkens instead, which is the correct direction against a light
+      // background — a colored blob needs to visibly deepen a light canvas
+      // the way it visibly brightens a dark one.
+      ctx.globalCompositeOperation = themeRef.current === "light" ? "multiply" : "screen";
       for (const b of blobs) {
         try {
           const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
           grad.addColorStop(0, b.color);
           grad.addColorStop(0.5, b.color + "88");
           grad.addColorStop(1, "transparent");
-          ctx.globalAlpha = 0.28 + pulse * 0.5;
+          // Floor raised (0.28 -> 0.42) — the ambient effect was reading
+          // as too subtle across the board, not just in the dark/light
+          // mismatch cases the blend-mode fix above addresses.
+          ctx.globalAlpha = 0.42 + pulse * 0.5;
           ctx.fillStyle = grad;
           ctx.beginPath();
           ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);

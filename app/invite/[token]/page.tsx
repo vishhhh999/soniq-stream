@@ -242,7 +242,7 @@ export default function InvitePage({ params }: { params: { token: string } }) {
       ) : joined ? (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
-            <Check size={18} strokeWidth={2} className="text-canvas" />
+            <Check size={18} strokeWidth={2} className="text-on-accent" />
           </div>
           <p className="text-primary text-sm font-medium">Added to your library. Redirecting...</p>
         </div>
@@ -331,7 +331,7 @@ export default function InvitePage({ params }: { params: { token: string } }) {
                   <div className="flex items-center gap-3 flex-wrap justify-center">
                     <button
                       onClick={() => toggle()}
-                      className="w-11 h-11 rounded-full bg-accent text-canvas flex items-center justify-center hover:bg-accent-strong transition-colors shrink-0"
+                      className="w-11 h-11 rounded-full bg-accent text-on-accent flex items-center justify-center hover:bg-accent-strong transition-colors shrink-0"
                     >
                       {playing ? (
                         <Pause size={18} strokeWidth={2} />
@@ -394,7 +394,7 @@ export default function InvitePage({ params }: { params: { token: string } }) {
                 {status === "unauthenticated" ? (
                   <button
                     onClick={accept}
-                    className="w-full flex items-center justify-center gap-2 bg-accent text-canvas text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors"
+                    className="w-full flex items-center justify-center gap-2 bg-accent text-on-accent text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors"
                   >
                     <LogIn size={15} strokeWidth={1.5} />
                     Sign in to add to your library
@@ -403,7 +403,7 @@ export default function InvitePage({ params }: { params: { token: string } }) {
                   <button
                     onClick={accept}
                     disabled={joining}
-                    className="w-full bg-accent text-canvas text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
+                    className="w-full bg-accent text-on-accent text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
                   >
                     {joining ? "Adding to library..." : "Accept invite"}
                   </button>

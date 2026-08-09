@@ -90,7 +90,7 @@ export default function MobilePlayerBar() {
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); toggle(); }}
-          className="w-11 h-11 rounded-full bg-accent text-canvas flex items-center justify-center shrink-0 -mr-1"
+          className="w-11 h-11 rounded-full bg-accent text-on-accent flex items-center justify-center shrink-0 -mr-1"
         >
           {isPlaying ? <Pause size={17} strokeWidth={2} /> : <Play size={17} strokeWidth={2} className="ml-0.5" />}
         </button>
@@ -153,7 +153,7 @@ export default function MobilePlayerBar() {
             <button onClick={previous} className="p-2 -m-2">
               <SkipBack size={26} strokeWidth={1.5} className={queue.length > 1 || currentTime > 3 ? "text-primary" : "text-tertiary"} />
             </button>
-            <button ref={expandedPlayButtonRef} onClick={toggle} className="w-16 h-16 rounded-full bg-accent text-canvas flex items-center justify-center shrink-0">
+            <button ref={expandedPlayButtonRef} onClick={toggle} className="w-16 h-16 rounded-full bg-accent text-on-accent flex items-center justify-center shrink-0">
               {isPlaying ? <Pause size={24} strokeWidth={2} /> : <Play size={24} strokeWidth={2} className="ml-1" />}
             </button>
             <button onClick={next} className="p-2 -m-2">

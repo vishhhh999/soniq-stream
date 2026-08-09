@@ -62,7 +62,7 @@ export default function LandingPage() {
           {isAuthed ? (
             <Link
               href="/"
-              className="text-sm font-medium bg-accent text-canvas px-4 py-2 rounded-md hover:bg-accent-strong transition-colors"
+              className="text-sm font-medium bg-accent text-on-accent px-4 py-2 rounded-md hover:bg-accent-strong transition-colors"
             >
               Go to your library
             </Link>
@@ -76,7 +76,7 @@ export default function LandingPage() {
               </Link>
               <Link
                 href="/setup"
-                className="text-sm font-medium bg-accent text-canvas px-4 py-2 rounded-md hover:bg-accent-strong transition-colors"
+                className="text-sm font-medium bg-accent text-on-accent px-4 py-2 rounded-md hover:bg-accent-strong transition-colors"
               >
                 Get started
               </Link>
@@ -109,7 +109,7 @@ export default function LandingPage() {
             {isAuthed ? (
               <Link
                 href="/"
-                className="text-sm font-medium bg-accent text-canvas px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
+                className="text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
               >
                 Go to your library
               </Link>
@@ -117,7 +117,7 @@ export default function LandingPage() {
               <>
                 <Link
                   href="/setup"
-                  className="text-sm font-medium bg-accent text-canvas px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
+                  className="text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
                 >
                   Create your library
                 </Link>
@@ -237,7 +237,7 @@ export default function LandingPage() {
         </h2>
         <Link
           href={isAuthed ? "/" : "/setup"}
-          className="inline-block mt-8 text-sm font-medium bg-accent text-canvas px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
+          className="inline-block mt-8 text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
         >
           {isAuthed ? "Go to your library" : "Create your library"}
         </Link>

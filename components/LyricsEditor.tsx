@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Play, Pause, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RotateCcw, Crosshair, X } from "lucide-react";
+import { Play, Pause, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RotateCcw, Crosshair, ArrowLeft } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
 import type { SyncedLine } from "@/lib/lyricsSync";
 
@@ -214,7 +214,7 @@ export default function LyricsEditor({
         <div className="flex items-center gap-3">
           <button
             onClick={tapLine}
-            className="flex-1 bg-accent text-canvas text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors"
+            className="flex-1 bg-accent text-on-accent text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors"
           >
             Tap when this line starts
           </button>
@@ -237,25 +237,32 @@ export default function LyricsEditor({
     // Rendered as its own wide overlay rather than inline inside
     // TrackDetail's ~400px sidebar column — a per-line list with a
     // timestamp, four icon buttons, and the line text was genuinely
-    // cramped in that width, with most lines truncating. z-[60] to sit
-    // above TrackDetail's own modal (z-50).
+    // Full-dialog takeover, not a floating popup — was previously capped
+    // at max-w-2xl and centered as its own overlay above TrackDetail,
+    // which still read as cramped for a per-line list with a timestamp
+    // plus 4 icon buttons per row. Now takes the full TrackDetail
+    // footprint (z-[60], same as before, still layers above TrackDetail's
+    // z-50) with a standard top-left back button instead of a corner X,
+    // matching the "own screen, back button to return" pattern used for
+    // this kind of drill-down elsewhere.
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center backdrop-ambient-60 backdrop-blur-sm px-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.97 }}
-          className="w-full max-w-2xl rounded-2xl border border-border bg-elevated p-4 sm:p-6 relative max-h-[85vh] flex flex-col"
+          className="w-full max-w-3xl rounded-2xl border border-border bg-elevated p-5 sm:p-8 relative max-h-[85vh] flex flex-col"
         >
           <button
             onClick={cancelReview}
-            className="absolute top-5 right-5 text-tertiary hover:text-primary transition-colors"
+            className="flex items-center gap-1.5 text-sm text-secondary hover:text-primary transition-colors shrink-0 -ml-1 mb-1 w-fit"
           >
-            <X size={18} strokeWidth={1.5} />
+            <ArrowLeft size={16} strokeWidth={1.5} />
+            Back
           </button>
 
-          <div className="flex items-center justify-between flex-wrap gap-3 pr-8 shrink-0">
-            <p className="text-sm font-medium text-primary">Review timing</p>
+          <div className="flex items-center justify-between flex-wrap gap-3 mt-3 shrink-0">
+            <p className="text-md font-medium text-primary">Review timing</p>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-tertiary mr-1">Shift all:</span>
               <button onClick={() => shiftAll(-1)} title="-1s" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors">
@@ -276,14 +283,15 @@ export default function LyricsEditor({
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1 mt-4">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-1 mt-5">
             {reviewLines.map((line, i) => (
               // Column on mobile — a timestamp + 4 icon buttons alone eat
               // almost the entire width of a phone screen, leaving no
               // room for the line text (the exact cramping this overlay
               // was built to fix in the first place). Row on wider
-              // screens, where there's actually space for both.
-              <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 text-sm py-2 sm:py-1 border-b border-border/50 sm:border-none">
+              // screens, where there's actually space for both — now with
+              // real room to breathe given the full-dialog width.
+              <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-sm py-2.5 sm:py-1.5 border-b border-border/50 sm:border-none">
                 <div className="flex items-center gap-2 sm:gap-1.5">
                   <span className="text-xs text-tertiary tabular-nums w-14 sm:w-16 shrink-0">{fmt(line.time)}</span>
                   <button onClick={() => nudgeLine(i, -0.1)} title="-0.1s" className="p-2 sm:p-1.5 rounded hover:bg-surface transition-colors shrink-0">
@@ -308,20 +316,20 @@ export default function LyricsEditor({
             <button
               onClick={saveReview}
               disabled={saving}
-              className="bg-accent text-canvas text-sm font-medium px-4 py-2 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
+              className="bg-accent text-on-accent text-sm font-medium px-5 py-2.5 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save timing"}
             </button>
             <button
               onClick={cancelReview}
-              className="text-sm text-secondary border border-border rounded-md px-4 py-2 hover:border-border-strong transition-colors"
+              className="text-sm text-secondary border border-border rounded-md px-5 py-2.5 hover:border-border-strong transition-colors"
             >
               Cancel
             </button>
             {current?.id === track.id && (
               <button
                 onClick={toggle}
-                className="ml-auto p-2 rounded-full border border-border hover:border-border-strong transition-colors"
+                className="ml-auto p-2.5 rounded-full border border-border hover:border-border-strong transition-colors"
                 title={isPlaying ? "Pause" : "Play"}
               >
                 {isPlaying ? <Pause size={13} strokeWidth={2} /> : <Play size={13} strokeWidth={2} />}
@@ -356,7 +364,7 @@ export default function LyricsEditor({
         <button
           onClick={startSync}
           disabled={!text.trim()}
-          className="flex items-center gap-2 text-sm bg-accent text-canvas rounded-md px-4 py-2 hover:bg-accent-strong transition-colors disabled:opacity-40"
+          className="flex items-center gap-2 text-sm bg-accent text-on-accent rounded-md px-4 py-2 hover:bg-accent-strong transition-colors disabled:opacity-40"
         >
           <Play size={13} strokeWidth={2} />
           {isSynced ? "Re-sync from scratch" : "Sync timing"}

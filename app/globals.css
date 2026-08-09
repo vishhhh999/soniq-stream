@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  /* LIGHT — light gray, not clinical white. */
+  /* LIGHT — light gray, not clinical white. Monochrome only, no color. */
   --bg-base: #eeeeee;
   --bg-surface: #f6f6f6;
   --bg-elevated: #ffffff;
@@ -14,15 +14,25 @@
   --text-secondary: #5c5c5c;
   --text-tertiary: #8f8f8f;
 
-  --accent: #161616;
-  --accent-strong: #000000;
+  /* ACCENT — the one deliberate color in an otherwise monochrome system.
+     Used narrowly: primary actions, active/selected states, toggles-on,
+     links. Deeper in light mode than dark so it holds contrast against
+     the lighter background instead of washing out. */
+  --accent: #e8650a;
+  --accent-strong: #c2530a;
+  /* Text/icon color placed ON TOP of --accent (buttons, active pills).
+     Was borrowed from --bg-base before accent became a real color — that
+     worked by coincidence when accent was just inverted monochrome, but
+     canvas (light gray/near-black) doesn't contrast against orange. Fixed
+     white reads correctly on this accent in both themes. */
+  --on-accent: #ffffff;
 
   --error: #d64545;
   --success: #3f8f5f;
 }
 
 .dark {
-  /* DARK — really dark gray, deliberately not pure black. */
+  /* DARK — really dark gray, deliberately not pure black. Monochrome only. */
   --bg-base: #121212;
   --bg-surface: #1a1a1a;
   --bg-elevated: #212121;
@@ -33,8 +43,8 @@
   --text-secondary: #a3a3a3;
   --text-tertiary: #6b6b6b;
 
-  --accent: #f2f2f2;
-  --accent-strong: #ffffff;
+  --accent: #ff8a3d;
+  --accent-strong: #ffa563;
 
   --error: #ff6b6b;
   --success: #6fcf97;

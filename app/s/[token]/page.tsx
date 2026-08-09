@@ -460,7 +460,7 @@ export default function SharePage({ params }: { params: { token: string } }) {
               <div className="flex items-center gap-3 mb-8 flex-wrap">
                 <button
                   onClick={() => toggle()}
-                  className="w-11 h-11 rounded-full bg-accent text-canvas flex items-center justify-center hover:bg-accent-strong transition-colors shrink-0"
+                  className="w-11 h-11 rounded-full bg-accent text-on-accent flex items-center justify-center hover:bg-accent-strong transition-colors shrink-0"
                 >
                   {playing ? (
                     <Pause size={18} strokeWidth={2} />

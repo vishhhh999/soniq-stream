@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, X as XIcon, Settings as SettingsIcon } from "lucide-react";
+import { Plus, Search, X as XIcon, Settings as SettingsIcon, Disc3 } from "lucide-react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import AddMenu from "@/components/AddMenu";
 import UploadDropZone from "@/components/UploadDropZone";
@@ -288,16 +288,18 @@ export default function LibraryHome() {
         </div>
 
         {filteredGroups.length === 0 ? (
-          <div className="border border-dashed border-border rounded-lg py-16 sm:py-24 text-center">
+          <div className="border border-dashed border-border rounded-lg py-16 sm:py-24 text-center flex flex-col items-center gap-3">
             {q ? (
               <>
+                <Search size={40} strokeWidth={1} className="text-tertiary" />
                 <p className="text-secondary text-base">No results for "{query}"</p>
-                <button onClick={() => setQuery("")} className="text-tertiary text-sm mt-2 hover:text-secondary transition-colors">Clear search</button>
+                <button onClick={() => setQuery("")} className="text-tertiary text-sm hover:text-secondary transition-colors">Clear search</button>
               </>
             ) : (
               <>
+                <Disc3 size={40} strokeWidth={1} className="text-tertiary" />
                 <p className="text-secondary text-base">Nothing here yet.</p>
-                <p className="text-tertiary text-sm mt-1">Add your first track to get started.</p>
+                <p className="text-tertiary text-sm">Add your first track to get started.</p>
               </>
             )}
           </div>

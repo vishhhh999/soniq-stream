@@ -128,7 +128,7 @@ export default function SetupPage() {
               <button
                 type="submit"
                 disabled={busy || !email || password.length < 8}
-                className="w-full bg-accent text-canvas text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
+                className="w-full bg-accent text-on-accent text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
               >
                 {busy ? "Sending code..." : "Continue"}
               </button>
@@ -183,7 +183,7 @@ export default function SetupPage() {
               <button
                 type="submit"
                 disabled={busy || code.length !== 6}
-                className="w-full bg-accent text-canvas text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
+                className="w-full bg-accent text-on-accent text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
               >
                 {busy ? "Verifying..." : "Verify"}
               </button>
@@ -220,7 +220,7 @@ export default function SetupPage() {
               <button
                 type="submit"
                 disabled={busy || username.length < 3}
-                className="w-full bg-accent text-canvas text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50 mb-3"
+                className="w-full bg-accent text-on-accent text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50 mb-3"
               >
                 {busy ? "Saving..." : "Set username"}
               </button>

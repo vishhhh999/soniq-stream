@@ -63,7 +63,7 @@ export default function CookieConsent() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={acknowledge}
-                  className="flex-1 bg-accent text-canvas text-xs font-medium py-2 rounded-md hover:bg-accent-strong transition-colors"
+                  className="flex-1 bg-accent text-on-accent text-xs font-medium py-2 rounded-md hover:bg-accent-strong transition-colors"
                 >
                   Got it
                 </button>
@@ -97,7 +97,7 @@ export default function CookieConsent() {
               </div>
               <button
                 onClick={acknowledge}
-                className="w-full bg-accent text-canvas text-xs font-medium py-2 rounded-md hover:bg-accent-strong transition-colors"
+                className="w-full bg-accent text-on-accent text-xs font-medium py-2 rounded-md hover:bg-accent-strong transition-colors"
               >
                 Done
               </button>

@@ -325,7 +325,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
             <button
               onClick={() => playQueue(groups.map((g) => g.latest), 0)}
               disabled={groups.length === 0}
-              className="flex items-center gap-1.5 text-sm font-medium bg-accent text-canvas px-4 py-2 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-40"
+              className="flex items-center gap-1.5 text-sm font-medium bg-accent text-on-accent px-4 py-2 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-40"
             >
               <Play size={13} strokeWidth={2} className="ml-0.5" />
               Play

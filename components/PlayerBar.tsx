@@ -195,7 +195,7 @@ export default function PlayerBar() {
             ref={playButtonRef}
             onClick={toggle}
             disabled={!current}
-            className="w-8 h-8 rounded-full bg-accent text-canvas flex items-center justify-center disabled:opacity-30 hover:bg-accent-strong transition-colors shrink-0"
+            className="w-8 h-8 rounded-full bg-accent text-on-accent flex items-center justify-center disabled:opacity-30 hover:bg-accent-strong transition-colors shrink-0"
           >
             {isPlaying ? <Pause size={14} strokeWidth={2} /> : <Play size={14} strokeWidth={2} className="ml-0.5" />}
           </button>

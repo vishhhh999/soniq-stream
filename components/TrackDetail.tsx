@@ -282,7 +282,7 @@ export default function TrackDetail({
         className="fixed inset-0 z-50 flex items-center justify-center px-4 pointer-events-none"
       >
         <div
-          className="bg-elevated border border-border rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col sm:flex-row pointer-events-auto shadow-2xl"
+          className="bg-elevated border border-border rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col sm:flex-row pointer-events-auto shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* LEFT PANEL — track identity */}
@@ -377,37 +377,40 @@ export default function TrackDetail({
               <div className="m-3 bg-surface rounded-xl overflow-hidden">
                 <Row icon={<Share2 size={15} strokeWidth={1.5} />} label="Share" open={openRow === "share"} onToggle={() => toggleRow("share")} rightHint={shareUrl ? "Active" : "Private"}>
                   {!shareUrl ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {EXPIRY_OPTIONS.map((opt) => (
-                          <button
-                            key={opt.value}
-                            onClick={() => setExpiryDays(opt.value)}
-                            className={`text-xs px-2.5 py-1.5 rounded-full border transition-colors ${expiryDays === opt.value ? "border-accent text-accent" : "border-border text-secondary hover:border-border-strong"}`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-xs text-tertiary mb-2">Link expires after</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {EXPIRY_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              onClick={() => setExpiryDays(opt.value)}
+                              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${expiryDays === opt.value ? "border-accent text-accent" : "border-border text-secondary hover:border-border-strong"}`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer w-fit">
-                        <input type="checkbox" checked={allowDownload} onChange={(e) => setAllowDownload(e.target.checked)} className="accent-[var(--accent)]" />
+                      <label className="flex items-center gap-2.5 text-sm text-secondary cursor-pointer w-fit">
+                        <input type="checkbox" checked={allowDownload} onChange={(e) => setAllowDownload(e.target.checked)} className="accent-[var(--accent)] w-4 h-4" />
                         Allow download
                       </label>
-                      <button onClick={createShare} className="flex items-center gap-2 text-sm text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong hover:text-primary transition-colors">
+                      <button onClick={createShare} className="flex items-center gap-2 text-sm text-secondary border border-border rounded-md px-4 py-2 hover:border-border-strong hover:text-primary transition-colors">
                         <Link2 size={13} strokeWidth={1.5} /> Generate link
                       </button>
                       {shareError && <p className="text-xs text-error">{shareError}</p>}
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       <div className="flex items-center gap-2">
-                        <input readOnly value={shareUrl} className="flex-1 bg-canvas border border-border rounded-md px-3 py-2 text-xs text-secondary" />
-                        <button onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:border-border-strong shrink-0">
+                        <input readOnly value={shareUrl} className="flex-1 bg-canvas border border-border rounded-md px-3 py-2.5 text-xs text-secondary" />
+                        <button onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="w-9 h-9 flex items-center justify-center rounded-md border border-border hover:border-border-strong shrink-0">
                           {copied ? <Check size={13} className="text-accent" /> : <Link2 size={13} className="text-secondary" />}
                         </button>
                       </div>
-                      <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer w-fit">
-                        <input type="checkbox" checked={allowDownload} onChange={(e) => toggleShareDownload(e.target.checked)} className="accent-[var(--accent)]" />
+                      <label className="flex items-center gap-2.5 text-sm text-secondary cursor-pointer w-fit">
+                        <input type="checkbox" checked={allowDownload} onChange={(e) => toggleShareDownload(e.target.checked)} className="accent-[var(--accent)] w-4 h-4" />
                         Allow download
                       </label>
                       {shareError && <p className="text-xs text-error">{shareError}</p>}
@@ -418,10 +421,10 @@ export default function TrackDetail({
                       ) : (
                         <div className="flex items-center gap-2 text-xs flex-wrap">
                           <span className="text-secondary">Deactivate this link? It'll stop working immediately.</span>
-                          <button onClick={revokeShare} className="text-error border border-error/40 rounded-md px-2.5 py-1 hover:bg-error/10 transition-colors">
+                          <button onClick={revokeShare} className="text-error border border-error/40 rounded-md px-3 py-1.5 hover:bg-error/10 transition-colors">
                             Yes, deactivate
                           </button>
-                          <button onClick={() => setConfirmingRevoke(false)} className="text-secondary border border-border rounded-md px-2.5 py-1 hover:border-border-strong transition-colors">
+                          <button onClick={() => setConfirmingRevoke(false)} className="text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong transition-colors">
                             Never mind
                           </button>
                         </div>

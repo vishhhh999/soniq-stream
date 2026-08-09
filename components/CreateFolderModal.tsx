@@ -38,7 +38,7 @@ export default function CreateFolderModal({
           <div className="flex items-center gap-3">
             <button
               onClick={onConfirm}
-              className="flex-1 bg-accent text-canvas text-sm font-medium py-2.5 rounded-md hover:bg-accent-strong transition-colors"
+              className="flex-1 bg-accent text-on-accent text-sm font-medium py-2.5 rounded-md hover:bg-accent-strong transition-colors"
             >
               Create folder
             </button>

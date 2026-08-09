@@ -56,7 +56,7 @@ export default function AddMenu({
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
-        className="flex items-center gap-2 text-sm font-medium bg-accent text-canvas px-4 py-2 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
+        className="flex items-center gap-2 text-sm font-medium bg-accent text-on-accent px-4 py-2 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
       >
         <Plus size={16} strokeWidth={2} />
         {busy ? label : labelProp}

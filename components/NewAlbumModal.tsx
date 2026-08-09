@@ -140,7 +140,7 @@ export default function NewAlbumModal({ onClose, onCreated }: { onClose: () => v
           <button
             onClick={error ? (albumCreated ? onCreated : submit) : submit}
             disabled={!name.trim() || busy}
-            className="w-full bg-accent text-canvas text-sm font-medium py-2.5 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
+            className="w-full bg-accent text-on-accent text-sm font-medium py-2.5 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
           >
             {busy ? "Creating..." : error ? (albumCreated ? "Continue without cover" : "Try again") : "Create album"}
           </button>

@@ -52,7 +52,7 @@ export default function ContactPage() {
         {sent ? (
           <div className="flex items-start gap-3 border border-border rounded-lg p-5">
             <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center shrink-0">
-              <Check size={15} strokeWidth={2} className="text-canvas" />
+              <Check size={15} strokeWidth={2} className="text-on-accent" />
             </div>
             <div>
               <p className="text-sm font-medium text-primary">Sent.</p>
@@ -96,7 +96,7 @@ export default function ContactPage() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full bg-accent text-canvas text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
+              className="w-full bg-accent text-on-accent text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
             >
               {busy ? "Sending..." : "Send message"}
             </button>
