@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { albums, albumMembers, users, inviteLinks } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -33,11 +33,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       ? await db
           .select({ id: users.id, username: users.username, avatarUrl: users.avatarUrl })
           .from(users)
-          .where(
-            memberUserIds.length === 1
-              ? eq(users.id, memberUserIds[0])
-              : (users.id as any).in(memberUserIds)
-          )
+          .where(inArray(users.id, memberUserIds))
       : [];
   const userMap = new Map(memberUsers.map((u) => [u.id, u]));
 
