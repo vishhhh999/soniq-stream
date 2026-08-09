@@ -9,6 +9,7 @@ import AuthedPlayerShell from "@/components/AuthedPlayerShell";
 import GoogleLinkToast from "@/components/GoogleLinkToast";
 import PlayTracker from "@/components/PlayTracker";
 import InstallPrompt from "@/components/InstallPrompt";
+import CookieConsent from "@/components/CookieConsent";
 
 const interTight = Inter_Tight({ subsets: ["latin"], variable: "--font-inter-tight" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-display" });
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <GoogleLinkToast />
                 <PlayTracker />
                 <InstallPrompt />
+                <CookieConsent />
                 <div className="relative z-10 min-h-[calc(100vh-6rem)] pb-24">{children}</div>
               </PlayerProvider>
             </AmbientProvider>

@@ -12,6 +12,10 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const { pathname } = nextUrl;
       const publicPaths = [
+        /^\/$/,                // landing page for logged-out visitors — app/page.tsx
+                                // itself checks auth and renders the real
+                                // library instead once signed in, so this
+                                // doesn't expose anything.
         /^\/login$/,
         /^\/setup$/,
         /^\/api\/setup$/,
@@ -19,6 +23,11 @@ export const authConfig = {
         /^\/api\/share\//,
         /^\/invite\//,         // invite acceptance pages
         /^\/api\/invite\//,    // invite preview API (GET, no auth needed)
+        /^\/terms$/,
+        /^\/privacy$/,
+        /^\/cookies$/,
+        /^\/contact$/,
+        /^\/api\/contact$/,
         /^\/api\/auth\//, // NextAuth's own routes: signin, callback, session, csrf, signout
       ];
       if (publicPaths.some((re) => re.test(pathname))) return true;
