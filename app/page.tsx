@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, Search, X as XIcon, Settings as SettingsIcon } from "lucide-react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -51,26 +51,55 @@ export default function Home() {
     return () => window.removeEventListener("soniq:track-deleted", onDeleted);
   }, []);
 
-  const unsorted = tracks.filter((t: any) => !t.albumId);
-  const groups = groupVersions(unsorted as any);
-  const countInAlbum = (albumId: string) => tracks.filter((t: any) => t.albumId === albumId).length;
-  const albumNameById = new Map(albums.map((a) => [a.id, a.name]));
+  // Previously none of this was memoized — tracks.filter(), groupVersions(),
+  // and the album-name/count lookups all re-ran on EVERY render, including
+  // every single keystroke while typing in the search box (which re-filters
+  // the entire track list from scratch on each character) and any unrelated
+  // re-render for any other reason. For a library of any real size this is
+  // the difference between search feeling instant and feeling laggy.
+  // useMemo keys these to their actual inputs so they only redo the work
+  // when tracks/albums/query genuinely change.
+  const unsorted = useMemo(() => tracks.filter((t: any) => !t.albumId), [tracks]);
+  const groups = useMemo(() => groupVersions(unsorted as any), [unsorted]);
+
+  // Was previously a plain function re-scanning the full track list per
+  // album card on every render (O(albums × tracks) every time) — now a
+  // single O(tracks) pass builds a count map once per tracks change, and
+  // each card just does an O(1) lookup.
+  const albumTrackCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of tracks as any[]) {
+      if (t.albumId) counts.set(t.albumId, (counts.get(t.albumId) ?? 0) + 1);
+    }
+    return counts;
+  }, [tracks]);
+  const countInAlbum = (albumId: string) => albumTrackCounts.get(albumId) ?? 0;
+
+  const albumNameById = useMemo(() => new Map(albums.map((a) => [a.id, a.name])), [albums]);
 
   const q = query.trim().toLowerCase();
   // Search runs against ALL tracks, not just unsorted ones — previously
   // this filtered `groups` (already scoped to unsorted-only), so any
   // track sitting inside an album was never searchable at all. When not
   // searching, the normal Albums-grid + Unsorted-list view is unchanged.
-  const searchMatches = q
-    ? tracks.filter(
-        (t: any) =>
-          t.title.toLowerCase().includes(q) || (t.artist || "").toLowerCase().includes(q)
-      )
-    : [];
-  const filteredGroups = q ? groupVersions(searchMatches as any) : groups;
-  const filteredAlbums = q
-    ? albums.filter((a) => a.name.toLowerCase().includes(q))
-    : albums;
+  const searchMatches = useMemo(
+    () =>
+      q
+        ? tracks.filter(
+            (t: any) =>
+              t.title.toLowerCase().includes(q) || (t.artist || "").toLowerCase().includes(q)
+          )
+        : [],
+    [q, tracks]
+  );
+  const filteredGroups = useMemo(
+    () => (q ? groupVersions(searchMatches as any) : groups),
+    [q, searchMatches, groups]
+  );
+  const filteredAlbums = useMemo(
+    () => (q ? albums.filter((a) => a.name.toLowerCase().includes(q)) : albums),
+    [q, albums]
+  );
 
   const clearSelection = () => {
     setSelectedIds(new Set());

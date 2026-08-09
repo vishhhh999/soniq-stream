@@ -11,7 +11,16 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
   const { getFrequencyData, isPlaying, current } = usePlayer();
   const { enabled } = useAmbient();
   const tRef = useRef(0);
-  const [colors, setColors] = useState<{ from: string; to: string }>({ from: "#888888", to: "#444444" });
+  // Read by the draw loop every frame — a ref rather than state because
+  // nothing in this component's JSX depends on it, and using state here
+  // was causing two problems: an unnecessary re-render of the whole
+  // component on every color change, and (worse) the main animation
+  // effect below had `colors` in its dependency array, so every track
+  // change tore down and rebuilt the entire canvas loop — RAF, resize
+  // listener, noise tile, and the beat-detection rolling average all
+  // reset — causing a visible stutter right as a new track started,
+  // exactly when the pulse effect should feel most alive.
+  const colorsRef = useRef<{ from: string; to: string }>({ from: "#888888", to: "#444444" });
 
   // Resolve the gradient once per track (not per frame) — deterministic from
   // the track's own id when no cover art, or sampled from the album cover
@@ -19,12 +28,11 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
   useEffect(() => {
     if (!current) return;
     let cancelled = false;
-    const seedGradient = gradientFromSeed(current.id);
-    setColors(seedGradient); // immediate fallback while image sampling (if any) runs
+    colorsRef.current = gradientFromSeed(current.id); // immediate fallback while image sampling (if any) runs
 
     if (current.albumCoverUrl) {
       gradientFromImage(current.albumCoverUrl).then((imgGradient) => {
-        if (!cancelled && imgGradient) setColors(imgGradient);
+        if (!cancelled && imgGradient) colorsRef.current = imgGradient;
       });
     }
     return () => {
@@ -50,7 +58,12 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
     resize();
     window.addEventListener("resize", resize);
 
-    let noiseTile: HTMLCanvasElement | null = null;
+    // Previously rebuilt a fresh 128x128 tile (16,384 Math.random() pixels)
+    // from scratch every 6 frames — a real, continuous CPU cost since this
+    // runs on essentially every page regardless of whether music is even
+    // playing. A small pre-generated pool cycled through instead keeps the
+    // same film-grain flicker look at a fraction of the cost.
+    const NOISE_POOL_SIZE = 4;
     const buildNoiseTile = () => {
       const tile = document.createElement("canvas");
       tile.width = 128;
@@ -67,7 +80,8 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       tctx.putImageData(imgData, 0, 0);
       return tile;
     };
-    noiseTile = buildNoiseTile();
+    const noisePool = Array.from({ length: NOISE_POOL_SIZE }, buildNoiseTile);
+    let noiseIndex = 0;
     let noiseAge = 0;
 
     // Beat-onset detection: track a rolling average of bass energy and treat
@@ -116,9 +130,9 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       pulse *= 0.87; // decay — fades to near-zero within ~250-300ms
 
       const blobs = [
-        { x: w * 0.3 + Math.sin(t) * 60, y: h * (1.05 - bass * 0.1), r: w * (0.32 + pulse * 0.22 + bass * 0.05), color: colors.from },
-        { x: w * 0.7 + Math.cos(t * 0.8) * 80, y: h * (1.1 - mid * 0.08), r: w * (0.28 + pulse * 0.12 + mid * 0.06), color: colors.to },
-        { x: w * 0.5 + Math.sin(t * 1.3) * 50, y: h * 1.15, r: w * (0.38 + pulse * 0.15), color: colors.from },
+        { x: w * 0.3 + Math.sin(t) * 60, y: h * (1.05 - bass * 0.1), r: w * (0.32 + pulse * 0.22 + bass * 0.05), color: colorsRef.current.from },
+        { x: w * 0.7 + Math.cos(t * 0.8) * 80, y: h * (1.1 - mid * 0.08), r: w * (0.28 + pulse * 0.12 + mid * 0.06), color: colorsRef.current.to },
+        { x: w * 0.5 + Math.sin(t * 1.3) * 50, y: h * 1.15, r: w * (0.38 + pulse * 0.15), color: colorsRef.current.from },
       ];
 
       ctx.globalCompositeOperation = "screen";
@@ -142,15 +156,13 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
 
       noiseAge++;
       if (noiseAge > 6) {
-        noiseTile = buildNoiseTile();
+        noiseIndex = (noiseIndex + 1) % noisePool.length;
         noiseAge = 0;
       }
-      if (noiseTile) {
-        const pattern = ctx.createPattern(noiseTile, "repeat");
-        if (pattern) {
-          ctx.fillStyle = pattern;
-          ctx.fillRect(0, 0, w, h);
-        }
+      const pattern = ctx.createPattern(noisePool[noiseIndex], "repeat");
+      if (pattern) {
+        ctx.fillStyle = pattern;
+        ctx.fillRect(0, 0, w, h);
       }
 
       rafRef.current = requestAnimationFrame(draw);
@@ -161,7 +173,7 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       window.removeEventListener("resize", resize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [enabled, isPlaying, getFrequencyData, colors]);
+  }, [enabled, isPlaying, getFrequencyData]);
 
   if (!enabled) return null;
 

@@ -44,7 +44,16 @@ export function gradientFromSeed(seed: string): { from: string; to: string } {
 // Extracts two dominant-ish colors from an image by sampling pixels on a
 // downscaled canvas — cheap, runs client-side, no extra dependency. Not a
 // true clustering algorithm, but good enough for an ambient backdrop.
+//
+// Cached by URL: previously every track change re-fetched and re-decoded
+// the cover image from scratch, even for a track replayed later in the
+// same session, or every track in an album sharing one cover — wasted
+// network + canvas work for a result that's 100% deterministic per URL.
+const imageGradientCache = new Map<string, { from: string; to: string } | null>();
+
 export async function gradientFromImage(imageUrl: string): Promise<{ from: string; to: string } | null> {
+  if (imageGradientCache.has(imageUrl)) return imageGradientCache.get(imageUrl)!;
+
   try {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -74,12 +83,17 @@ export async function gradientFromImage(imageUrl: string): Promise<{ from: strin
         r2 += data[i]; g2 += data[i + 1]; b2 += data[i + 2]; n2++;
       }
     }
-    return {
+    const result = {
       from: rgbToHex(r1 / n1, g1 / n1, b1 / n1),
       to: rgbToHex(r2 / n2, g2 / n2, b2 / n2),
     };
+    imageGradientCache.set(imageUrl, result);
+    return result;
   } catch {
-    // CORS-blocked or failed to load — caller falls back to gradientFromSeed
+    // CORS-blocked or failed to load — caller falls back to gradientFromSeed.
+    // Cache the miss too so a broken/blocked URL doesn't get retried on
+    // every single track change for the rest of the session.
+    imageGradientCache.set(imageUrl, null);
     return null;
   }
 }

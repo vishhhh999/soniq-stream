@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Disc3, Pencil, Share2, ImagePlus, Trash2, Play, Shuffle, MoreHorizontal, BarChart3, ListPlus, Download } from "lucide-react";
@@ -118,7 +118,9 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
     load();
   };
 
-  const groups = groupVersions(tracks as any);
+  // Same fix as the homepage — was recomputing on every render regardless
+  // of whether `tracks` actually changed.
+  const groups = useMemo(() => groupVersions(tracks as any), [tracks]);
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
