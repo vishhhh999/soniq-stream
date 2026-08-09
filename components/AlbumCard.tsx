@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Disc3 } from "lucide-react";
 
-export type Album = { id: string; name: string; coverUrl: string | null };
+export type Album = { id: string; name: string; coverUrl: string | null; sharedFromAlbumId?: string | null };
 
 // Both a drag source (drop this album onto another to create a folder) and
 // a drop target (drop a track onto it to add that track to this album).

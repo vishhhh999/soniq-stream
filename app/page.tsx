@@ -239,7 +239,7 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05, duration: 0.35 }}
               >
-                <AlbumCard album={a} trackCount={countInAlbum(a.id)} dragDisabled={isMobile} />
+                <AlbumCard album={a} trackCount={countInAlbum(a.id)} dragDisabled={isMobile || !!a.sharedFromAlbumId} />
               </motion.div>
             ))}
           </div>

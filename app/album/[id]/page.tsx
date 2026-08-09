@@ -356,26 +356,31 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
               </button>
             )}
 
-            {/* Delete — owner only */}
-            {!isReadOnly && (!confirmingDelete ? (
+            {/* Delete (owner) / Remove from library (receiver) — receivers
+                used to have no way to get a shared album out of their own
+                library at all, since this whole block only rendered for
+                the owner. Now shows a distinct action either way. */}
+            {!confirmingDelete ? (
               <button
                 onClick={() => setConfirmingDelete(true)}
                 className="flex items-center gap-1.5 text-sm text-error border border-error/40 rounded-md px-3 py-2 hover:bg-error/10 transition-colors"
               >
                 <Trash2 size={15} strokeWidth={1.5} />
-                <span className="hidden sm:inline">Delete</span>
+                <span className="hidden sm:inline">{isReadOnly ? "Remove from library" : "Delete"}</span>
               </button>
             ) : (
               <div className="flex items-center gap-2 text-xs flex-wrap">
-                <span className="text-secondary hidden sm:inline">Delete album? Tracks move to Unsorted.</span>
+                <span className="text-secondary hidden sm:inline">
+                  {isReadOnly ? "Remove this album from your library?" : "Delete album? Tracks move to Unsorted."}
+                </span>
                 <button onClick={handleDeleteAlbum} className="text-error border border-error/40 rounded-md px-3 py-1.5 hover:bg-error/10 transition-colors">
-                  Yes, delete
+                  {isReadOnly ? "Yes, remove" : "Yes, delete"}
                 </button>
                 <button onClick={() => setConfirmingDelete(false)} className="text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong transition-colors">
                   Cancel
                 </button>
               </div>
-            ))}
+            )}
 
             {!isReadOnly && <UploadButton onUploaded={load} albumId={params.id} label="Add tracks" />}
 
