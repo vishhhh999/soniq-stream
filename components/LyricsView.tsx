@@ -21,17 +21,14 @@ export default function LyricsView({ track, onClose }: { track: Track; onClose: 
   useEffect(() => {
     setLoading(true);
     fetch(`/api/tracks/${track.id}`)
-      .then((r) => r.json())
-      .then((full) => {
+      .then(r => r.json())
+      .then(full => {
         if (Array.isArray(full.lyricsSynced) && full.lyricsSynced.length > 0) {
-          setLines(full.lyricsSynced);
-          setRawText(null);
+          setLines(full.lyricsSynced); setRawText(null);
         } else if (full.lyrics) {
-          setLines(null);
-          setRawText(full.lyrics);
+          setLines(null); setRawText(full.lyrics);
         } else {
-          setLines(null);
-          setRawText(null);
+          setLines(null); setRawText(null);
         }
       })
       .finally(() => setLoading(false));
@@ -45,48 +42,49 @@ export default function LyricsView({ track, onClose }: { track: Track; onClose: 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-40 flex flex-col overflow-hidden"
+        // bg-canvas is the solid base — without it the page bleeds through.
+        // AmbientBackground (scoped) layers the reactive gradient on top.
+        // Content sits at z-10 above both.
+        className="fixed inset-0 z-40 bg-canvas overflow-hidden"
       >
-        {/* Reactive ambient gradient — same one as the main library page,
-            scoped inside this fullscreen overlay so it fills the lyrics view. */}
         <AmbientBackground scoped />
-        {/* Dark overlay so lyrics remain readable against the gradient. */}
-        <div className="absolute inset-0 bg-canvas/75 z-0" />
-        <div className="relative z-10 flex flex-col h-full">
-        <div className="flex items-center justify-between px-8 py-6 shrink-0">
-          <div>
-            <p className="text-lg font-medium text-primary">{track.title}</p>
-            <p className="text-sm text-secondary">{track.artist || "Unknown"}</p>
-          </div>
-          <button onClick={onClose} className="text-tertiary hover:text-primary transition-colors">
-            <X size={22} strokeWidth={1.5} />
-          </button>
-        </div>
 
-        <div className="flex-1 min-h-0 px-8 pb-8">
-          {loading ? (
-            <p className="text-secondary text-base text-center mt-24">Loading...</p>
-          ) : lines && lines.length > 0 ? (
-            <div className="max-w-2xl mx-auto h-full">
-              <SyncedLyricsList lines={lines} currentTime={currentTime} variant="fullscreen" />
+        {/* Content layer — needs to be above the ambient canvas */}
+        <div className="relative z-10 flex flex-col h-full">
+          <div className="flex items-center justify-between px-8 py-6 shrink-0">
+            <div>
+              <p className="text-lg font-medium text-primary">{track.title}</p>
+              <p className="text-sm text-secondary">{track.artist || "Unknown"}</p>
             </div>
-          ) : rawText ? (
-            <div className="max-w-2xl mx-auto py-24 text-center overflow-y-auto no-scrollbar h-full">
-              <p className="text-secondary text-base mb-6">
-                Lyrics haven&apos;t been synced to timing yet — showing plain text.
-              </p>
-              <div className="text-primary text-lg leading-relaxed whitespace-pre-line">{rawText}</div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <p className="text-secondary text-base mb-2">No lyrics added yet.</p>
-              <p className="text-tertiary text-sm flex items-center gap-1.5">
-                <Pencil size={13} strokeWidth={1.5} />
-                Add them from the track panel.
-              </p>
-            </div>
-          )}
-        </div>
+            <button onClick={onClose} className="text-tertiary hover:text-primary transition-colors">
+              <X size={22} strokeWidth={1.5} />
+            </button>
+          </div>
+
+          <div className="flex-1 min-h-0 px-8 pb-8">
+            {loading ? (
+              <p className="text-secondary text-base text-center mt-24">Loading...</p>
+            ) : lines && lines.length > 0 ? (
+              <div className="max-w-2xl mx-auto h-full">
+                <SyncedLyricsList lines={lines} currentTime={currentTime} variant="fullscreen" />
+              </div>
+            ) : rawText ? (
+              <div className="max-w-2xl mx-auto py-24 text-center overflow-y-auto no-scrollbar h-full">
+                <p className="text-secondary text-base mb-6">
+                  Lyrics haven&apos;t been synced to timing yet — showing plain text.
+                </p>
+                <div className="text-primary text-lg leading-relaxed whitespace-pre-line">{rawText}</div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <p className="text-secondary text-base mb-2">No lyrics added yet.</p>
+                <p className="text-tertiary text-sm flex items-center gap-1.5">
+                  <Pencil size={13} strokeWidth={1.5} />
+                  Add them from the track panel.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
     </AnimatePresence>
