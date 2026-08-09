@@ -164,6 +164,40 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Pricing */}
+      <section className="border-t border-border">
+        <div className="max-w-3xl mx-auto px-6 py-20 sm:py-28">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl sm:text-3xl font-display font-bold text-primary tracking-tight">
+              Simple pricing.
+            </h2>
+            <p className="text-secondary text-base mt-3 max-w-md mx-auto">
+              Start free. Upgrade when your library outgrows it.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="border border-border rounded-xl p-6">
+              <p className="text-xs uppercase tracking-wide text-tertiary mb-2">Free</p>
+              <p className="text-3xl font-display font-bold text-primary">$0</p>
+              <p className="text-sm text-secondary mt-3 leading-relaxed">
+                500MB of storage — everything else in SONIQ, no feature limits.
+                Enough to get a real feel for it.
+              </p>
+            </div>
+            <div className="border border-accent rounded-xl p-6 relative">
+              <p className="text-xs uppercase tracking-wide text-accent mb-2">Pro</p>
+              <p className="text-3xl font-display font-bold text-primary">
+                $5<span className="text-base font-normal text-secondary">/mo</span>
+              </p>
+              <p className="text-sm text-secondary mt-3 leading-relaxed">
+                Unlimited storage. Or $40/year instead — that's 4 months free
+                compared to paying monthly.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className="max-w-3xl mx-auto px-6 py-20 sm:py-28 text-center">
         <Music2 size={28} strokeWidth={1.2} className="text-accent mx-auto mb-6" />

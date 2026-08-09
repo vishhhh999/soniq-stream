@@ -39,6 +39,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
     storageCapBytes: number | null;
   } | null>(null);
   const [upgrading, setUpgrading] = useState(false);
+  const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">("monthly");
   const [cancelling, setCancelling] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
@@ -88,7 +89,11 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
     try {
       const [scriptLoaded, res] = await Promise.all([
         loadRazorpayScript(),
-        fetch("/api/billing/checkout", { method: "POST" }),
+        fetch("/api/billing/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ interval: billingInterval }),
+        }),
       ]);
       if (!scriptLoaded) throw new Error("Could not load the payment form. Check your connection and try again.");
       const data = await res.json();
@@ -98,13 +103,25 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         key: data.keyId,
         subscription_id: data.subscriptionId,
         name: "SONIQ",
-        description: "SONIQ Pro — unlimited storage",
+        description: billingInterval === "yearly" ? "SONIQ Pro — yearly" : "SONIQ Pro — monthly",
         theme: { color: "#f2f2f2" },
-        // Fires once the customer completes the authorization payment.
-        // The webhook is still the source of truth for subscriptionStatus
-        // (it can arrive slightly before or after this handler does), so
-        // this just refetches rather than optimistically marking paid.
-        handler: () => {
+        // Verifies the signature server-side and, if genuine, flips the UI
+        // to Pro immediately — the webhook (subscription.activated) is
+        // still the actual source of truth and will independently confirm
+        // this moments later, this just closes the gap so the user isn't
+        // staring at "Free" for a few seconds after paying.
+        handler: async (response: any) => {
+          try {
+            const verifyRes = await fetch("/api/billing/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(response),
+            });
+            if (!verifyRes.ok) throw new Error();
+          } catch {
+            // Non-fatal — the webhook will still land shortly and correct
+            // the status regardless of whether this optimistic step worked.
+          }
           setUpgrading(false);
           refetchMe();
         },
@@ -342,18 +359,34 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                   </button>
                 )
               ) : (
-                <button
-                  onClick={startUpgrade}
-                  disabled={upgrading}
-                  className="text-xs font-medium text-canvas bg-accent rounded-md px-3 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
-                >
-                  {/* Price shown here is whatever's set on the Razorpay
-                      Plan (RAZORPAY_PLAN_ID) — this label is just a
-                      generic prompt so it never drifts out of sync with
-                      the real price, which lives in the Razorpay
-                      dashboard, not this codebase. */}
-                  {upgrading ? "Opening checkout..." : "Upgrade to Pro"}
-                </button>
+                <div className="space-y-2.5">
+                  {/* Monthly/yearly — actual prices live on the Razorpay
+                      Plans (RAZORPAY_PLAN_ID_MONTHLY / _YEARLY), these
+                      labels are just the marketing framing kept in sync
+                      manually. Update both together if pricing changes. */}
+                  <div className="flex gap-1.5 p-0.5 bg-surface rounded-md w-fit">
+                    <button
+                      onClick={() => setBillingInterval("monthly")}
+                      className={`text-xs px-3 py-1.5 rounded transition-colors ${billingInterval === "monthly" ? "bg-canvas text-primary" : "text-secondary hover:text-primary"}`}
+                    >
+                      Monthly — $5/mo
+                    </button>
+                    <button
+                      onClick={() => setBillingInterval("yearly")}
+                      className={`text-xs px-3 py-1.5 rounded transition-colors ${billingInterval === "yearly" ? "bg-canvas text-primary" : "text-secondary hover:text-primary"}`}
+                    >
+                      Yearly — $40/yr
+                      <span className="ml-1.5 text-[10px] text-accent">4 months free</span>
+                    </button>
+                  </div>
+                  <button
+                    onClick={startUpgrade}
+                    disabled={upgrading}
+                    className="text-xs font-medium text-canvas bg-accent rounded-md px-3 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
+                  >
+                    {upgrading ? "Opening checkout..." : "Upgrade to Pro"}
+                  </button>
+                </div>
               )}
             </div>
 

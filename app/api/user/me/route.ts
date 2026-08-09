@@ -27,7 +27,7 @@ export async function GET() {
 
   if (!user) return NextResponse.json({ error: "User not found." }, { status: 404 });
 
-  const isPaid = isPaidStatus(user.subscriptionStatus);
+  const isPaid = isPaidStatus(user.subscriptionStatus, user.subscriptionPeriodEnd);
   const storageUsedBytes = await getStorageUsedBytes(userId);
 
   return NextResponse.json({

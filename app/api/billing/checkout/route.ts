@@ -7,17 +7,23 @@ import { getRazorpay } from "@/lib/razorpay";
 
 export const dynamic = "force-dynamic";
 
-// Requires RAZORPAY_PLAN_ID — the Plan created in the Razorpay dashboard
-// (Subscriptions -> Plans). Unlike Stripe there's no hosted checkout page:
-// this creates a Subscription object server-side and returns its id, then
-// the frontend opens Razorpay's own checkout.js modal against that id to
-// actually collect payment.
-export async function POST(_req: NextRequest) {
+// Requires RAZORPAY_PLAN_ID_MONTHLY and RAZORPAY_PLAN_ID_YEARLY — two
+// separate Plans created in the Razorpay dashboard (Subscriptions ->
+// Plans), one per billing interval. Body: { interval: "monthly" | "yearly" }.
+//
+// Unlike Stripe there's no hosted checkout page: this creates a
+// Subscription object server-side and returns its id, then the frontend
+// opens Razorpay's own checkout.js modal against that id to actually
+// collect payment.
+export async function POST(req: NextRequest) {
   const session = await auth();
   const userId = session?.user && (session.user as any).id;
   if (!userId) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
 
-  const planId = process.env.RAZORPAY_PLAN_ID;
+  const body = await req.json().catch(() => ({}));
+  const interval = body?.interval === "yearly" ? "yearly" : "monthly";
+
+  const planId = interval === "yearly" ? process.env.RAZORPAY_PLAN_ID_YEARLY : process.env.RAZORPAY_PLAN_ID_MONTHLY;
   const keyId = process.env.RAZORPAY_KEY_ID;
   if (!planId || !keyId) return NextResponse.json({ error: "Billing is not configured yet." }, { status: 500 });
 
@@ -30,15 +36,16 @@ export async function POST(_req: NextRequest) {
     const subscription = await razorpay.subscriptions.create({
       plan_id: planId,
       // Razorpay requires a finite number of billing cycles up front —
-      // there's no literal "until cancelled" option. 120 monthly cycles is
-      // 10 years, which is effectively indefinite for a $5/mo product;
-      // cancellation is still available at any time via the cancel route.
-      total_count: 120,
+      // there's no literal "until cancelled" option. 120 monthly cycles /
+      // 20 yearly cycles both land around 10-20 years, effectively
+      // indefinite for this product; cancellation is available any time
+      // via the cancel route regardless.
+      total_count: interval === "yearly" ? 20 : 120,
       customer_notify: 1,
       // Stashed here so the webhook (which only receives the subscription
       // object, not our session) can resolve which of our users this
       // belongs to — same role Stripe's subscription_data.metadata played.
-      notes: { userId },
+      notes: { userId, interval },
     });
 
     // Recorded immediately, before payment is actually confirmed — status
