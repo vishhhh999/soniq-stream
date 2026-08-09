@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, Search, X as XIcon, Settings as SettingsIcon } from "lucide-react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import UploadButton from "@/components/UploadButton";
+import AddMenu from "@/components/AddMenu";
 import UploadDropZone from "@/components/UploadDropZone";
 import SettingsModal from "@/components/SettingsModal";
 import Logo from "@/components/Logo";
@@ -248,7 +248,7 @@ export default function LibraryHome() {
             <Plus size={16} strokeWidth={2} />
             <span className="hidden sm:inline">New album</span>
           </button>
-          <UploadButton onUploaded={load} />
+          <AddMenu onUploaded={load} />
         </div>
       </header>
 

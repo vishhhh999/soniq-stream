@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Disc3, Pencil, Share2, ImagePlus, Trash2, Play, Shuffle, MoreHorizontal, BarChart3, ListPlus, Download } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
-import UploadButton from "@/components/UploadButton";
+import AddMenu from "@/components/AddMenu";
 import UploadDropZone from "@/components/UploadDropZone";
 import TrackDetail from "@/components/TrackDetail";
 import SortableTrackRow from "@/components/SortableTrackRow";
@@ -384,7 +384,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
               </div>
             )}
 
-            {!isReadOnly && <UploadButton onUploaded={load} albumId={params.id} label="Add tracks" />}
+            {!isReadOnly && <AddMenu onUploaded={load} albumId={params.id} label="Add tracks" />}
 
             <div className="relative">
               <button
