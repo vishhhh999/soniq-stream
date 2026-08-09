@@ -1,9 +1,29 @@
 "use client";
 
-import { useState } from "react";
-import { Play, Check } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Play, Pause, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RotateCcw, Crosshair } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
 import type { SyncedLine } from "@/lib/lyricsSync";
+
+// Redesigned sync flow, loosely modeled on Musixmatch's line-review UI
+// (per-line nudge + a global calibration shift) rather than the old
+// tap-along-only flow, which had no way to fix a single mistimed line
+// without redoing the entire track from scratch. Three modes now:
+//   'idle'    — text editor + Sync/Edit timing buttons
+//   'tapping' — live tap-along, unchanged from before, still the fastest
+//               way to rough in a whole track for the first time
+//   'review'  — per-line editable list: nudge individual lines, re-tap a
+//               single line against the live playhead, or shift every
+//               line at once via calibration. This is also the entry
+//               point when editing an ALREADY-synced track — no need to
+//               re-tap the whole thing just to fix one line's timing.
+type Mode = "idle" | "tapping" | "review";
+
+const fmt = (t: number) => {
+  const m = Math.floor(t / 60);
+  const s = (t % 60).toFixed(2).padStart(5, "0");
+  return `${m}:${s}`;
+};
 
 export default function LyricsEditor({
   track,
@@ -14,11 +34,13 @@ export default function LyricsEditor({
   initialLyrics: string;
   initialSynced: SyncedLine[] | null;
 }) {
-  const { audioRef, play } = usePlayer();
+  const { audioRef, play, current, isPlaying, toggle } = usePlayer();
   const [text, setText] = useState(initialLyrics);
-  const [syncing, setSyncing] = useState(false);
+  const [mode, setMode] = useState<Mode>("idle");
   const [syncLines, setSyncLines] = useState<string[]>([]);
   const [captured, setCaptured] = useState<SyncedLine[]>([]);
+  const [reviewLines, setReviewLines] = useState<SyncedLine[]>([]);
+  const [originalReviewLines, setOriginalReviewLines] = useState<SyncedLine[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [isSynced, setIsSynced] = useState(!!initialSynced && initialSynced.length > 0);
@@ -55,12 +77,14 @@ export default function LyricsEditor({
     setTimeout(() => setSaved(false), 1500);
   };
 
+  // --- Tap-along (unchanged mechanics, now lands in review instead of saving directly) ---
+
   const startSync = () => {
     const parsedLines = text.split("\n").map((l) => l.trim()).filter(Boolean);
     if (parsedLines.length === 0) return;
     setSyncLines(parsedLines);
     setCaptured([]);
-    setSyncing(true);
+    setMode("tapping");
     play(track);
     if (audioRef.current) audioRef.current.currentTime = 0;
   };
@@ -72,31 +96,113 @@ export default function LyricsEditor({
     const newCaptured = [...captured, { time: audioRef.current.currentTime, text: syncLines[idx] }];
     setCaptured(newCaptured);
     if (newCaptured.length === syncLines.length) {
-      finishSync(newCaptured);
+      enterReview(newCaptured);
     }
   };
 
-  const finishSync = async (lines: SyncedLine[]) => {
-    setSyncing(false);
+  // Spacebar as an alternative to clicking the tap button — clicking means
+  // moving the mouse to a fixed target under time pressure, which is
+  // exactly the "hard to hit the tap at the right moment" problem. A key
+  // that's always under your finger removes that.
+  useEffect(() => {
+    if (mode !== "tapping") return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        tapLine();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mode, captured, syncLines]);
+
+  const cancelSync = () => {
+    setMode("idle");
+    if (audioRef.current) audioRef.current.pause();
+  };
+
+  // --- Review mode: per-line nudge/retap + global calibration shift ---
+
+  const enterReview = (lines: SyncedLine[]) => {
+    setReviewLines(lines.map((l) => ({ ...l })));
+    setOriginalReviewLines(lines.map((l) => ({ ...l })));
+    setMode("review");
+  };
+
+  const editExisting = () => {
+    if (!initialSynced || initialSynced.length === 0) return;
+    enterReview(initialSynced);
+  };
+
+  const nudgeLine = (index: number, delta: number) => {
+    setReviewLines((prev) =>
+      prev.map((l, i) => (i === index ? { ...l, time: Math.max(0, l.time + delta) } : l))
+    );
+  };
+
+  // Re-captures just this one line against wherever the track is playing
+  // right now — fixes a single mistimed line without redoing the tap-along
+  // for the whole track.
+  const retapLine = (index: number) => {
+    if (!audioRef.current) return;
+    const t = audioRef.current.currentTime;
+    setReviewLines((prev) => prev.map((l, i) => (i === index ? { ...l, time: t } : l)));
+  };
+
+  // Shifts every line's timestamp by the same amount — for when the whole
+  // sync is just consistently early or late, rather than any one line
+  // being wrong. Applied cumulatively; "Reset" restores the values from
+  // when review mode was entered (either straight from tap-along, or from
+  // loading an already-synced track via "Edit timing").
+  const shiftAll = (delta: number) => {
+    setReviewLines((prev) => prev.map((l) => ({ ...l, time: Math.max(0, l.time + delta) })));
+  };
+
+  const resetCalibration = () => {
+    setReviewLines(originalReviewLines.map((l) => ({ ...l })));
+  };
+
+  const playFromLine = (t: number) => {
+    if (current?.id !== track.id) {
+      play(track);
+      setTimeout(() => {
+        if (audioRef.current) {
+          audioRef.current.currentTime = t;
+          audioRef.current.play().catch(() => {});
+        }
+      }, 60);
+    } else {
+      if (audioRef.current) {
+        audioRef.current.currentTime = t;
+        audioRef.current.play().catch(() => {});
+      }
+    }
+  };
+
+  const saveReview = async () => {
+    setSaving(true);
     const res = await fetch(`/api/tracks/${track.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lyricsSynced: lines }),
+      body: JSON.stringify({ lyricsSynced: reviewLines }),
     });
+    setSaving(false);
     if (!res.ok) {
       alert("Couldn't save the synced lyrics. Try again.");
       return;
     }
     setIsSynced(true);
+    setMode("idle");
     notifyLyricsUpdated();
   };
 
-  const cancelSync = () => {
-    setSyncing(false);
-    if (audioRef.current) audioRef.current.pause();
+  const cancelReview = () => {
+    setMode("idle");
   };
 
-  if (syncing) {
+  // --- Render ---
+
+  if (mode === "tapping") {
     const currentLine = syncLines[captured.length];
     return (
       <div className="border border-border-strong rounded-md p-5 space-y-4">
@@ -119,7 +225,85 @@ export default function LyricsEditor({
           </button>
         </div>
         <p className="text-xs text-tertiary">
-          Play the track and tap the button in time with each line as it starts. Finishes automatically after the last line — this panel stays open, it won't close on you.
+          Play the track and tap the button (or hit Space) in time with each line as it starts.
+          You'll get a chance to fine-tune every line afterward — it doesn't have to be perfect on the first pass.
+        </p>
+      </div>
+    );
+  }
+
+  if (mode === "review") {
+    return (
+      <div className="border border-border-strong rounded-md p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <p className="text-xs uppercase tracking-wide text-tertiary">Review timing</p>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-tertiary mr-1">Shift all:</span>
+            <button onClick={() => shiftAll(-1)} title="-1s" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors">
+              <ChevronsLeft size={13} strokeWidth={2} />
+            </button>
+            <button onClick={() => shiftAll(-0.1)} title="-0.1s" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors">
+              <ChevronLeft size={13} strokeWidth={2} />
+            </button>
+            <button onClick={() => shiftAll(0.1)} title="+0.1s" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors">
+              <ChevronRight size={13} strokeWidth={2} />
+            </button>
+            <button onClick={() => shiftAll(1)} title="+1s" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors">
+              <ChevronsRight size={13} strokeWidth={2} />
+            </button>
+            <button onClick={resetCalibration} title="Reset all changes" className="p-1.5 rounded border border-border hover:border-border-strong transition-colors ml-1">
+              <RotateCcw size={13} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+
+        <div className="max-h-80 overflow-y-auto space-y-1 pr-1">
+          {reviewLines.map((line, i) => (
+            <div key={i} className="flex items-center gap-2 text-sm">
+              <span className="text-xs text-tertiary tabular-nums w-14 shrink-0">{fmt(line.time)}</span>
+              <button onClick={() => nudgeLine(i, -0.1)} title="-0.1s" className="p-1 rounded hover:bg-surface transition-colors shrink-0">
+                <ChevronLeft size={13} strokeWidth={2} className="text-tertiary" />
+              </button>
+              <button onClick={() => nudgeLine(i, 0.1)} title="+0.1s" className="p-1 rounded hover:bg-surface transition-colors shrink-0">
+                <ChevronRight size={13} strokeWidth={2} className="text-tertiary" />
+              </button>
+              <button onClick={() => playFromLine(line.time)} title="Play from here" className="p-1 rounded hover:bg-surface transition-colors shrink-0">
+                <Play size={12} strokeWidth={2} className="text-tertiary" />
+              </button>
+              <button onClick={() => retapLine(i)} title="Set to current playhead position" className="p-1 rounded hover:bg-surface transition-colors shrink-0">
+                <Crosshair size={12} strokeWidth={2} className="text-tertiary" />
+              </button>
+              <span className="text-primary truncate flex-1">{line.text}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            onClick={saveReview}
+            disabled={saving}
+            className="bg-accent text-canvas text-sm font-medium px-4 py-2 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save timing"}
+          </button>
+          <button
+            onClick={cancelReview}
+            className="text-sm text-secondary border border-border rounded-md px-4 py-2 hover:border-border-strong transition-colors"
+          >
+            Cancel
+          </button>
+          {current?.id === track.id && (
+            <button
+              onClick={toggle}
+              className="ml-auto p-2 rounded-full border border-border hover:border-border-strong transition-colors"
+              title={isPlaying ? "Pause" : "Play"}
+            >
+              {isPlaying ? <Pause size={13} strokeWidth={2} /> : <Play size={13} strokeWidth={2} />}
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-tertiary">
+          Nudge a line with the arrows, click the crosshair to re-tap it against wherever the track is currently playing, or shift everything at once above if the whole sync is off by a consistent amount.
         </p>
       </div>
     );
@@ -148,8 +332,16 @@ export default function LyricsEditor({
           className="flex items-center gap-2 text-sm bg-accent text-canvas rounded-md px-4 py-2 hover:bg-accent-strong transition-colors disabled:opacity-40"
         >
           <Play size={13} strokeWidth={2} />
-          {isSynced ? "Re-sync timing" : "Sync timing"}
+          {isSynced ? "Re-sync from scratch" : "Sync timing"}
         </button>
+        {isSynced && (
+          <button
+            onClick={editExisting}
+            className="flex items-center gap-2 text-sm text-secondary border border-border rounded-md px-4 py-2 hover:border-border-strong hover:text-primary transition-colors"
+          >
+            Edit timing
+          </button>
+        )}
         {isSynced && (
           <span className="text-xs text-tertiary flex items-center gap-1">
             <Check size={12} strokeWidth={2} className="text-accent" />
