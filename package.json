@@ -19,6 +19,7 @@
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.32.1",
+    "fflate": "^0.8.2",
     "framer-motion": "^11.3.19",
     "lucide-react": "^0.417.0",
     "music-metadata": "^10.5.1",
@@ -29,8 +30,8 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "resend": "^6.18.1",
-    "wavesurfer.js": "^7.8.6",
-    "fflate": "^0.8.2"
+    "stripe": "^22.4.0",
+    "wavesurfer.js": "^7.8.6"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

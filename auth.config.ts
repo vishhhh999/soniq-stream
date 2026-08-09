@@ -28,6 +28,7 @@ export const authConfig = {
         /^\/cookies$/,
         /^\/contact$/,
         /^\/api\/contact$/,
+        /^\/api\/billing\/webhook$/, // Stripe's servers hit this, no session cookie
         /^\/api\/auth\//, // NextAuth's own routes: signin, callback, session, csrf, signout
       ];
       if (publicPaths.some((re) => re.test(pathname))) return true;

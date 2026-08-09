@@ -16,6 +16,16 @@ export const users = pgTable("users", {
   googleLinkedAt: timestamp("google_linked_at"),
   username: text("username").unique(),
   avatarUrl: text("avatar_url"),
+  // Billing — subscriptionStatus drives all storage-cap enforcement.
+  // 'free' (default) | 'active' | 'past_due' | 'canceled'. Kept in sync
+  // via the Stripe webhook (app/api/billing/webhook/route.ts), never set
+  // directly from client-facing routes.
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  subscriptionStatus: text("subscription_status").default("free"),
+  // Nullable — set on any active/past_due subscription, used to show
+  // "renews on X" / "access until X" in Settings. Cleared on cancel.
+  subscriptionPeriodEnd: timestamp("subscription_period_end"),
 });
 
 export const folders = pgTable("folders", {

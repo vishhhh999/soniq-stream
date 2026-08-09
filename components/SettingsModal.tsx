@@ -31,6 +31,16 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [plan, setPlan] = useState<{
+    isPaid: boolean;
+    status: string;
+    periodEnd: string | null;
+    storageUsedBytes: number;
+    storageCapBytes: number | null;
+  } | null>(null);
+  const [upgrading, setUpgrading] = useState(false);
+  const [openingPortal, setOpeningPortal] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -43,9 +53,38 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         setUsername(d.username || null);
         setAvatarUrl(d.avatarUrl || null);
         setHasPassword(!!d.hasPassword);
+        if (d.plan) setPlan(d.plan);
       })
       .catch(() => {});
   }, []);
+
+  const startUpgrade = async () => {
+    setUpgrading(true);
+    setBillingError(null);
+    try {
+      const res = await fetch("/api/billing/checkout", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "Could not start checkout.");
+      window.location.href = data.url;
+    } catch (e: any) {
+      setBillingError(e.message || "Could not start checkout. Try again.");
+      setUpgrading(false);
+    }
+  };
+
+  const openBillingPortal = async () => {
+    setOpeningPortal(true);
+    setBillingError(null);
+    try {
+      const res = await fetch("/api/billing/portal", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "Could not open billing management.");
+      window.location.href = data.url;
+    } catch (e: any) {
+      setBillingError(e.message || "Could not open billing management. Try again.");
+      setOpeningPortal(false);
+    }
+  };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -183,6 +222,65 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                   {avatarError && <p className="text-xs text-error mt-1">{avatarError}</p>}
                 </div>
               </div>
+            </div>
+
+            {/* Plan / storage — free tier is a storage cap only, no track
+                or feature gating. Checkout and billing management both
+                hand off to Stripe-hosted pages rather than building any
+                custom card-entry or cancel-flow UI here. */}
+            <div className="px-6 py-5 border-t border-border">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs uppercase tracking-wide text-tertiary">Plan</span>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${plan?.isPaid ? "bg-accent/15 text-accent" : "bg-surface text-secondary"}`}>
+                  {plan?.isPaid ? "SONIQ Pro" : "Free"}
+                </span>
+              </div>
+
+              {plan && !plan.isPaid && plan.storageCapBytes && (
+                <div className="mb-3">
+                  <div className="h-1.5 rounded-full bg-surface overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${plan.storageUsedBytes / plan.storageCapBytes > 0.9 ? "bg-error" : "bg-accent"}`}
+                      style={{ width: `${Math.min(100, (plan.storageUsedBytes / plan.storageCapBytes) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-tertiary mt-1.5">
+                    {(plan.storageUsedBytes / (1024 * 1024)).toFixed(0)}MB of {(plan.storageCapBytes / (1024 * 1024)).toFixed(0)}MB used
+                  </p>
+                </div>
+              )}
+
+              {plan?.isPaid && (
+                <p className="text-xs text-tertiary mb-3">
+                  Unlimited storage.
+                  {plan.status === "past_due" && " Your last payment didn't go through — update your card to avoid losing access."}
+                  {plan.periodEnd && plan.status === "active" && ` Renews ${new Date(plan.periodEnd).toLocaleDateString()}.`}
+                </p>
+              )}
+
+              {billingError && <p className="text-xs text-error mb-2">{billingError}</p>}
+
+              {plan?.isPaid ? (
+                <button
+                  onClick={openBillingPortal}
+                  disabled={openingPortal}
+                  className="text-xs text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong transition-colors disabled:opacity-50"
+                >
+                  {openingPortal ? "Opening..." : "Manage billing"}
+                </button>
+              ) : (
+                <button
+                  onClick={startUpgrade}
+                  disabled={upgrading}
+                  className="text-xs font-medium text-canvas bg-accent rounded-md px-3 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
+                >
+                  {/* $5/mo hardcoded for display — kept in sync with the
+                      STRIPE_PRICE_ID env var manually, since the actual
+                      Price lives in Stripe's dashboard, not this codebase.
+                      Update both together if the price ever changes. */}
+                  {upgrading ? "Starting checkout..." : "Upgrade — $5/mo"}
+                </button>
+              )}
             </div>
 
             {/* Account */}

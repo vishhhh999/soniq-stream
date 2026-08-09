@@ -123,6 +123,11 @@ async function main() {
 
   // Additive migration: first-Google-link timestamp for one-time toast.
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_linked_at TIMESTAMP;`;
+  // Billing — see lib/db/schema.ts for what drives each column.
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT 'free';`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_period_end TIMESTAMP;`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE;`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
 

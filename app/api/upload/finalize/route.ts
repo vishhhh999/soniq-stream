@@ -9,6 +9,7 @@ import { CopyObjectCommand } from "@aws-sdk/client-s3";
 import { albumMembers, contentFollows } from "@/lib/db/schema";
 import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2";
 import { notifyAlbumFollowers, getUsernameById } from "@/lib/notifications";
+import { checkStorageAllowance } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -31,6 +32,26 @@ export async function POST(req: NextRequest) {
     const { publicUrl, filename, contentType, fileSize, albumId, folderId, independent } = await req.json();
     if (!publicUrl || !filename) {
       return NextResponse.json({ error: "publicUrl and filename are required" }, { status: 400 });
+    }
+
+    // Free-tier storage cap. Checked with the client-supplied fileSize
+    // before the expensive fetch-from-R2 + metadata-parse work below, so a
+    // free user who's already over the cap fails fast instead of waiting
+    // through a full upload pipeline for a request that was always going
+    // to be rejected. This is a soft/UX gate on a client-reported number,
+    // not an adversarial security boundary — fine for a solo/small-team
+    // product where the worst case is someone lying to their own account.
+    const allowance = await checkStorageAllowance(userId, Number(fileSize) || 0);
+    if (!allowance.allowed) {
+      return NextResponse.json(
+        {
+          error: "You've reached the free plan's 500MB storage limit. Upgrade to SONIQ Pro for unlimited storage.",
+          code: "STORAGE_LIMIT_REACHED",
+          usedBytes: allowance.usedBytes,
+          capBytes: allowance.capBytes,
+        },
+        { status: 402 }
+      );
     }
 
     // Without this check, anyone authenticated could upload a track into
