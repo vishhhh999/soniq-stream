@@ -24,6 +24,10 @@ export const authConfig = {
         /^\/setup$/,
         /^\/api\/setup$/,
         /^\/s\//,
+        /^\/embed\//,        // embeddable player — same public/token-gated
+                              // model as /s/, but meant to run inside an
+                              // iframe on someone else's site where no
+                              // login is ever possible
         /^\/api\/share\//,
         /^\/invite\//,         // invite acceptance pages
         /^\/api\/invite\//,    // invite preview API (GET, no auth needed)
