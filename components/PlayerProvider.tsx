@@ -57,6 +57,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { currentRef.current = current; }, [current]);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const isPlayingSnapshotRef = useRef(false);
+  useEffect(() => { isPlayingSnapshotRef.current = isPlaying; }, [isPlaying]);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
@@ -467,17 +469,36 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // restores sound the instant the app is foregrounded again.
   useEffect(() => {
     const resume = () => {
-      if (audioCtxRef.current?.state === "suspended") {
-        audioCtxRef.current.resume().catch(() => {});
+      const ctx = audioCtxRef.current;
+      if (ctx?.state === "suspended") {
+        ctx.resume().catch(() => {});
+      }
+      // Defensive: some mobile browsers pause the <audio> element itself
+      // (not just the Web Audio context) on backgrounding. If we think
+      // we should be playing, nudge it directly too.
+      const audio = getActive();
+      if (audio && audio.paused && isPlayingSnapshotRef.current) {
+        audio.play().catch(() => {});
       }
     };
+
     document.addEventListener("visibilitychange", resume);
     window.addEventListener("pageshow", resume);
     window.addEventListener("focus", resume);
+
+    // Keep-alive: iOS in particular can re-suspend the context shortly after
+    // a single resume() while the tab is backgrounded. Poll every couple of
+    // seconds and resume again if needed — cheap, and it's the difference
+    // between "silent after 10s in background" and "keeps playing."
+    const keepAlive = setInterval(() => {
+      if (document.visibilityState === "hidden") resume();
+    }, 2000);
+
     return () => {
       document.removeEventListener("visibilitychange", resume);
       window.removeEventListener("pageshow", resume);
       window.removeEventListener("focus", resume);
+      clearInterval(keepAlive);
     };
   }, []);
 

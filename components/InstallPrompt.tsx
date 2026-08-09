@@ -13,6 +13,11 @@ export default function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
+    // Never prompt on public pages — someone opening a shared link doesn't
+    // have an account yet and hasn't chosen to use the app themselves.
+    const path = window.location.pathname;
+    if (path.startsWith("/s/") || path.startsWith("/invite/") || path === "/login" || path === "/setup") return;
+
     // Already installed (running standalone) — never show.
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone === true;
