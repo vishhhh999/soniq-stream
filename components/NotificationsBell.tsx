@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell } from "lucide-react";
 import { gradientFromSeed } from "@/lib/gradient";
+import { MODAL_SPRING } from "@/lib/motion";
 
 type NotificationItem = {
   id: string;
@@ -126,7 +127,7 @@ export default function NotificationsBell() {
             initial={{ opacity: 0, scale: 0.95, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -4 }}
-            transition={{ type: "spring", stiffness: 320, damping: 28 }}
+            transition={MODAL_SPRING}
             className="absolute right-0 top-10 w-[calc(100vw-2rem)] max-w-80 max-h-[420px] bg-elevated border border-border rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col"
           >
             <div className="px-4 py-3 border-b border-border shrink-0">

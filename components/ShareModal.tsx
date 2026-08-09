@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Link2, Check } from "lucide-react";
+import { MODAL_SPRING } from "@/lib/motion";
 
 const EXPIRY_OPTIONS = [
   { label: "7 days", value: 7 },
@@ -67,7 +68,7 @@ export default function ShareModal({
           initial={{ opacity: 0, scale: 0.96, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
-          transition={{ type: "spring", stiffness: 300, damping: 28 }}
+          transition={MODAL_SPRING}
           className="bg-elevated border border-border rounded-lg w-full max-w-sm p-6"
           onClick={(e) => e.stopPropagation()}
         >

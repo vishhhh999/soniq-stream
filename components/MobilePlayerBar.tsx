@@ -146,7 +146,7 @@ export default function MobilePlayerBar() {
         </div>
 
         <div className="flex items-center justify-between mb-4">
-          <button onClick={toggleShuffle} className="p-2 -m-2">
+          <button onClick={toggleShuffle} className="p-3 -m-3">
             <Shuffle size={19} strokeWidth={1.5} className={shuffleOn ? "text-accent" : "text-secondary"} />
           </button>
           <div className="flex items-center gap-6">
@@ -160,7 +160,7 @@ export default function MobilePlayerBar() {
               <SkipForward size={26} strokeWidth={1.5} className={queueIndex < queue.length - 1 ? "text-primary" : "text-tertiary"} />
             </button>
           </div>
-          <button onClick={cycleRepeatMode} className="p-2 -m-2">
+          <button onClick={cycleRepeatMode} className="p-3 -m-3">
             {repeatMode === "one" ? (
               <Repeat1 size={19} strokeWidth={1.5} className="text-accent" />
             ) : (

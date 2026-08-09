@@ -11,6 +11,7 @@ import { isFeedbackEnabled, setFeedbackEnabled, triggerFeedback } from "@/lib/fe
 import { usePlayer } from "./PlayerProvider";
 import { APP_VERSION } from "@/lib/version";
 import { gradientFromSeed } from "@/lib/gradient";
+import { MODAL_SPRING } from "@/lib/motion";
 
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const { theme, toggle: toggleTheme } = useTheme();
@@ -249,7 +250,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           initial={{ opacity: 0, scale: 0.96, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
-          transition={{ type: "spring", stiffness: 300, damping: 28 }}
+          transition={MODAL_SPRING}
           className="bg-elevated border border-border rounded-lg w-full max-w-xl max-h-[85vh] overflow-y-auto no-scrollbar"
           onClick={(e) => e.stopPropagation()}
         >
@@ -394,7 +395,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                       className={`text-xs px-3 py-1.5 rounded transition-colors ${billingInterval === "yearly" ? "bg-canvas text-primary" : "text-secondary hover:text-primary"}`}
                     >
                       Yearly — $40/yr
-                      <span className="ml-1.5 text-[10px] text-accent">4 months free</span>
+                      <span className="ml-1.5 text-[10px] text-accent-text">4 months free</span>
                     </button>
                   </div>
                   <button
@@ -504,7 +505,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                       >
                         {hasPassword ? "Change password" : "Set a password"}
                       </button>
-                      {passwordSaved && <span className="text-xs text-accent flex items-center gap-1"><Check size={12} strokeWidth={2} /> Saved</span>}
+                      {passwordSaved && <span className="text-xs text-accent-text flex items-center gap-1"><Check size={12} strokeWidth={2} /> Saved</span>}
                     </div>
                   )}
                 </div>

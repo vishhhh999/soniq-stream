@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Play } from "lucide-react";
 import { gradientFromSeed } from "@/lib/gradient";
+import { MODAL_SPRING } from "@/lib/motion";
 
 type TrackStat = { trackId: string; title: string; plays: number };
 type ListenerStat = { userId: string | null; username: string | null; plays: number };
@@ -69,7 +70,7 @@ export default function AlbumInsightsModal({
           initial={{ opacity: 0, scale: 0.96, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
-          transition={{ type: "spring", stiffness: 300, damping: 28 }}
+          transition={MODAL_SPRING}
           className="bg-elevated border border-border rounded-lg w-full max-w-sm max-h-[85vh] overflow-y-auto no-scrollbar"
           onClick={(e) => e.stopPropagation()}
         >

@@ -450,7 +450,20 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
         <AlbumInsightsModal albumId={params.id} albumName={album.name} onClose={() => setShowInsights(false)} />
       )}
 
-      {groups.length === 0 ? (
+      {!album ? (
+        <div className="space-y-1">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-lg animate-pulse">
+              <div className="w-9 h-9 rounded bg-surface shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 bg-surface rounded w-1/3" />
+                <div className="h-2.5 bg-surface rounded w-1/5" />
+              </div>
+              <div className="h-2.5 bg-surface rounded w-8 shrink-0" />
+            </div>
+          ))}
+        </div>
+      ) : groups.length === 0 ? (
         <div className="border border-dashed border-border rounded-lg py-16 sm:py-24 text-center flex flex-col items-center gap-3">
           <Disc3 size={40} strokeWidth={1} className="text-tertiary" />
           <p className="text-secondary text-base">No tracks in this album yet.</p>

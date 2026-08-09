@@ -8,6 +8,7 @@ import {
   MoreHorizontal, Trash2, Copy,
 } from "lucide-react";
 import { gradientFromSeed } from "@/lib/gradient";
+import { MODAL_SPRING } from "@/lib/motion";
 
 type Member = {
   id: string;
@@ -209,7 +210,7 @@ export default function AlbumSharePanel({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          transition={MODAL_SPRING}
           className="bg-elevated border border-border rounded-t-2xl sm:rounded-2xl w-full max-w-sm min-h-[240px] max-h-[85vh] overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
@@ -246,7 +247,7 @@ export default function AlbumSharePanel({
             {loadError && (
               <div className="p-6 text-center">
                 <p className="text-sm text-secondary mb-3">{loadError}</p>
-                <button onClick={load} className="text-xs text-accent hover:underline">
+                <button onClick={load} className="text-xs text-accent-text hover:underline">
                   Try again
                 </button>
               </div>

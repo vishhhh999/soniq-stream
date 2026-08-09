@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trash2, FolderInput, X } from "lucide-react";
 import type { Album } from "./AlbumCard";
+import { MODAL_SPRING } from "@/lib/motion";
 
 export default function SelectionToolbar({
   count,
@@ -29,7 +30,7 @@ export default function SelectionToolbar({
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 12 }}
-        transition={{ type: "spring", stiffness: 320, damping: 30 }}
+        transition={MODAL_SPRING}
         className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 bg-elevated border border-border rounded-full shadow-xl px-4 sm:px-5 py-3 flex items-center gap-3 sm:gap-4 max-w-[calc(100vw-2rem)]"
       >
         <span className="text-sm text-primary font-medium">{count} selected</span>

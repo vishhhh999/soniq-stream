@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
 import type { Album } from "./AlbumCard";
+import { MODAL_SPRING } from "@/lib/motion";
 
 type Props = {
   track: Track;
@@ -254,7 +255,7 @@ export default function TrackContextMenu({
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", stiffness: 320, damping: 34 }}
+            transition={MODAL_SPRING}
             onClick={(e) => e.stopPropagation()}
             className="w-full rounded-t-2xl overflow-hidden pb-safe"
           >

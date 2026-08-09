@@ -16,6 +16,7 @@ export default {
         tertiary: "var(--text-tertiary)",
         accent: "var(--accent)",
         "accent-strong": "var(--accent-strong)",
+        "accent-text": "var(--accent-text)",
         "on-accent": "var(--on-accent)",
         error: "var(--error)",
       },

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePlayer } from "./PlayerProvider";
 import { useAmbient } from "./AmbientProvider";
 import { useTheme } from "./ThemeProvider";
+import { useIsMobile } from "@/lib/useMediaQuery";
 import { gradientFromSeed, gradientFromImage, peekImageGradient } from "@/lib/gradient";
 
 type Gradient = { from: string; to: string };
@@ -74,6 +75,13 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
   const { getFrequencyData, isPlaying, current, currentTime, crossfadingToTrack, preloadingTrack, crossfadeDuration } = usePlayer();
   const { enabled, colorStateRef } = useAmbient();
   const { theme } = useTheme();
+  const isMobile = useIsMobile();
+  // Ref, same reasoning as themeRef below — the draw loop's setup effect
+  // only depends on [enabled, isPlaying, getFrequencyData], so reading
+  // mobile-ness via a ref lets a resize/orientation change take effect on
+  // the next frame without tearing down the whole canvas/noise-pool setup.
+  const isMobileRef = useRef(isMobile);
+  isMobileRef.current = isMobile;
   // Ref, not a direct closure value, because the draw loop's effect only
   // re-runs on [enabled, isPlaying, getFrequencyData] (see its own comment
   // about avoiding teardown-on-every-change) — reading theme via a ref lets
@@ -253,7 +261,21 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
     let pulse = 0;
     let lastPulseTime = 0;
 
+    let frameSkip = 0;
     const draw = () => {
+      // Mobile: render every other frame (~30fps instead of 60fps) — still
+      // reschedules on every rAF tick so the throttle stays smooth and
+      // responsive, just skips the actual (expensive) draw work half the
+      // time. Desktop is unaffected, frameSkip only increments/gates when
+      // isMobileRef.current is true.
+      if (isMobileRef.current) {
+        frameSkip++;
+        if (frameSkip % 2 !== 0) {
+          rafRef.current = requestAnimationFrame(draw);
+          return;
+        }
+      }
+
       const w = window.innerWidth;
       const h = window.innerHeight;
       tRef.current += 0.006;
@@ -347,10 +369,15 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       const isWarm = srcHue < 90 || srcHue > 300; // reds/oranges/yellows/magentas
       const shifted = shiftHue(displayed.from, isWarm ? 30 : -30);
       const maxR = h * 0.55; // hard cap so blobs can't bleed past the bottom-only mask band below
+      // Mobile drops the third (center) blob — 2 blobs instead of 3 is a
+      // real per-frame cost reduction (each is a radial gradient fill),
+      // and left+right alone still reads as the same gradient family.
       const blobs = [
         { x: w * 0.22 + Math.sin(t) * 50, y: h * (1.02 - bass * 0.05), r: Math.min(maxR, w * 0.3 + pulse * w * 0.12 + bass * w * 0.04), color: displayed.from },
         { x: w * 0.78 + Math.cos(t * 0.8) * 60, y: h * (1.05 - mid * 0.04), r: Math.min(maxR, w * 0.26 + pulse * w * 0.08 + mid * w * 0.03), color: shifted },
-        { x: w * 0.5 + Math.sin(t * 1.3) * 60, y: h * 1.08, r: Math.min(maxR, w * 0.34 + pulse * w * 0.1 + bass * w * 0.03), color: displayed.from },
+        ...(isMobileRef.current ? [] : [
+          { x: w * 0.5 + Math.sin(t * 1.3) * 60, y: h * 1.08, r: Math.min(maxR, w * 0.34 + pulse * w * 0.1 + bass * w * 0.03), color: displayed.from },
+        ]),
       ];
 
       // Blend mode is theme-aware, not fixed to "screen" — screen only
@@ -383,15 +410,20 @@ export default function AmbientBackground({ scoped = false }: { scoped?: boolean
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
 
-      noiseAge++;
-      if (noiseAge > 6) {
-        noiseIndex = (noiseIndex + 1) % noisePool.length;
-        noiseAge = 0;
-      }
-      const pattern = ctx.createPattern(noisePool[noiseIndex], "repeat");
-      if (pattern) {
-        ctx.fillStyle = pattern;
-        ctx.fillRect(0, 0, w, h);
+      // Skipped entirely on mobile — a full-viewport pattern fill is real
+      // per-frame cost for a subtle texture flourish that reads much less
+      // noticeably on a smaller phone screen anyway.
+      if (!isMobileRef.current) {
+        noiseAge++;
+        if (noiseAge > 6) {
+          noiseIndex = (noiseIndex + 1) % noisePool.length;
+          noiseAge = 0;
+        }
+        const pattern = ctx.createPattern(noisePool[noiseIndex], "repeat");
+        if (pattern) {
+          ctx.fillStyle = pattern;
+          ctx.fillRect(0, 0, w, h);
+        }
       }
 
       rafRef.current = requestAnimationFrame(draw);

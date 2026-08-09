@@ -12,6 +12,7 @@ import { detectBPM } from "@/lib/bpm";
 import { detectKey } from "@/lib/key";
 import { waveformBars } from "@/lib/waveformBars";
 import LyricsEditor from "./LyricsEditor";
+import { MODAL_SPRING } from "@/lib/motion";
 
 const EXPIRY_OPTIONS = [
   { label: "7 days", value: 7 },
@@ -104,8 +105,6 @@ export default function TrackDetail({
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [confirmingRevoke, setConfirmingRevoke] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [showEmbed, setShowEmbed] = useState(false);
-  const [embedCopied, setEmbedCopied] = useState(false);
 
   useEffect(() => {
     fetch(`/api/tracks/${track.id}/play`)
@@ -281,7 +280,7 @@ export default function TrackDetail({
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 8 }}
-        transition={{ type: "spring", stiffness: 300, damping: 28 }}
+        transition={MODAL_SPRING}
         className="fixed inset-0 z-50 flex items-center justify-center px-4 pointer-events-none"
       >
         <div
@@ -359,7 +358,7 @@ export default function TrackDetail({
                     {(track as any).channels && <p>Channels: {(track as any).channels === 1 ? "Mono" : "Stereo"}</p>}
                     {(track as any).format && <p>Format: {(track as any).format.toUpperCase()}</p>}
                     {playCount !== null && <p>{playCount} play{playCount === 1 ? "" : "s"}</p>}
-                    {(saving || saved) && <p className="text-accent">{saving ? "Saving..." : "Saved"}</p>}
+                    {(saving || saved) && <p className="text-accent-text">{saving ? "Saving..." : "Saved"}</p>}
                   </div>
                 </motion.div>
               )}
@@ -417,35 +416,6 @@ export default function TrackDetail({
                         Allow download
                       </label>
                       {shareError && <p className="text-xs text-error">{shareError}</p>}
-                      {!showEmbed ? (
-                        <button onClick={() => setShowEmbed(true)} className="text-xs text-secondary hover:text-primary transition-colors underline underline-offset-2">
-                          Get embed code
-                        </button>
-                      ) : (
-                        <div className="space-y-2">
-                          <p className="text-xs text-tertiary">Paste this into any website to embed the player.</p>
-                          <div className="flex items-start gap-2">
-                            <textarea
-                              readOnly
-                              rows={2}
-                              value={`<iframe src="${shareUrl.replace("/s/", "/embed/")}" width="100%" height="180" frameborder="0"></iframe>`}
-                              className="flex-1 bg-canvas border border-border rounded-md px-3 py-2 text-xs text-secondary font-mono resize-none"
-                              onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-                            />
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(`<iframe src="${shareUrl.replace("/s/", "/embed/")}" width="100%" height="180" frameborder="0"></iframe>`);
-                                setEmbedCopied(true);
-                                triggerFeedback("tap");
-                                setTimeout(() => setEmbedCopied(false), 1500);
-                              }}
-                              className="w-9 h-9 flex items-center justify-center rounded-md border border-border hover:border-border-strong shrink-0"
-                            >
-                              {embedCopied ? <Check size={13} className="text-accent" /> : <Link2 size={13} className="text-secondary" />}
-                            </button>
-                          </div>
-                        </div>
-                      )}
                       {!confirmingRevoke ? (
                         <button onClick={() => setConfirmingRevoke(true)} className="text-xs text-error hover:text-error/80 transition-colors">
                           Deactivate link

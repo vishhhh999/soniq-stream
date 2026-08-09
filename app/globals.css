@@ -20,11 +20,21 @@
      the lighter background instead of washing out. */
   --accent: #e8650a;
   --accent-strong: #c2530a;
+  /* Separate, darker value for small ACCENT-COLORED TEXT specifically
+     (confirmation labels like "Saved", badges like "4 months free") —
+     --accent itself only clears WCAG's 3:1 threshold for large/UI-scale
+     elements (buttons, borders, icons) against light backgrounds, not the
+     4.5:1 required for small text. Buttons/icons keep using --accent;
+     anywhere accent color is applied to actual small text should use this
+     instead. Dark mode doesn't need the split — #ff8a3d already clears
+     4.5:1 as text against the dark background at any size. */
+  --accent-text: #b04d08;
   /* Text/icon color placed ON TOP of --accent (buttons, active pills).
-     Was borrowed from --bg-base before accent became a real color — that
-     worked by coincidence when accent was just inverted monochrome, but
-     canvas (light gray/near-black) doesn't contrast against orange. Fixed
-     white reads correctly on this accent in both themes. */
+     White reads correctly here in light mode (3.3:1 against #e8650a,
+     meets WCAG's 3:1 threshold for large/UI-scale text) — but the SAME
+     white fails badly against dark mode's brighter #ff8a3d (2.35:1, an
+     actual failure even at large-text scale). Dark mode gets its own
+     value below instead of sharing this one. */
   --on-accent: #ffffff;
 
   --error: #d64545;
@@ -45,6 +55,12 @@
 
   --accent: #ff8a3d;
   --accent-strong: #ffa563;
+  --accent-text: #ff8a3d; /* same as accent — already clears 4.5:1 as text at any size in dark mode */
+  /* Dark mode's accent is bright enough that WHITE text on it fails
+     contrast (2.35:1) — near-black passes cleanly instead (7.72:1). This
+     is a real WCAG failure fix, not a style preference: light mode's
+     accent is dark enough for white text to work, dark mode's isn't. */
+  --on-accent: #161616;
 
   --error: #ff6b6b;
   --success: #6fcf97;

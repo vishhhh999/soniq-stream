@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Share, SquarePlus, Download } from "lucide-react";
 import Logo from "./Logo";
+import { MODAL_SPRING } from "@/lib/motion";
 
 const DISMISS_KEY = "soniq-install-prompt-dismissed";
 
@@ -75,7 +76,7 @@ export default function InstallPrompt() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          transition={MODAL_SPRING}
           className="fixed bottom-4 left-4 right-4 z-[70] bg-elevated border border-border rounded-xl shadow-2xl p-4"
         >
           <div className="flex items-start gap-3">
