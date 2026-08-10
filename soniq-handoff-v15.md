@@ -7,7 +7,21 @@ Vish is building SONIQ (soniq.lol). No em dashes ever. Direct, terse. Real zips 
 
 ---
 
-## Session summary: v8.14.0 -> v8.15.0
+## v8.15.1 — Upgrade CTA wired properly
+
+The v8.15.0 handoff above left the snippet lock overlay's upgrade prompt as text-only, no button, because `SettingsModal` only opened via local state inside `LibraryHome` and there was no clean path to it from the standalone album page or from deep inside `NewSnippetModal`. Fixed properly instead of patched around:
+
+- **`lib/settingsBus.ts`** (new) — tiny `window` CustomEvent pub/sub: `openSettings(section?)` / `onOpenSettings(cb)`. Deliberately not a React context — this needs to be callable from anywhere without every intermediate component in the tree needing to know about it.
+- **`components/AuthedPlayerShell.tsx`** — now the single mount point for `SettingsModal`, since it's already the one thing rendered on every authenticated route (root layout) regardless of whether you're in the Library, an album page, embed, wherever. Listens for the bus event, renders `SettingsModal` with the requested section.
+- **`components/SettingsModal.tsx`** — takes an optional `initialSection="billing"` prop, scrolls the billing block into view on mount when set (`billingRef` + `scrollIntoView`). No tab system existed to switch between, it's one long scrolling modal, so "jump to section" means scroll, not switch.
+- **`components/LibraryHome.tsx`** — its own local `showSettings` state and `<SettingsModal>` render removed. The nav settings button now calls `openSettings()` through the bus instead, so there's exactly one `SettingsModal` instance in the app, not two independently-mounted copies that could theoretically both be open at once.
+- **`components/snippet/NewSnippetModal.tsx`** — the lock overlay's Upgrade button now closes the snippet modal and calls `openSettings("billing")`. Closing first because `SettingsModal` is `z-[60]` and the snippet modal is `z-[90]` — layering it underneath a full-screen takeover would've meant it opened invisibly behind it.
+
+This also fixes something the v8.15.0 pass didn't know was broken: the album page (`app/album/[id]/page.tsx`) never had any way to open Settings at all before this, snippet export or otherwise, since Settings lived entirely in `LibraryHome`'s local state. It does now, for free, as a side effect of centralizing the modal.
+
+---
+
+
 
 ### Discovery: v8.14.0 zip was internally inconsistent
 The handoff claimed server-side snippet rendering (real ffmpeg mux, `@napi-rs/canvas`) was live and verified end-to-end. The actual zip contents didn't match: no `app/api/snippets/render/route.ts`, no server deps in `package.json`, `lib/useSnippetExport.ts` was still the pre-8.13 client-side MediaRecorder version. `lib/version.ts` said 8.13.0 in the first zip Vish sent. A corrected v8.14.0 zip was provided afterward that did contain the real server-render implementation.

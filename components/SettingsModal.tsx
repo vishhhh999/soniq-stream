@@ -13,7 +13,7 @@ import { APP_VERSION } from "@/lib/version";
 import { gradientFromSeed } from "@/lib/gradient";
 import { MODAL_SPRING } from "@/lib/motion";
 
-export default function SettingsModal({ onClose }: { onClose: () => void }) {
+export default function SettingsModal({ onClose, initialSection }: { onClose: () => void; initialSection?: "billing" }) {
   const { theme, toggle: toggleTheme } = useTheme();
   const { enabled: ambientOn, toggle: toggleAmbient } = useAmbient();
   const { crossfadeEnabled, crossfadeDuration, setCrossfade } = usePlayer();
@@ -260,6 +260,16 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   };
 
   const { from: gradFrom, to: gradTo } = gradientFromSeed(userId ?? "default");
+  const billingRef = useRef<HTMLDivElement>(null);
+
+  // Jump straight to the billing section when opened from an upgrade CTA
+  // elsewhere in the app (e.g. the snippet export premium lock), instead of
+  // dropping the person at the top and making them scroll to find it.
+  useEffect(() => {
+    if (initialSection === "billing" && billingRef.current) {
+      billingRef.current.scrollIntoView({ block: "start" });
+    }
+  }, [initialSection]);
 
   return (
     <AnimatePresence>
@@ -341,7 +351,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                 checkout.js modal (no redirect page — see startUpgrade);
                 cancellation is a direct API call since Razorpay has no
                 self-serve billing portal for standard accounts. */}
-            <div className="px-6 py-5 border-t border-border">
+            <div ref={billingRef} className="px-6 py-5 border-t border-border">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs uppercase tracking-wide text-tertiary">Plan</span>
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${plan?.isPaid ? "bg-accent/15 text-accent" : "bg-surface text-secondary"}`}>

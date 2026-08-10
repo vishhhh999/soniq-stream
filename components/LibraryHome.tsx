@@ -6,7 +6,7 @@ import { Plus, Search, X as XIcon, Settings as SettingsIcon, Disc3 } from "lucid
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import AddMenu from "@/components/AddMenu";
 import UploadDropZone from "@/components/UploadDropZone";
-import SettingsModal from "@/components/SettingsModal";
+import { openSettings } from "@/lib/settingsBus";
 import Logo from "@/components/Logo";
 import TrackDetail from "@/components/TrackDetail";
 import TrackRowGroup from "@/components/TrackRow";
@@ -36,7 +36,10 @@ export default function LibraryHome() {
   const [query, setQuery] = useState("");
   const [detailTrack, setDetailTrack] = useState<Track | null>(null);
   const [showNewAlbum, setShowNewAlbum] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  // SettingsModal itself now lives in AuthedPlayerShell (mounted once, on
+  // every authenticated route) so it's reachable from outside this
+  // component's tree too, e.g. the snippet export upgrade CTA on the
+  // standalone album page. This nav button just requests it via the bus.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false); // mobile only
@@ -263,7 +266,7 @@ export default function LibraryHome() {
             )}
           </div>
           <button
-            onClick={() => setShowSettings(true)}
+            onClick={() => openSettings()}
             aria-label="Settings"
             title="Settings"
             className="w-8 h-8 flex items-center justify-center rounded-full border border-border hover:border-border-strong transition-colors text-secondary hover:text-primary"
@@ -444,7 +447,7 @@ export default function LibraryHome() {
         />
       )}
 
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {/* SettingsModal itself is rendered globally in AuthedPlayerShell now. */}
 
       <DragOverlay>
         {activeDragLabel && (

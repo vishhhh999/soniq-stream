@@ -10,6 +10,7 @@ import { TEMPLATE_RENDERERS } from "@/lib/snippetRenderers";
 import { useSnippetExport } from "@/lib/useSnippetExport";
 import { MODAL_SPRING } from "@/lib/motion";
 import WaveformTrimSelector from "../WaveformTrimSelector";
+import { openSettings } from "@/lib/settingsBus";
 
 const MAX_SNIPPET_SEC = 30;
 
@@ -200,7 +201,13 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
                 <Lock size={18} strokeWidth={1.5} className="text-primary" />
               </div>
               <p className="text-sm font-medium text-white">Premium template</p>
-              <p className="text-xs text-white/70 max-w-[220px]">Upgrade from Settings &rarr; Billing to unlock this template and export it in full quality.</p>
+              <p className="text-xs text-white/70 max-w-[220px]">Upgrade to unlock this template and export it in full quality.</p>
+              <button
+                onClick={() => { onClose(); openSettings("billing"); }}
+                className="mt-1 text-[11px] uppercase tracking-wide px-4 py-2 rounded-full bg-accent text-on-accent hover:bg-accent-strong transition-colors"
+              >
+                Upgrade
+              </button>
             </div>
           )}
 
