@@ -51,10 +51,12 @@ function drawVinyl(
   ctx.restore();
 }
 
-// Title + duration, in the user-selected text color. No artist name, per
-// Vish's earlier call.
+// Title + a live "current / total" counter against the FULL track, not the
+// snippet window -- e.g. "0:16 / 3:04" for a clip starting 16s into a
+// 3:04 track, ticking up every frame while it plays so the overlay reads
+// as "this is playing" rather than a static label.
 function drawTrackInfo(rc: SnippetRenderContext, x: number, y: number, align: "left" | "center" | "right" = "center") {
-  const { ctx, trackTitle, duration, textColor } = rc;
+  const { ctx, trackTitle, t, trimStartAbs, trackDurationAbs, textColor } = rc;
   const color = TEXT_COLOR_HEX[textColor];
   ctx.textAlign = align;
   ctx.fillStyle = color;
@@ -63,7 +65,7 @@ function drawTrackInfo(rc: SnippetRenderContext, x: number, y: number, align: "l
   ctx.font = "400 22px 'General Sans', sans-serif";
   ctx.fillStyle = color;
   ctx.filter = "opacity(0.65)";
-  ctx.fillText(fmtDuration(duration), x, y + 32);
+  ctx.fillText(`${fmtDuration(trimStartAbs + t)} / ${fmtDuration(trackDurationAbs)}`, x, y + 32);
   ctx.filter = "none";
 }
 
@@ -86,7 +88,7 @@ export function renderVinylEdge(rc: SnippetRenderContext) {
   drawBackground(rc);
   const radius = height * 0.34;
   drawVinyl(rc, radius * 0.25, height / 2, radius, t);
-  drawTrackInfo(rc, width / 2, height * 0.86);
+  drawTrackInfo(rc, width / 2, height * 0.91);
 }
 
 // ── Premium templates ───────────────────────────────────────────────────
@@ -151,7 +153,7 @@ export function renderPulseGrid(rc: SnippetRenderContext) {
 // Track title as the visual hero, waveform-shaped underline beneath it.
 // No vinyl at all — deliberately the odd one out in the set.
 export function renderTypeWave(rc: SnippetRenderContext) {
-  const { ctx, width, height, trackTitle, duration, textColor, frequencyData } = rc;
+  const { ctx, width, height, trackTitle, t, trimStartAbs, trackDurationAbs, textColor, frequencyData } = rc;
   drawBackground(rc);
   const color = TEXT_COLOR_HEX[textColor];
 
@@ -171,11 +173,11 @@ export function renderTypeWave(rc: SnippetRenderContext) {
   const startY = height * 0.42 - (lines.length - 1) * 36;
   lines.forEach((l, i) => ctx.fillText(l, width / 2, startY + i * 72));
 
-  // Duration, right under the title.
+  // Live "current / total" counter, right under the title.
   ctx.font = "400 24px 'General Sans', sans-serif";
   ctx.fillStyle = color;
   ctx.filter = "opacity(0.65)";
-  ctx.fillText(fmtDuration(duration), width / 2, startY + lines.length * 72 + 20);
+  ctx.fillText(`${fmtDuration(trimStartAbs + t)} / ${fmtDuration(trackDurationAbs)}`, width / 2, startY + lines.length * 72 + 20);
   ctx.filter = "none";
 
   // Waveform-shaped underline, audio-reactive when data is available.

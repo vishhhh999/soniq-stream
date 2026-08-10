@@ -97,4 +97,6 @@ export interface SnippetRenderContext {
   useAlbumArt: boolean;
   spinSpeed: number; // multiplier on the base disc rotation rate, default 1
   textColor: TextColor;
+  trimStartAbs: number; // absolute position in the full track where this snippet starts
+  trackDurationAbs: number; // full track length, for the "0:16 / 3:04" live counter
 }

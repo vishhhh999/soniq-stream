@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, Lock, Volume2, VolumeX, Download, Gauge } from "lucide-react";
+import { X, Check, Lock, Volume2, VolumeX, Download, Gauge, Play, Pause } from "lucide-react";
 import { usePlayer, Track } from "../PlayerProvider";
 import { SNIPPET_TEMPLATES, SnippetTemplateId, DiscColor, GradientChoice, TextColor, TEXT_COLOR_HEX, VINYL_ASSET_PATHS } from "@/lib/snippetTemplates";
 import { TEMPLATE_RENDERERS } from "@/lib/snippetRenderers";
@@ -28,6 +28,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
   const [trimStart, setTrimStart] = useState(0);
   const [trackDuration, setTrackDuration] = useState(track.durationSec ?? MAX_SNIPPET_SEC);
   const [trimEnd, setTrimEndState] = useState(Math.min(MAX_SNIPPET_SEC, track.durationSec ?? MAX_SNIPPET_SEC));
+  const [previewPlaying, setPreviewPlaying] = useState(true);
 
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -65,6 +66,12 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
   // dedicated (muted-optional) audio element, independent of the main
   // player so opening this modal never disturbs whatever's actually playing
   // in the app.
+  //
+  // Elapsed time is derived from audio.currentTime (not a separate
+  // performance.now() clock) -- that makes pause a one-line no-op instead
+  // of needing its own paused-offset bookkeeping, since the audio element's
+  // own currentTime naturally freezes while paused and the draw loop just
+  // reads whatever it currently is.
   useEffect(() => {
     const canvas = previewCanvasRef.current;
     if (!canvas) return;
@@ -77,23 +84,27 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
     audio.muted = muted;
     audio.currentTime = trimStart;
     previewAudioRef.current = audio;
-    audio.play().catch(() => {});
+    if (previewPlaying) audio.play().catch(() => {});
     audio.addEventListener("loadedmetadata", () => {
       if (Number.isFinite(audio.duration) && audio.duration > 0 && !track.durationSec) {
         setTrackDuration(audio.duration);
       }
     }, { once: true });
 
-    const startWall = performance.now();
     const segDuration = trimEnd - trimStart;
 
     const draw = () => {
       const vinylImages = vinylImgsRef.current;
       if (!vinylImages) { previewRafRef.current = requestAnimationFrame(draw); return; }
-      let elapsed = (performance.now() - startWall) / 1000;
-      if (elapsed >= segDuration) {
+      let elapsed = audio.currentTime - trimStart;
+      // Loop back to the start once the trimmed window ends -- checked every
+      // frame rather than relying on the audio element's own 'ended' event,
+      // since currentTime is reset before it ever reaches the track's real
+      // end (the trim window ends well before the file does, most of the
+      // time).
+      if (elapsed >= segDuration || audio.currentTime >= trimEnd) {
         audio.currentTime = trimStart;
-        audio.play().catch(() => {});
+        if (previewPlaying) audio.play().catch(() => {});
         elapsed = 0;
       }
       const renderer = TEMPLATE_RENDERERS[templateId];
@@ -106,6 +117,8 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
         vinylImages, discColor, gradient, useAlbumArt,
         spinSpeed,
         textColor,
+        trimStartAbs: trimStart,
+        trackDurationAbs: trackDuration,
       });
       previewRafRef.current = requestAnimationFrame(draw);
     };
@@ -118,6 +131,16 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateId, discColor, gradient, useAlbumArt, trimStart, trimEnd, muted, spinSpeed, textColor, track.id]);
+
+  // Play/pause toggle for the preview -- separate effect so toggling it
+  // doesn't tear down and rebuild the whole draw loop (which would restart
+  // image loading state, etc).
+  useEffect(() => {
+    const audio = previewAudioRef.current;
+    if (!audio) return;
+    if (previewPlaying) audio.play().catch(() => {});
+    else audio.pause();
+  }, [previewPlaying]);
 
   const selectedMeta = SNIPPET_TEMPLATES.find((t) => t.id === templateId)!;
   const locked = selectedMeta.premium && isPaid === false;
@@ -133,6 +156,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       albumArtUrl: track.albumCoverUrl ?? null,
       trackTitle: track.title,
       trimStart, trimEnd,
+      trackDuration,
       audioUrl: track.fileUrl,
       spinSpeed,
       textColor,
@@ -162,6 +186,13 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
         </button>
         <span className="text-sm font-medium text-primary">New Snippet</span>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPreviewPlaying((p) => !p)}
+            className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-secondary hover:text-primary transition-colors"
+            title={previewPlaying ? "Pause preview" : "Play preview"}
+          >
+            {previewPlaying ? <Pause size={16} strokeWidth={1.5} /> : <Play size={16} strokeWidth={1.5} className="ml-0.5" />}
+          </button>
           <button
             onClick={() => setMuted((m) => !m)}
             className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-secondary hover:text-primary transition-colors"

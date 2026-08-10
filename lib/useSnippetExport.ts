@@ -26,6 +26,7 @@ interface ExportOptions {
   trackTitle: string;
   trimStart: number;
   trimEnd: number;
+  trackDuration: number; // full track length, for the live "current / total" counter
   audioUrl: string;
   spinSpeed: number; // multiplier on the base rotation rate, 0.5x-2x
   textColor: TextColor;
@@ -118,6 +119,8 @@ export function useSnippetExport() {
           discColor: opts.discColor, gradient: opts.gradient, useAlbumArt: opts.useAlbumArt,
           spinSpeed: opts.spinSpeed,
           textColor: opts.textColor,
+          trimStartAbs: opts.trimStart,
+          trackDurationAbs: opts.trackDuration,
         };
         renderer(rc);
         setProgress(Math.min(1, elapsed / duration));
