@@ -32,6 +32,22 @@ type PlayerState = {
   eq: { low: number; mid: number; high: number };
   setEQ: (band: "low" | "mid" | "high", value: number) => void;
   eqBypassed: boolean; setEQBypassed: (v: boolean) => void;
+  // Phase 2 stems mixing — the Stems tab decodes the 4 stem files into
+  // AudioBuffers and schedules them via AudioBufferSourceNode against this
+  // same AudioContext, for sample-accurate sync (native <audio> elements
+  // drift against each other over time, which is why this isn't just 4
+  // more <audio> tags). When stem playback is active, the main track's
+  // own output is silenced here so the two don't play simultaneously.
+  audioContext: () => AudioContext | null;
+  stemsMuted: boolean; setStemsMuted: (v: boolean) => void;
+  // Varispeed — native playbackRate + preservesPitch. NOTE: this changes
+  // speed and pitch together when preservesPitch is off (classic tape-style
+  // varispeed), or speed only (pitch held constant) when it's on. True
+  // INDEPENDENT pitch-shift-without-speed-change needs a real time-stretch/
+  // phase-vocoder library (e.g. soundtouchjs) — not implemented, would be
+  // a deliberate follow-up if wanted, not something playbackRate can do.
+  playbackRate: number; setPlaybackRate: (r: number) => void;
+  preservesPitch: boolean; setPreservesPitch: (v: boolean) => void;
   crossfadeEnabled: boolean; crossfadeDuration: number; setCrossfade: (e: boolean, d: number) => void;
   // The track being crossfaded INTO, set the instant the gain ramp begins
   // and cleared once the swap completes (or is cancelled by a seek). Lets
@@ -129,6 +145,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { eqRef.current = eq; }, [eq]);
   const [eqBypassed, setEQBypassedState] = useState(false);
   const eqSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Master gain sits between the analyser and destination — silenced while
+  // the Stems tab is actively mixing its own AudioBufferSourceNodes into
+  // the same destination, so the main mixed-down track doesn't also play
+  // underneath the separated stems.
+  const masterGainRef = useRef<GainNode | null>(null);
+  const [stemsMuted, setStemsMutedState] = useState(false);
+  const [playbackRate, setPlaybackRateState] = useState(1);
+  const [preservesPitch, setPreservesPitchState] = useState(true);
 
   const applyEQToChains = useCallback((values: { low: number; mid: number; high: number }) => {
     const nodes = [eqLowARef.current, eqLowBRef.current];
@@ -179,6 +203,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const sB = ctx.createMediaElementSource(elB); const gB = ctx.createGain(); gB.gain.value = 0;
       const chainB = makeEQChain(sB); chainB.output.connect(gB); gB.connect(an);
       an.connect(ctx.destination);
+
+      // Master gain — inserted after the analyser tap so getFrequencyData
+      // still sees the full signal even while this is silenced for stems mode.
+      const master = ctx.createGain(); master.gain.value = stemsMuted ? 0 : 1;
+      an.disconnect();
+      an.connect(master);
+      master.connect(ctx.destination);
+      masterGainRef.current = master;
 
       eqLowARef.current = chainA.low; eqMidARef.current = chainA.mid; eqHighARef.current = chainA.high;
       eqLowBRef.current = chainB.low; eqMidBRef.current = chainB.mid; eqHighBRef.current = chainB.high;
@@ -628,6 +660,39 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     applyEQToChains(v ? { low: 0, mid: 0, high: 0 } : eqRef.current);
   }, [applyEQToChains]);
 
+  const audioContext = useCallback(() => audioCtxRef.current, []);
+  const setStemsMuted = useCallback((v: boolean) => {
+    setStemsMutedState(v);
+    if (masterGainRef.current) masterGainRef.current.gain.value = v ? 0 : 1;
+  }, []);
+
+  const applyRateToElements = useCallback((rate: number, preserve: boolean) => {
+    [audioRefA.current, audioRefB.current].forEach((el) => {
+      if (!el) return;
+      el.playbackRate = rate;
+      try { (el as any).preservesPitch = preserve; (el as any).mozPreservesPitch = preserve; (el as any).webkitPreservesPitch = preserve; } catch {}
+    });
+  }, []);
+
+  const setPlaybackRate = useCallback((r: number) => {
+    setPlaybackRateState(r);
+    applyRateToElements(r, preservesPitch);
+  }, [applyRateToElements, preservesPitch]);
+
+  const setPreservesPitch = useCallback((v: boolean) => {
+    setPreservesPitchState(v);
+    applyRateToElements(playbackRate, v);
+  }, [applyRateToElements, playbackRate]);
+
+  // Varispeed resets to normal on every track change — a saved-per-track
+  // speed isn't part of this scope, and silently carrying 1.4x into the
+  // next track someone plays would be a surprising, easy-to-miss bug.
+  useEffect(() => {
+    setPlaybackRateState(1);
+    applyRateToElements(1, preservesPitch);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id]);
+
   const getFrequencyData = useCallback(() => {
     if (!analyserRef.current || !dataArrayRef.current) return null;
     analyserRef.current.getByteFrequencyData(dataArrayRef.current as Uint8Array<ArrayBuffer>);
@@ -639,6 +704,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       current, isPlaying, currentTime, duration, audioRef, queue, queueIndex, shuffleOn,
       play, playQueue, toggle, next, previous, toggleShuffle, jumpToQueueIndex, reorderQueue,
       repeatMode, cycleRepeatMode, getFrequencyData, eq, setEQ, eqBypassed, setEQBypassed,
+      audioContext, stemsMuted, setStemsMuted, playbackRate, setPlaybackRate, preservesPitch, setPreservesPitch,
       crossfadeEnabled, crossfadeDuration, setCrossfade,
       crossfadingToTrack, preloadingTrack,
     }}>

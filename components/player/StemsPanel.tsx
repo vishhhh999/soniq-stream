@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Download, X, AudioLines } from "lucide-react";
+import { Loader2, Download, X, AudioLines, Volume2, VolumeX } from "lucide-react";
 import { Track } from "../PlayerProvider";
+import { useStemsEngine, StemName } from "@/lib/useStemsEngine";
 
 const STEMS: { name: string; urlField: "vocalsUrl" | "drumsUrl" | "bassUrl" | "otherUrl" }[] = [
   { name: "vocals", urlField: "vocalsUrl" },
@@ -16,6 +17,17 @@ export default function StemsPanel({ track }: { track: Track }) {
   const [loaded, setLoaded] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Only wire up the live-mix engine once a job is actually completed —
+  // passing null keeps useStemsEngine fully idle otherwise.
+  const stemUrls = job?.status === "completed"
+    ? {
+        vocals: job.vocalsUrl ?? undefined,
+        drums: job.drumsUrl ?? undefined,
+        bass: job.bassUrl ?? undefined,
+        other: job.otherUrl ?? undefined,
+      }
+    : null;
+  const engine = useStemsEngine(stemUrls);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,26 +111,44 @@ export default function StemsPanel({ track }: { track: Track }) {
         </div>
       )}
 
+      {engine.error && (
+        <div className="mb-3 bg-error/15 border border-error/40 rounded-lg px-3 py-2 text-xs text-error">
+          {engine.error}
+        </div>
+      )}
+
       <div className="grid grid-cols-4 gap-2 flex-1">
         {STEMS.map(({ name, urlField }) => {
           const url = job?.status === "completed" ? job?.[urlField] : null;
+          const isMuted = engine.muted[name as StemName];
           return (
-            <div
+            <button
               key={name}
-              className="rounded-xl bg-canvas flex flex-col items-center justify-between py-4 px-2"
+              onClick={() => url && engine.ready && engine.toggleMute(name as StemName)}
+              disabled={!url || !engine.ready}
+              className={`rounded-xl flex flex-col items-center justify-between py-4 px-2 transition-colors ${
+                url ? "bg-canvas hover:bg-canvas/70 cursor-pointer" : "bg-canvas"
+              } disabled:cursor-default`}
             >
               <div className="flex-1 flex items-center justify-center text-tertiary">
-                {job?.status === "processing" ? (
+                {job?.status === "processing" || (url && engine.loading) ? (
                   <Loader2 size={18} strokeWidth={1.5} className="animate-spin" />
+                ) : url && engine.ready ? (
+                  isMuted ? (
+                    <VolumeX size={18} strokeWidth={1.5} className="text-tertiary" />
+                  ) : (
+                    <Volume2 size={18} strokeWidth={1.5} className="text-accent" />
+                  )
                 ) : (
                   <AudioLines size={18} strokeWidth={1.5} className={url ? "text-primary" : ""} />
                 )}
               </div>
-              <p className="text-xs text-secondary mt-3">{name}</p>
+              <p className={`text-xs mt-3 ${isMuted ? "text-tertiary" : "text-secondary"}`}>{name}</p>
               {url ? (
                 <a
                   href={url}
                   download
+                  onClick={(e) => e.stopPropagation()}
                   className="mt-2 text-tertiary hover:text-primary transition-colors"
                   title={`Download ${name}`}
                 >
@@ -127,7 +157,7 @@ export default function StemsPanel({ track }: { track: Track }) {
               ) : (
                 <span className="mt-2 w-1 h-1 rounded-full bg-tertiary/40" />
               )}
-            </div>
+            </button>
           );
         })}
       </div>
@@ -137,9 +167,14 @@ export default function StemsPanel({ track }: { track: Track }) {
           Separating stems — this can take a few minutes.
         </p>
       )}
-      {job?.status === "completed" && (
+      {job?.status === "completed" && engine.loading && (
         <p className="text-xs text-tertiary text-center mt-4">
-          Ready — download individually above. Live solo/mute during playback is coming soon.
+          Loading stems for live playback...
+        </p>
+      )}
+      {job?.status === "completed" && engine.ready && (
+        <p className="text-xs text-tertiary text-center mt-4">
+          Tap a stem to mute or unmute it during playback.
         </p>
       )}
     </div>
