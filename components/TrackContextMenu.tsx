@@ -5,11 +5,12 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, ListPlus, Pencil, Download, FolderInput, Copy,
-  Trash2, ChevronRight, X, AudioLines,
+  Trash2, ChevronRight, X, AudioLines, Wand2,
 } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
 import type { Album } from "./AlbumCard";
 import { MODAL_SPRING } from "@/lib/motion";
+import NewSnippetModal from "./snippet/NewSnippetModal";
 
 type Props = {
   track: Track;
@@ -40,6 +41,7 @@ export default function TrackContextMenu({
   const [duplicating, setDuplicating] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSnippetModal, setShowSnippetModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setMounted(true), []);
@@ -190,6 +192,11 @@ export default function TrackContextMenu({
           onClick={download}
           disabled={downloading}
         />
+        <MenuItem
+          icon={<Wand2 size={14} strokeWidth={1.5} />}
+          label="Create snippet"
+          onClick={() => setShowSnippetModal(true)}
+        />
         {!isReadOnly && (
           <MenuItem
             icon={<Copy size={14} strokeWidth={1.5} />}
@@ -267,43 +274,68 @@ export default function TrackContextMenu({
     </div>
   );
 
+  // The snippet modal must survive `position` going null (which happens the
+  // instant this menu closes, since the "Create snippet" item calls
+  // setShowSnippetModal(true) without also closing the menu — see its
+  // onClick). Rendered independent of both the mobile/desktop menu bodies
+  // below so it isn't torn down along with them.
+  const snippetPortal = showSnippetModal
+    ? createPortal(
+        <NewSnippetModal track={track} onClose={() => { setShowSnippetModal(false); onClose(); }} />,
+        document.body
+      )
+    : null;
+
+  // While the snippet modal is open, don't also render the dropdown/sheet
+  // underneath it — the modal is full-screen, so this is just avoiding an
+  // unnecessary hidden layer, not a visual bug either way.
+  if (showSnippetModal) return snippetPortal;
+
   // Mobile: bottom sheet with backdrop.
   if (isMobile) {
-    return createPortal(
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 backdrop-ambient z-50 flex items-end"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={MODAL_SPRING}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full rounded-t-2xl overflow-hidden pb-safe"
-          >
-            {menuContent}
-            <button
+    return (
+      <>
+        {snippetPortal}
+        {createPortal(
+          <AnimatePresence>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 backdrop-ambient z-50 flex items-end"
               onClick={onClose}
-              className="w-full bg-elevated py-4 text-sm text-secondary flex items-center justify-center gap-2 border-t border-border"
             >
-              <X size={14} strokeWidth={1.5} /> Cancel
-            </button>
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>,
-      document.body
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={MODAL_SPRING}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full rounded-t-2xl overflow-hidden pb-safe"
+              >
+                {menuContent}
+                <button
+                  onClick={onClose}
+                  className="w-full bg-elevated py-4 text-sm text-secondary flex items-center justify-center gap-2 border-t border-border"
+                >
+                  <X size={14} strokeWidth={1.5} /> Cancel
+                </button>
+              </motion.div>
+            </motion.div>
+          </AnimatePresence>,
+          document.body
+        )}
+      </>
     );
   }
 
   // Desktop: floating card pinned to button position.
-  if (!position) return null;
+  if (!position) return snippetPortal;
 
-  return createPortal(
+  return (
+    <>
+      {snippetPortal}
+      {createPortal(
     <div
       className="fixed z-50"
       style={{ top: position.top, right: position.right }}
@@ -311,6 +343,8 @@ export default function TrackContextMenu({
       {menuContent}
     </div>,
     document.body
+  )}
+    </>
   );
 }
 
