@@ -2,7 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
-import { X, Monitor } from "lucide-react";
+import { X, Laptop2 } from "lucide-react";
 import { MODAL_SPRING } from "@/lib/motion";
 
 export default function SnippetDesktopOnlyModal({ onClose }: { onClose: () => void }) {
@@ -17,18 +17,26 @@ export default function SnippetDesktopOnlyModal({ onClose }: { onClose: () => vo
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={MODAL_SPRING}
         onClick={(e) => e.stopPropagation()}
-        className="bg-elevated border border-border rounded-2xl p-8 max-w-sm w-full text-center relative"
+        className="relative w-full max-w-sm rounded-2xl overflow-hidden border border-border"
       >
-        <button onClick={onClose} className="absolute top-4 right-4 text-tertiary hover:text-primary transition-colors">
-          <X size={16} strokeWidth={1.5} />
-        </button>
-        <div className="w-12 h-12 rounded-full bg-canvas flex items-center justify-center mx-auto mb-4 text-secondary">
-          <Monitor size={20} strokeWidth={1.5} />
+        {/* Dark gradient hero, same visual language as the snippet templates
+            themselves (Depth Vinyl's dark gradient bg) instead of a flat
+            neutral card -- the "bland" screen Vish flagged. */}
+        <div className="relative bg-gradient-to-b from-[#1a1a1a] to-[#050505] px-8 pt-10 pb-8 text-center">
+          <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors">
+            <X size={16} strokeWidth={1.5} />
+          </button>
+          <div className="w-14 h-14 rounded-full bg-white/8 border border-white/10 flex items-center justify-center mx-auto mb-5">
+            <Laptop2 size={22} strokeWidth={1.5} className="text-accent" />
+          </div>
+          <p className="text-base font-medium text-white mb-2">Desktop only, for now</p>
+          <p className="text-xs text-white/60 leading-relaxed max-w-[260px] mx-auto">
+            Snippet export is desktop-only for now, we&apos;re working on bringing it to mobile soon.
+          </p>
         </div>
-        <p className="text-sm font-medium text-primary mb-1.5">Desktop only, for now</p>
-        <p className="text-xs text-secondary leading-relaxed">
-          Snippet export is desktop-only for now, we&apos;re working on bringing it to mobile soon.
-        </p>
+        <div className="bg-elevated px-6 py-4 text-center">
+          <p className="text-[11px] text-tertiary">Open SONIQ on desktop to create and export a snippet.</p>
+        </div>
       </motion.div>
     </motion.div>,
     document.body

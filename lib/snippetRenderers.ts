@@ -15,12 +15,12 @@ function drawBackground({ ctx, width, height, gradient }: SnippetRenderContext) 
 // The label sits at roughly 30% of the disc's radius from center, matching
 // the real asset's proportions.
 function drawVinyl(
-  { ctx, vinylImages, discColor, albumArt, useAlbumArt }: SnippetRenderContext,
+  { ctx, vinylImages, discColor, albumArt, useAlbumArt, spinSpeed }: SnippetRenderContext,
   cx: number, cy: number, radius: number, t: number,
 ) {
   const img = vinylImages[discColor];
   if (!img) return;
-  const rotation = (t / 1.8) * Math.PI * 2;
+  const rotation = (t / 1.8) * Math.PI * 2 * (spinSpeed || 1);
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -44,15 +44,13 @@ function drawVinyl(
   ctx.restore();
 }
 
-function drawTrackInfo(rc: SnippetRenderContext, x: number, y: number, align: CanvasTextAlign = "center") {
-  const { ctx, trackTitle, trackArtist } = rc;
+// Title only, per Vish's call -- no artist name underneath.
+function drawTrackInfo(rc: SnippetRenderContext, x: number, y: number, align: "left" | "center" | "right" = "center") {
+  const { ctx, trackTitle } = rc;
   ctx.textAlign = align;
   ctx.fillStyle = "#ffffff";
   ctx.font = "600 34px 'General Sans', sans-serif";
   ctx.fillText(trackTitle, x, y);
-  ctx.font = "400 24px 'General Sans', sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
-  ctx.fillText(trackArtist, x, y + 34);
 }
 
 // ── Free templates ──────────────────────────────────────────────────────
@@ -139,7 +137,7 @@ export function renderPulseGrid(rc: SnippetRenderContext) {
 // Track title as the visual hero, waveform-shaped underline beneath it.
 // No vinyl at all — deliberately the odd one out in the set.
 export function renderTypeWave(rc: SnippetRenderContext) {
-  const { ctx, width, height, trackTitle, trackArtist, frequencyData } = rc;
+  const { ctx, width, height, trackTitle, frequencyData } = rc;
   drawBackground(rc);
 
   ctx.textAlign = "center";
@@ -158,12 +156,8 @@ export function renderTypeWave(rc: SnippetRenderContext) {
   const startY = height * 0.42 - (lines.length - 1) * 36;
   lines.forEach((l, i) => ctx.fillText(l, width / 2, startY + i * 72));
 
-  ctx.font = "400 26px 'General Sans', sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.fillText(trackArtist, width / 2, startY + lines.length * 72 + 20);
-
   // Waveform-shaped underline, audio-reactive when data is available.
-  const wfY = startY + lines.length * 72 + 70;
+  const wfY = startY + lines.length * 72 + 40;
   const barCount = 44;
   const barGap = (width * 0.7) / barCount;
   const startX = width * 0.15;

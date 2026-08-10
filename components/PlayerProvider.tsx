@@ -8,6 +8,8 @@ export type Track = {
   durationSec?: number | null; bpm?: number | null; key?: string | null;
   albumId?: string | null; albumCoverUrl?: string | null;
   eqLow?: number | null; eqMid?: number | null; eqHigh?: number | null;
+  eqLowMid?: number | null; eqHighMid?: number | null;
+  trimStart?: number | null; trimEnd?: number | null;
   // Admin cross-user read access only (see lib/adminAccess.ts). userId
   // lets PlayTracker recognize "this isn't my own track" and skip logging
   // a play for it — an admin listening to someone else's track shouldn't
@@ -29,8 +31,8 @@ type PlayerState = {
   // currently active (both A and B chains carry filters, since crossfade
   // can swap the active element mid-playback — see ensureGraph). Persisted
   // per-track via a debounced PATCH, loaded fresh whenever `current` changes.
-  eq: { low: number; mid: number; high: number };
-  setEQ: (band: "low" | "mid" | "high", value: number) => void;
+  eq: { low: number; lowMid: number; mid: number; highMid: number; high: number };
+  setEQ: (band: "low" | "lowMid" | "mid" | "highMid" | "high", value: number) => void;
   eqBypassed: boolean; setEQBypassed: (v: boolean) => void;
   // Phase 2 stems mixing — the Stems tab decodes the 4 stem files into
   // AudioBuffers and schedules them via AudioBufferSourceNode against this
@@ -129,18 +131,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const dataArrayRef = useRef<Uint8Array | null>(null);
   const graphReady = useRef(false);
 
-  // EQ — one 3-filter chain per element (source -> low -> mid -> high -> gain),
-  // built once in ensureGraph alongside everything else. Both chains always
-  // carry the same gain values (see applyEQToChains) so a crossfade swap
-  // never has to re-apply EQ — whichever element becomes active already has
-  // the right filter state.
+  // EQ — one 5-filter chain per element (source -> low -> lowMid -> mid ->
+  // highMid -> high -> gain), built once in ensureGraph alongside everything
+  // else. Both chains always carry the same gain values (see
+  // applyEQToChains) so a crossfade swap never has to re-apply EQ —
+  // whichever element becomes active already has the right filter state.
+  // Bumped from 3 to 5 bands in v8.15.0 to match the Apple Music/Spotify
+  // convention Vish asked for.
   const eqLowARef = useRef<BiquadFilterNode | null>(null);
+  const eqLowMidARef = useRef<BiquadFilterNode | null>(null);
   const eqMidARef = useRef<BiquadFilterNode | null>(null);
+  const eqHighMidARef = useRef<BiquadFilterNode | null>(null);
   const eqHighARef = useRef<BiquadFilterNode | null>(null);
   const eqLowBRef = useRef<BiquadFilterNode | null>(null);
+  const eqLowMidBRef = useRef<BiquadFilterNode | null>(null);
   const eqMidBRef = useRef<BiquadFilterNode | null>(null);
+  const eqHighMidBRef = useRef<BiquadFilterNode | null>(null);
   const eqHighBRef = useRef<BiquadFilterNode | null>(null);
-  const [eq, setEqState] = useState({ low: 0, mid: 0, high: 0 });
+  const [eq, setEqState] = useState({ low: 0, lowMid: 0, mid: 0, highMid: 0, high: 0 });
   const eqRef = useRef(eq);
   useEffect(() => { eqRef.current = eq; }, [eq]);
   const eqBypassedRef = useRef(false);
@@ -156,12 +164,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [playbackRate, setPlaybackRateState] = useState(1);
   const [preservesPitch, setPreservesPitchState] = useState(true);
 
-  const applyEQToChains = useCallback((values: { low: number; mid: number; high: number }) => {
-    const nodes = [eqLowARef.current, eqLowBRef.current];
+  const applyEQToChains = useCallback((values: { low: number; lowMid: number; mid: number; highMid: number; high: number }) => {
+    const lowNodes = [eqLowARef.current, eqLowBRef.current];
+    const lowMidNodes = [eqLowMidARef.current, eqLowMidBRef.current];
     const midNodes = [eqMidARef.current, eqMidBRef.current];
+    const highMidNodes = [eqHighMidARef.current, eqHighMidBRef.current];
     const highNodes = [eqHighARef.current, eqHighBRef.current];
-    nodes.forEach((n) => { if (n) n.gain.value = values.low; });
+    lowNodes.forEach((n) => { if (n) n.gain.value = values.low; });
+    lowMidNodes.forEach((n) => { if (n) n.gain.value = values.lowMid; });
     midNodes.forEach((n) => { if (n) n.gain.value = values.mid; });
+    highMidNodes.forEach((n) => { if (n) n.gain.value = values.highMid; });
     highNodes.forEach((n) => { if (n) n.gain.value = values.high; });
   }, []);
 
@@ -193,11 +205,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const an = ctx.createAnalyser(); an.fftSize = 256;
 
       const makeEQChain = (source: MediaElementAudioSourceNode) => {
-        const low = ctx.createBiquadFilter(); low.type = "lowshelf"; low.frequency.value = 320;
+        const low = ctx.createBiquadFilter(); low.type = "lowshelf"; low.frequency.value = 100;
+        const lowMid = ctx.createBiquadFilter(); lowMid.type = "peaking"; lowMid.frequency.value = 400; lowMid.Q.value = 1;
         const mid = ctx.createBiquadFilter(); mid.type = "peaking"; mid.frequency.value = 1000; mid.Q.value = 0.9;
-        const high = ctx.createBiquadFilter(); high.type = "highshelf"; high.frequency.value = 3200;
-        source.connect(low); low.connect(mid); mid.connect(high);
-        return { low, mid, high, output: high as AudioNode };
+        const highMid = ctx.createBiquadFilter(); highMid.type = "peaking"; highMid.frequency.value = 3500; highMid.Q.value = 1;
+        const high = ctx.createBiquadFilter(); high.type = "highshelf"; high.frequency.value = 10000;
+        source.connect(low); low.connect(lowMid); lowMid.connect(mid); mid.connect(highMid); highMid.connect(high);
+        return { low, lowMid, mid, highMid, high, output: high as AudioNode };
       };
 
       const sA = ctx.createMediaElementSource(elA); const gA = ctx.createGain(); gA.gain.value = 1;
@@ -214,15 +228,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       master.connect(ctx.destination);
       masterGainRef.current = master;
 
-      eqLowARef.current = chainA.low; eqMidARef.current = chainA.mid; eqHighARef.current = chainA.high;
-      eqLowBRef.current = chainB.low; eqMidBRef.current = chainB.mid; eqHighBRef.current = chainB.high;
+      eqLowARef.current = chainA.low; eqLowMidARef.current = chainA.lowMid; eqMidARef.current = chainA.mid; eqHighMidARef.current = chainA.highMid; eqHighARef.current = chainA.high;
+      eqLowBRef.current = chainB.low; eqLowMidBRef.current = chainB.lowMid; eqMidBRef.current = chainB.mid; eqHighMidBRef.current = chainB.highMid; eqHighBRef.current = chainB.high;
 
       dataArrayRef.current = new Uint8Array(an.frequencyBinCount);
       audioCtxRef.current = ctx; gainARef.current = gA; gainBRef.current = gB; analyserRef.current = an;
       graphReady.current = true;
       // Apply whatever EQ state is already pending (e.g. a track played
       // before the user gesture that unlocks AudioContext had a chance to run).
-      applyEQToChains(eqBypassedRef.current ? { low: 0, mid: 0, high: 0 } : eqRef.current);
+      applyEQToChains(eqBypassedRef.current ? { low: 0, lowMid: 0, mid: 0, highMid: 0, high: 0 } : eqRef.current);
     } catch (e) { console.warn("Web Audio unavailable:", e); }
   }, []);
 
@@ -629,15 +643,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const next = {
       low: current?.eqLow ?? 0,
+      lowMid: current?.eqLowMid ?? 0,
       mid: current?.eqMid ?? 0,
+      highMid: current?.eqHighMid ?? 0,
       high: current?.eqHigh ?? 0,
     };
     setEqState(next);
-    applyEQToChains(eqBypassed ? { low: 0, mid: 0, high: 0 } : next);
+    applyEQToChains(eqBypassed ? { low: 0, lowMid: 0, mid: 0, highMid: 0, high: 0 } : next);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
 
-  const setEQ = useCallback((band: "low" | "mid" | "high", value: number) => {
+  const setEQ = useCallback((band: "low" | "lowMid" | "mid" | "highMid" | "high", value: number) => {
     setEqState((prev) => {
       const next = { ...prev, [band]: value };
       if (!eqBypassed) applyEQToChains(next);
@@ -649,7 +665,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         eqSaveTimer.current = setTimeout(() => {
           fetch(`/api/tracks/${trackId}`, {
             method: "PATCH", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ eqLow: next.low, eqMid: next.mid, eqHigh: next.high }),
+            body: JSON.stringify({ eqLow: next.low, eqLowMid: next.lowMid, eqMid: next.mid, eqHighMid: next.highMid, eqHigh: next.high }),
           }).catch(() => {});
         }, 400);
       }
@@ -660,7 +676,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const setEQBypassed = useCallback((v: boolean) => {
     eqBypassedRef.current = v;
     setEQBypassedState(v);
-    applyEQToChains(v ? { low: 0, mid: 0, high: 0 } : eqRef.current);
+    applyEQToChains(v ? { low: 0, lowMid: 0, mid: 0, highMid: 0, high: 0 } : eqRef.current);
   }, [applyEQToChains]);
 
   const audioContext = useCallback(() => audioCtxRef.current, []);

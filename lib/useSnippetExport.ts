@@ -24,13 +24,19 @@ interface ExportOptions {
   useAlbumArt: boolean;
   albumArtUrl: string | null;
   trackTitle: string;
-  trackArtist: string;
   trimStart: number;
   trimEnd: number;
   audioUrl: string;
+  spinSpeed: number; // multiplier on the base rotation rate, 0.5x-2x
   getFrequencyData: () => Uint8Array | null;
 }
 
+// Reverted to client-side rendering (v8.15.0) after the server-render path
+// (v8.13/8.14) turned out to require Vercel Pro for the 300s maxDuration to
+// actually be honored -- Hobby's hard 10s cap kills it regardless of code.
+// Decision: stay on Hobby, accept the premium gate is enforced in the UI
+// only (locked templates still render for free users behind a blocking
+// overlay in NewSnippetModal, not skipped entirely -- see that component).
 export function useSnippetExport() {
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -39,10 +45,10 @@ export function useSnippetExport() {
   const cancelRef = useRef(false);
 
   // MediaRecorder + canvas.captureStream is the only browser-native route
-  // to a real video file — no server render, no ffmpeg dependency. This is
-  // the piece flagged in the roadmap as desktop-only: iOS Safari's version
-  // of this combo has a documented history of recordings that silently
-  // never fire onstop. Desktop Chrome/Firefox/Edge/Safari-macOS are solid.
+  // to a real video file -- no server render, no ffmpeg dependency. This is
+  // the piece the desktop-only guard exists for: iOS Safari's version of
+  // this combo has a documented history of recordings that silently never
+  // fire onstop. Desktop Chrome/Firefox/Edge/Safari-macOS are solid.
   const start = useCallback(async (opts: ExportOptions) => {
     cancelRef.current = false;
     setExporting(true); setProgress(0); setError(null); setResultUrl(null);
@@ -60,9 +66,6 @@ export function useSnippetExport() {
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("Canvas rendering isn't available in this browser.");
 
-      // Separate <audio> element for the export, trimmed to the selected
-      // window — deliberately not reusing the main player's element so
-      // scrubbing/switching tracks elsewhere can't interfere mid-export.
       const audio = new Audio(opts.audioUrl);
       audio.crossOrigin = "anonymous";
       audio.currentTime = opts.trimStart;
@@ -75,7 +78,7 @@ export function useSnippetExport() {
       const source = audioCtx.createMediaElementSource(audio);
       const dest = audioCtx.createMediaStreamDestination();
       source.connect(dest);
-      source.connect(audioCtx.destination); // still audible during export, matches the reference's own preview-while-exporting behavior
+      source.connect(audioCtx.destination);
 
       const canvasStream = canvas.captureStream(30);
       const combined = new MediaStream([
@@ -109,9 +112,10 @@ export function useSnippetExport() {
           ctx, width: OUTPUT_WIDTH, height: OUTPUT_HEIGHT,
           t, duration, progress: t / duration,
           frequencyData: opts.getFrequencyData(),
-          trackTitle: opts.trackTitle, trackArtist: opts.trackArtist,
+          trackTitle: opts.trackTitle,
           albumArt, vinylImages: { white, black, orange },
           discColor: opts.discColor, gradient: opts.gradient, useAlbumArt: opts.useAlbumArt,
+          spinSpeed: opts.spinSpeed,
         };
         renderer(rc);
         setProgress(Math.min(1, elapsed / duration));

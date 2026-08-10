@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Download, X, AudioLines, Volume2, VolumeX } from "lucide-react";
+import { Loader2, Download, X, Mic2, Drum, Guitar, Layers, Volume2, VolumeX } from "lucide-react";
 import { Track } from "../PlayerProvider";
 import { useStemsEngine, StemName } from "@/lib/useStemsEngine";
 
-const STEMS: { name: string; urlField: "vocalsUrl" | "drumsUrl" | "bassUrl" | "otherUrl" }[] = [
-  { name: "vocals", urlField: "vocalsUrl" },
-  { name: "drums", urlField: "drumsUrl" },
-  { name: "bass", urlField: "bassUrl" },
-  { name: "other", urlField: "otherUrl" },
+// Distinct, identifiable icon per stem — was previously the same repeated
+// waveform glyph for all four, real bug Vish flagged from a screenshot.
+const STEMS: { name: string; urlField: "vocalsUrl" | "drumsUrl" | "bassUrl" | "otherUrl"; Icon: typeof Mic2 }[] = [
+  { name: "vocals", urlField: "vocalsUrl", Icon: Mic2 },
+  { name: "drums", urlField: "drumsUrl", Icon: Drum },
+  { name: "bass", urlField: "bassUrl", Icon: Guitar },
+  { name: "other", urlField: "otherUrl", Icon: Layers },
 ];
 
 export default function StemsPanel({ track }: { track: Track }) {
@@ -118,7 +120,7 @@ export default function StemsPanel({ track }: { track: Track }) {
       )}
 
       <div className="grid grid-cols-4 gap-2 flex-1">
-        {STEMS.map(({ name, urlField }) => {
+        {STEMS.map(({ name, urlField, Icon }) => {
           const url = job?.status === "completed" ? job?.[urlField] : null;
           const isMuted = engine.muted[name as StemName];
           return (
@@ -140,7 +142,7 @@ export default function StemsPanel({ track }: { track: Track }) {
                     <Volume2 size={18} strokeWidth={1.5} className="text-accent" />
                   )
                 ) : (
-                  <AudioLines size={18} strokeWidth={1.5} className={url ? "text-primary" : ""} />
+                  <Icon size={18} strokeWidth={1.5} className={url ? "text-primary" : ""} />
                 )}
               </div>
               <p className={`text-xs mt-3 ${isMuted ? "text-tertiary" : "text-secondary"}`}>{name}</p>

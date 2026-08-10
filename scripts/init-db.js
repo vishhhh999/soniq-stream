@@ -91,6 +91,12 @@ async function main() {
   await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS eq_low REAL DEFAULT 0;`;
   await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS eq_mid REAL DEFAULT 0;`;
   await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS eq_high REAL DEFAULT 0;`;
+  // v8.15.0: EQ expanded from 3 to 5 bands. Added here in the same session
+  // as the schema.ts change, per the standing lesson from the v8.12.1
+  // incident (schema.ts and this script silently went out of sync once
+  // before and took down every track in production).
+  await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS eq_low_mid REAL DEFAULT 0;`;
+  await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS eq_high_mid REAL DEFAULT 0;`;
 
   // Data isolation fix — tracks/albums/folders had NO owner column at all
   // until now, meaning every account could see every other account's

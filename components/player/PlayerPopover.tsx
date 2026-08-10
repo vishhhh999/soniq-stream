@@ -48,7 +48,7 @@ export default function PlayerPopover({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 12, scale: 0.98 }}
       transition={MODAL_SPRING}
-      className={`absolute bottom-full ${alignClass} mb-3 ${width} max-h-[420px] bg-elevated border border-border rounded-2xl shadow-xl p-4 overflow-hidden flex flex-col`}
+      className={`absolute bottom-full ${alignClass} mb-3 ${width} max-h-[420px] bg-elevated border border-border rounded-2xl shadow-xl p-4 overflow-y-auto flex flex-col`}
     >
       {children}
     </motion.div>

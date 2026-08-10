@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, Lock, Volume2, VolumeX, Download } from "lucide-react";
+import { X, Check, Lock, Volume2, VolumeX, Download, Gauge } from "lucide-react";
 import { usePlayer, Track } from "../PlayerProvider";
 import { SNIPPET_TEMPLATES, SnippetTemplateId, DiscColor, GradientChoice, VINYL_ASSET_PATHS } from "@/lib/snippetTemplates";
 import { TEMPLATE_RENDERERS } from "@/lib/snippetRenderers";
 import { useSnippetExport } from "@/lib/useSnippetExport";
 import { MODAL_SPRING } from "@/lib/motion";
+import WaveformTrimSelector from "../WaveformTrimSelector";
 
 const MAX_SNIPPET_SEC = 30;
 
@@ -21,12 +22,10 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
   const [gradient, setGradient] = useState<GradientChoice>("dark");
   const [useAlbumArt, setUseAlbumArt] = useState(!!track.albumCoverUrl);
   const [muted, setMuted] = useState(false);
+  const [spinSpeed, setSpinSpeed] = useState(1);
   const [trimStart, setTrimStart] = useState(0);
-  // Prefer the track's own saved duration; fall back to whatever the
-  // preview <audio> element reports once its metadata loads (covers the
-  // rare case durationSec wasn't backfilled for an older upload).
   const [trackDuration, setTrackDuration] = useState(track.durationSec ?? MAX_SNIPPET_SEC);
-  const trimEnd = Math.min(trimStart + MAX_SNIPPET_SEC, trackDuration);
+  const [trimEnd, setTrimEndState] = useState(Math.min(MAX_SNIPPET_SEC, track.durationSec ?? MAX_SNIPPET_SEC));
 
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -45,9 +44,6 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       .catch(() => setIsPaid(false));
   }, []);
 
-  // Preload images once for the live preview (separate from the export
-  // hook's own preload, since the preview runs continuously while the
-  // modal is open and shouldn't refetch on every template switch).
   useEffect(() => {
     let cancelled = false;
     const load = (src: string) => new Promise<HTMLImageElement>((res, rej) => {
@@ -63,7 +59,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
     return () => { cancelled = true; };
   }, [track.albumCoverUrl]);
 
-  // Live canvas preview loop — plays the trimmed window on repeat with a
+  // Live canvas preview loop -- plays the trimmed window on repeat with a
   // dedicated (muted-optional) audio element, independent of the main
   // player so opening this modal never disturbs whatever's actually playing
   // in the app.
@@ -94,7 +90,6 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       if (!vinylImages) { previewRafRef.current = requestAnimationFrame(draw); return; }
       let elapsed = (performance.now() - startWall) / 1000;
       if (elapsed >= segDuration) {
-        // loop the preview
         audio.currentTime = trimStart;
         audio.play().catch(() => {});
         elapsed = 0;
@@ -104,9 +99,10 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
         ctx, width: canvas.width, height: canvas.height,
         t: elapsed, duration: segDuration, progress: elapsed / segDuration,
         frequencyData: getFrequencyData(),
-        trackTitle: track.title, trackArtist: track.artist || "Unknown",
+        trackTitle: track.title,
         albumArt: useAlbumArt ? albumArtImgRef.current : null,
         vinylImages, discColor, gradient, useAlbumArt,
+        spinSpeed,
       });
       previewRafRef.current = requestAnimationFrame(draw);
     };
@@ -118,16 +114,24 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       previewAudioRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateId, discColor, gradient, useAlbumArt, trimStart, muted, track.id]);
+  }, [templateId, discColor, gradient, useAlbumArt, trimStart, trimEnd, muted, spinSpeed, track.id]);
 
   const selectedMeta = SNIPPET_TEMPLATES.find((t) => t.id === templateId)!;
+  const locked = selectedMeta.premium && isPaid === false;
+
+  const handleTrimChange = (s: number, e: number) => {
+    setTrimStart(s); setTrimEndState(e);
+  };
 
   const handleExport = () => {
+    if (locked) return;
     exportState.start({
       templateId, discColor, gradient, useAlbumArt,
       albumArtUrl: track.albumCoverUrl ?? null,
-      trackTitle: track.title, trackArtist: track.artist || "Unknown",
-      trimStart, trimEnd, audioUrl: track.fileUrl,
+      trackTitle: track.title,
+      trimStart, trimEnd,
+      audioUrl: track.fileUrl,
+      spinSpeed,
       getFrequencyData,
     });
   };
@@ -141,7 +145,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
   };
 
   if (!mounted) return null;
-  void audioContext; // reserved — not needed directly here, preview uses its own audio element
+  void audioContext;
 
   return createPortal(
     <motion.div
@@ -171,9 +175,9 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
           ) : (
             <button
               onClick={handleExport}
-              disabled={exportState.exporting || (selectedMeta.premium && !isPaid)}
+              disabled={exportState.exporting || locked}
               className="w-9 h-9 rounded-full bg-primary text-canvas flex items-center justify-center disabled:opacity-30 hover:opacity-90 transition-opacity"
-              title="Export"
+              title={locked ? "Upgrade to export this template" : "Export"}
             >
               <Check size={16} strokeWidth={2} />
             </button>
@@ -183,14 +187,27 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
 
       {/* Preview */}
       <div className="flex-1 flex items-center justify-center min-h-0 px-6">
-        <div className="relative h-full max-h-[70vh] aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
+        <div className="relative h-full max-h-[70vh] aspect-[9/16] rounded-2xl overflow-hidden shadow-xl bg-elevated border border-border">
           <canvas ref={previewCanvasRef} width={1080} height={1920} className="w-full h-full object-cover" />
+
+          {/* Premium block -- locked templates still preview so free users
+              can see what they're missing, but the preview sits under a
+              50% black overlay so it can't just be screen-recorded and
+              lifted clean. Export stays disabled regardless. */}
+          {locked && (
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 px-6 text-center">
+              <div className="w-11 h-11 rounded-full bg-canvas/90 flex items-center justify-center">
+                <Lock size={18} strokeWidth={1.5} className="text-primary" />
+              </div>
+              <p className="text-sm font-medium text-white">Premium template</p>
+              <p className="text-xs text-white/70 max-w-[220px]">Upgrade from Settings &rarr; Billing to unlock this template and export it in full quality.</p>
+            </div>
+          )}
+
           {exportState.exporting && (
             <div className="absolute inset-0 bg-canvas/90 flex flex-col items-center justify-center gap-3">
-              <div className="w-32 h-1 bg-border rounded-full overflow-hidden">
-                <div className="h-full bg-accent transition-all" style={{ width: `${exportState.progress * 100}%` }} />
-              </div>
-              <p className="text-xs text-tertiary">{Math.round(exportState.progress * 100)}% — do not close this tab</p>
+              <div className="w-6 h-6 border-2 border-tertiary border-t-accent rounded-full animate-spin" />
+              <p className="text-xs text-tertiary">Rendering... {Math.round(exportState.progress * 100)}%</p>
               <button onClick={exportState.cancel} className="text-xs text-error underline hover:no-underline mt-2">Cancel</button>
             </div>
           )}
@@ -201,16 +218,16 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       <div className="px-6 pt-4 shrink-0 overflow-x-auto no-scrollbar">
         <div className="flex gap-2 pb-2 w-max">
           {SNIPPET_TEMPLATES.map((tpl) => {
-            const locked = tpl.premium && isPaid === false;
+            const tplLocked = tpl.premium && isPaid === false;
             return (
               <button
                 key={tpl.id}
-                onClick={() => !locked && setTemplateId(tpl.id)}
+                onClick={() => setTemplateId(tpl.id)}
                 className={`relative shrink-0 px-4 py-2.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 ${
                   templateId === tpl.id ? "bg-primary text-canvas" : "bg-elevated text-secondary hover:text-primary"
-                } ${locked ? "opacity-60" : ""}`}
+                }`}
               >
-                {locked && <Lock size={11} strokeWidth={2} />}
+                {tplLocked && <Lock size={11} strokeWidth={2} />}
                 {tpl.name}
               </button>
             );
@@ -218,54 +235,69 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
         </div>
       </div>
 
-      {/* Options: disc color / gradient / album art toggle */}
-      <div className="px-6 pt-2 pb-4 shrink-0 space-y-3">
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] text-tertiary w-16 shrink-0">Disc</span>
-          {(["black", "white", "orange"] as DiscColor[]).map((c) => (
-            <button
-              key={c}
-              onClick={() => setDiscColor(c)}
-              className={`w-7 h-7 rounded-full border-2 transition-colors ${discColor === c ? "border-accent" : "border-transparent"}`}
-              style={{ background: c === "black" ? "#111" : c === "white" ? "#eee" : "#e8650a" }}
-            />
-          ))}
+      {/* Options: disc color / gradient / spin speed / album art toggle --
+          grouped into a card matching AdjustPanel/EQPanel's bg-canvas
+          block style, instead of a loose stack of rows that read as
+          visually disconnected from the rest of the app. */}
+      <div className="px-6 pt-2 pb-4 shrink-0">
+        <div className="bg-elevated border border-border rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-tertiary w-16 shrink-0">Disc</span>
+            {(["black", "white", "orange"] as DiscColor[]).map((c) => (
+              <button
+                key={c}
+                onClick={() => setDiscColor(c)}
+                className={`w-7 h-7 rounded-full border-2 transition-colors ${discColor === c ? "border-accent" : "border-transparent"}`}
+                style={{ background: c === "black" ? "#111" : c === "white" ? "#eee" : "#e8650a" }}
+              />
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-tertiary w-16 shrink-0">Background</span>
+            {(["dark", "light", "orange"] as GradientChoice[]).map((g) => (
+              <button
+                key={g}
+                onClick={() => setGradient(g)}
+                className={`w-7 h-7 rounded-full border-2 transition-colors capitalize ${gradient === g ? "border-accent" : "border-transparent"}`}
+                style={{ background: g === "dark" ? "#111" : g === "light" ? "#e5e0d8" : "#ff8a3d" }}
+              />
+            ))}
+          </div>
+          {selectedMeta.supportsAlbumArt && (
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-tertiary w-16 shrink-0 flex items-center gap-1"><Gauge size={11} strokeWidth={1.5} /> Spin</span>
+              <input
+                type="range" min={0.5} max={2} step={0.1} value={spinSpeed}
+                onChange={(e) => setSpinSpeed(Number(e.target.value))}
+                className="flex-1 accent-[var(--accent)] cursor-pointer"
+              />
+              <span className="text-[11px] text-tertiary tabular-nums w-8 text-right">{spinSpeed.toFixed(1)}x</span>
+            </div>
+          )}
+          {selectedMeta.supportsAlbumArt && track.albumCoverUrl && (
+            <label className="flex items-center gap-2 text-[11px] text-tertiary pt-1">
+              <input type="checkbox" checked={useAlbumArt} onChange={(e) => setUseAlbumArt(e.target.checked)} className="accent-[var(--accent)]" />
+              Overlay album art on label
+            </label>
+          )}
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] text-tertiary w-16 shrink-0">Background</span>
-          {(["dark", "light", "orange"] as GradientChoice[]).map((g) => (
-            <button
-              key={g}
-              onClick={() => setGradient(g)}
-              className={`w-7 h-7 rounded-full border-2 transition-colors capitalize ${gradient === g ? "border-accent" : "border-transparent"}`}
-              style={{ background: g === "dark" ? "#111" : g === "light" ? "#e5e0d8" : "#ff8a3d" }}
-            />
-          ))}
-        </div>
-        {selectedMeta.supportsAlbumArt && track.albumCoverUrl && (
-          <label className="flex items-center gap-2 text-[11px] text-tertiary">
-            <input type="checkbox" checked={useAlbumArt} onChange={(e) => setUseAlbumArt(e.target.checked)} className="accent-[var(--accent)]" />
-            Overlay album art on label
-          </label>
-        )}
-        {exportState.error && <p className="text-xs text-error">{exportState.error}</p>}
+        {exportState.error && <p className="text-xs text-error mt-3">{exportState.error}</p>}
       </div>
 
-      {/* Trim bar */}
+      {/* Trim bar -- shared component with AdjustPanel, capped to the
+          30s max snippet length, same card treatment as the options block
+          above. */}
       <div className="px-6 pb-8 shrink-0">
-        <div className="flex justify-between text-[11px] text-tertiary mb-1">
-          <span>{Math.floor(trimStart / 60)}:{String(Math.floor(trimStart % 60)).padStart(2, "0")}</span>
-          <span>{Math.floor(trimEnd / 60)}:{String(Math.floor(trimEnd % 60)).padStart(2, "0")}</span>
+        <div className="bg-elevated border border-border rounded-xl p-4">
+          <WaveformTrimSelector
+            trackId={track.id}
+            duration={trackDuration}
+            start={trimStart}
+            end={trimEnd}
+            onChange={handleTrimChange}
+            maxWindowSec={MAX_SNIPPET_SEC}
+          />
         </div>
-        <input
-          type="range"
-          min={0}
-          max={Math.max(0, trackDuration - 1)}
-          step={0.5}
-          value={trimStart}
-          onChange={(e) => setTrimStart(Math.min(Number(e.target.value), Math.max(0, trackDuration - 1)))}
-          className="w-full accent-[var(--accent)] cursor-pointer"
-        />
       </div>
     </motion.div>,
     document.body

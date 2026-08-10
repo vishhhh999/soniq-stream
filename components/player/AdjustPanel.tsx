@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Play, Pause, SkipBack, Music4, Gauge } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Play, Pause, SkipBack, Music4, Gauge, Scissors } from "lucide-react";
 import { usePlayer } from "../PlayerProvider";
-import WaveformSeekBar from "../WaveformSeekBar";
+import WaveformTrimSelector from "../WaveformTrimSelector";
 import { useMetronome } from "@/lib/useMetronome";
 import { useTuner } from "@/lib/useTuner";
 
@@ -28,6 +28,19 @@ export default function AdjustPanel() {
   const [showBeatGrid, setShowBeatGrid] = useState(true);
   const [showTuner, setShowTuner] = useState(false);
 
+  // Trim/region state, seeded from the track's saved trimStart/trimEnd
+  // (real DB columns, already existed, just never had a UI). Falls back to
+  // the full track length when nothing's been saved yet.
+  const [trimStart, setTrimStart] = useState(current?.trimStart ?? 0);
+  const [trimEnd, setTrimEnd] = useState(current?.trimEnd ?? duration ?? 0);
+  const trimSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setTrimStart(current?.trimStart ?? 0);
+    setTrimEnd(current?.trimEnd ?? duration ?? 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id]);
+
   const fmt = (s: number) => {
     if (!s || Number.isNaN(s)) return "0:00";
     const m = Math.floor(s / 60);
@@ -42,6 +55,20 @@ export default function AdjustPanel() {
     const secPerBeat = 60 / current.bpm;
     for (let t = 0; t < duration; t += secPerBeat) beatTimes.push(t);
   }
+
+  const handleTrimChange = (s: number, e: number) => {
+    setTrimStart(s); setTrimEnd(e);
+    if (trimSaveTimer.current) clearTimeout(trimSaveTimer.current);
+    const trackId = current.id;
+    trimSaveTimer.current = setTimeout(() => {
+      fetch(`/api/tracks/${trackId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trimStart: s, trimEnd: e }),
+      }).catch(() => {});
+    }, 400);
+  };
+
+  const resetTrim = () => handleTrimChange(0, duration);
 
   return (
     <div className="flex flex-col h-full overflow-y-auto no-scrollbar">
@@ -74,16 +101,32 @@ export default function AdjustPanel() {
         </button>
       </div>
 
-      {/* Waveform + transport */}
-      <div className="mb-2">
-        <WaveformSeekBar
+      {/* Trim / region selector — real start/end handles now, not just a
+          speed slider with no way to mark a region. Same shared component
+          the snippet export flow uses, so both trim UIs stay in sync by
+          construction instead of by discipline. */}
+      <div className="bg-canvas rounded-xl p-4 mb-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-secondary flex items-center gap-1.5">
+            <Scissors size={13} strokeWidth={1.5} /> Trim
+          </span>
+          <button
+            onClick={resetTrim}
+            className="text-[11px] text-tertiary hover:text-primary transition-colors"
+          >
+            Reset
+          </button>
+        </div>
+        <WaveformTrimSelector
           trackId={current.id}
-          progress={currentTime}
           duration={duration}
-          onSeek={(v) => { if (audioRef.current) audioRef.current.currentTime = v; }}
+          start={trimStart}
+          end={trimEnd}
+          onChange={handleTrimChange}
+          playhead={currentTime}
         />
         {beatTimes.length > 0 && (
-          <div className="relative h-2 mt-1">
+          <div className="relative h-2 mt-1.5">
             {beatTimes.map((t, i) => (
               <div
                 key={i}
@@ -93,16 +136,13 @@ export default function AdjustPanel() {
             ))}
           </div>
         )}
-        <div className="flex justify-between text-xs text-tertiary tabular-nums mt-1">
-          <span>{fmt(currentTime)}</span>
-          <span>{fmt(duration)}</span>
-        </div>
       </div>
 
       <div className="flex items-center justify-center gap-6 py-2">
         <button
-          onClick={() => { if (audioRef.current) audioRef.current.currentTime = 0; }}
+          onClick={() => { if (audioRef.current) audioRef.current.currentTime = trimStart; }}
           className="text-secondary hover:text-primary transition-colors p-2 -m-2"
+          title="Jump to trim start"
         >
           <SkipBack size={18} strokeWidth={1.5} />
         </button>
