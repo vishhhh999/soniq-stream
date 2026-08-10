@@ -79,7 +79,7 @@ export default function AlbumInsightsModal({
               <h2 className="text-md font-medium text-primary">Insights</h2>
               <p className="text-xs text-tertiary truncate">{albumName}</p>
             </div>
-            <button onClick={onClose} className="text-tertiary hover:text-primary transition-colors">
+            <button onClick={onClose} className="text-tertiary hover:text-primary transition-colors" aria-label="Close">
               <X size={18} strokeWidth={1.5} />
             </button>
           </div>

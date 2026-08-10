@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { otpCodes, users } from "@/lib/db/schema";
 import { eq, and, gt, desc } from "drizzle-orm";
 import { signIn } from "@/auth";
+import { isEmailAllowed } from "@/lib/allowedEmails";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,12 @@ export async function POST(req: NextRequest) {
 
     const normalizedEmail = email.toLowerCase().trim();
     const now = new Date();
+
+    // Defense-in-depth: the request step already checked this, but re-check
+    // here too in case ALLOWED_EMAILS changed between request and verify.
+    if (!isEmailAllowed(normalizedEmail)) {
+      return NextResponse.json({ error: "Signup isn't open to this email address." }, { status: 403 });
+    }
 
     // Find the most recent unexpired OTP for this email.
     const [otp] = await db

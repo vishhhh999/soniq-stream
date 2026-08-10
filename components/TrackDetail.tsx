@@ -105,6 +105,7 @@ export default function TrackDetail({
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [confirmingRevoke, setConfirmingRevoke] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [panelError, setPanelError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/tracks/${track.id}/play`)
@@ -147,12 +148,12 @@ export default function TrackDetail({
     try {
       const res = await fetch(`/api/tracks/${track.id}`, { method: "DELETE" });
       if (!res.ok) {
-        alert("Could not delete this track. Try again.");
+        setPanelError("Could not delete this track. Try again.");
         return;
       }
       onDeleted();
     } catch {
-      alert("Could not delete this track. Check your connection and try again.");
+      setPanelError("Could not delete this track. Check your connection and try again.");
     } finally {
       setDeleting(false);
     }
@@ -173,7 +174,7 @@ export default function TrackDetail({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Download failed:", err);
-      alert("Download failed. This is usually an R2 CORS issue on GET requests.");
+      setPanelError("Download failed. This is usually an R2 CORS issue on GET requests.");
     } finally {
       setDownloading(false);
     }
@@ -183,7 +184,7 @@ export default function TrackDetail({
     setDuplicating(true);
     const res = await fetch(`/api/tracks/${track.id}/duplicate`, { method: "POST" }).catch(() => null);
     setDuplicating(false);
-    if (!res?.ok) { alert("Could not duplicate this track."); return; }
+    if (!res?.ok) { setPanelError("Could not duplicate this track."); return; }
     onSaved();
   };
 
@@ -199,7 +200,7 @@ export default function TrackDetail({
       if (keyResult.key) { setKey(keyResult.key); patch.key = keyResult.key; }
       if (Object.keys(patch).length === 0) {
         const detail = (bpmResult as any).error?.message || (keyResult as any).error?.message || "unknown";
-        alert(`Detection failed: ${detail}`);
+        setPanelError(`Detection failed: ${detail}`);
         return;
       }
       await fetch(`/api/tracks/${track.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
@@ -314,7 +315,7 @@ export default function TrackDetail({
                   className="text-xs text-secondary bg-transparent border-b border-transparent hover:border-border focus:border-border-strong outline-none w-full truncate mt-0.5"
                 />
               </div>
-              <button onClick={onClose} className="sm:hidden text-tertiary hover:text-primary ml-3 shrink-0">
+              <button onClick={onClose} className="sm:hidden text-tertiary hover:text-primary ml-3 shrink-0" aria-label="Close">
                 <X size={18} strokeWidth={1.5} />
               </button>
             </div>
@@ -369,12 +370,18 @@ export default function TrackDetail({
           <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
               <p className="text-sm font-semibold text-primary">Details</p>
-              <button onClick={onClose} className="hidden sm:block text-tertiary hover:text-primary transition-colors">
+              <button onClick={onClose} className="hidden sm:block text-tertiary hover:text-primary transition-colors" aria-label="Close">
                 <X size={18} strokeWidth={1.5} />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto no-scrollbar">
+              {panelError && (
+                <div className="m-3 px-3 py-2 rounded-lg bg-error/10 border border-error/20 flex items-center justify-between gap-2">
+                  <p className="text-xs text-error flex-1">{panelError}</p>
+                  <button onClick={() => setPanelError(null)} className="text-xs text-error/70 hover:text-error shrink-0">Dismiss</button>
+                </div>
+              )}
               {/* Group 1 */}
               <div className="m-3 bg-surface rounded-xl overflow-hidden">
                 <Row icon={<Share2 size={15} strokeWidth={1.5} />} label="Share" open={openRow === "share"} onToggle={() => toggleRow("share")} rightHint={shareUrl ? "Active" : "Private"}>

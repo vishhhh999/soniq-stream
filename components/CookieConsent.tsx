@@ -45,7 +45,7 @@ export default function CookieConsent() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 40, opacity: 0 }}
           transition={MODAL_SPRING}
-          className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-[80] bg-elevated border border-border rounded-xl shadow-2xl p-5"
+          className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-[80] bg-elevated border border-border rounded-xl shadow-2xl p-5 pb-safe"
         >
           <div className="flex items-start justify-between gap-3 mb-2">
             <p className="text-sm font-medium text-primary">Cookies</p>

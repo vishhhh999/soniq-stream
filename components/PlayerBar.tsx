@@ -19,8 +19,17 @@ export default function PlayerBar() {
     queue, queueIndex, shuffleOn, toggleShuffle, jumpToQueueIndex, reorderQueue,
     repeatMode, cycleRepeatMode,
   } = usePlayer();
-  const [volume, setVolume] = useState(1);
-  const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(() => {
+    if (typeof window === "undefined") return 1;
+    try {
+      const stored = window.localStorage.getItem("soniq:volume");
+      return stored !== null ? Math.max(0, Math.min(1, Number(stored))) : 1;
+    } catch { return 1; }
+  });
+  const [muted, setMuted] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try { return window.localStorage.getItem("soniq:muted") === "true"; } catch { return false; }
+  });
   const [brokenTrack, setBrokenTrack] = useState<{ id: string; title: string } | null>(null);
   const [showQueue, setShowQueue] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
@@ -87,6 +96,13 @@ export default function PlayerBar() {
   // slider again.
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = muted ? 0 : volume;
+    // Persisted so volume/mute survive a reload — previously these reset
+    // to 100%/unmuted every time, unlike theme/crossfade/haptics which
+    // all correctly persist.
+    try {
+      window.localStorage.setItem("soniq:volume", String(volume));
+      window.localStorage.setItem("soniq:muted", String(muted));
+    } catch {}
   }, [volume, muted, current?.id]);
   const fmt = (s: number) => {
     if (!s || Number.isNaN(s)) return "0:00";

@@ -21,7 +21,10 @@ export async function POST(req: NextRequest) {
   const userId = session?.user && (session.user as any).id;
   if (!userId) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
 
-  const { name, parentId } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const name = typeof body?.name === "string" ? body.name.trim().slice(0, 100) : "";
+  if (!name) return NextResponse.json({ error: "Folder name is required." }, { status: 400 });
+  const parentId = body?.parentId;
   const row = { id: nanoid(), userId, name, parentId: parentId || null, createdAt: new Date() };
   await db.insert(folders).values(row);
   return NextResponse.json(row);

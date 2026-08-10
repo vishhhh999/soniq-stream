@@ -27,8 +27,17 @@ export async function POST(req: NextRequest) {
   const keyId = process.env.RAZORPAY_KEY_ID;
   if (!planId || !keyId) return NextResponse.json({ error: "Billing is not configured yet." }, { status: 500 });
 
-  const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId));
+  const [user] = await db.select({ email: users.email, subscriptionStatus: users.subscriptionStatus, razorpaySubscriptionId: users.razorpaySubscriptionId }).from(users).where(eq(users.id, userId));
   if (!user) return NextResponse.json({ error: "Not found." }, { status: 404 });
+
+  // Without this, double-clicking Subscribe (or two tabs) could create two
+  // separate live Razorpay subscriptions — only the newest id ever gets
+  // saved to razorpaySubscriptionId, so the first one would keep charging
+  // with no way for the app (or the user) to see or cancel it. If there's
+  // already an active/past_due subscription on file, don't start another.
+  if (user.razorpaySubscriptionId && (user.subscriptionStatus === "active" || user.subscriptionStatus === "past_due")) {
+    return NextResponse.json({ error: "You already have an active subscription." }, { status: 409 });
+  }
 
   const razorpay = getRazorpay();
 

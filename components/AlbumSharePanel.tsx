@@ -305,7 +305,7 @@ export default function AlbumSharePanel({
               <div className="w-8 h-8 rounded-md shrink-0" style={{ background: `linear-gradient(135deg, ${gradFrom}, ${gradTo})` }} />
             )}
             <p className="text-sm font-medium text-primary truncate flex-1">{albumName}</p>
-            <button onClick={onClose} className="text-tertiary hover:text-primary shrink-0">
+            <button onClick={onClose} className="text-tertiary hover:text-primary shrink-0" aria-label="Close">
               <X size={18} strokeWidth={1.5} />
             </button>
           </div>

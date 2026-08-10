@@ -73,7 +73,7 @@ export default function MobilePlayerBar() {
 
   // Collapsed mini-bar. Fixed to viewport bottom, above the mobile nav-safe area.
   const collapsed = (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-elevated border-t border-border">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-elevated border-t border-border pb-safe">
       <div className="h-16 flex items-center px-4 gap-3" onClick={() => setExpanded(true)}>
         <div
           className="w-9 h-9 rounded-full shrink-0 overflow-hidden bg-surface"

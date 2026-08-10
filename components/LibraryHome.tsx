@@ -42,6 +42,7 @@ export default function LibraryHome() {
   const [selectionMode, setSelectionMode] = useState(false); // mobile only
   const [folderPrompt, setFolderPrompt] = useState<{ albumA: Album; albumB: Album } | null>(null);
   const [activeDragLabel, setActiveDragLabel] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -137,15 +138,22 @@ export default function LibraryHome() {
       const idsToMove = selectedIds.has(draggedId) && selectedIds.size > 1 ? Array.from(selectedIds) : [draggedId];
 
       setTracks((prev) => prev.map((t) => (idsToMove.includes(t.id) ? { ...t, albumId } : t)));
-      await Promise.all(
-        idsToMove.map((id) =>
-          fetch(`/api/tracks/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ albumId }),
-          })
-        )
-      );
+      try {
+        const results = await Promise.all(
+          idsToMove.map((id) =>
+            fetch(`/api/tracks/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ albumId }),
+            })
+          )
+        );
+        if (results.some((r) => !r.ok)) {
+          setActionError("Some tracks couldn't be moved. Try again.");
+        }
+      } catch {
+        setActionError("Couldn't move the tracks. Try again.");
+      }
       clearSelection();
       load();
       return;
@@ -159,31 +167,40 @@ export default function LibraryHome() {
   const confirmCreateFolder = async () => {
     if (!folderPrompt) return;
     const { albumA, albumB } = folderPrompt;
-    const folderRes = await fetch("/api/folders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: `${albumA.name} & ${albumB.name}` }),
-    });
-    const folder = await folderRes.json();
-    await Promise.all([
-      fetch(`/api/albums/${albumA.id}`, {
-        method: "PATCH",
+    try {
+      const folderRes = await fetch("/api/folders", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ folderId: folder.id }),
-      }),
-      fetch(`/api/albums/${albumB.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ folderId: folder.id }),
-      }),
-    ]);
+        body: JSON.stringify({ name: `${albumA.name} & ${albumB.name}` }),
+      });
+      if (!folderRes.ok) throw new Error();
+      const folder = await folderRes.json();
+      const results = await Promise.all([
+        fetch(`/api/albums/${albumA.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ folderId: folder.id }),
+        }),
+        fetch(`/api/albums/${albumB.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ folderId: folder.id }),
+        }),
+      ]);
+      if (results.some((r) => !r.ok)) throw new Error();
+    } catch {
+      setActionError("Couldn't create the folder. Try again.");
+    }
     setFolderPrompt(null);
     load();
   };
 
   const bulkDelete = async () => {
     const ids = Array.from(selectedIds);
-    await Promise.all(ids.map((id) => fetch(`/api/tracks/${id}`, { method: "DELETE" })));
+    const results = await Promise.all(ids.map((id) => fetch(`/api/tracks/${id}`, { method: "DELETE" })));
+    if (results.some((r) => !r.ok)) {
+      setActionError("Some tracks couldn't be deleted. Try again.");
+    }
     clearSelection();
     load();
   };
@@ -209,6 +226,12 @@ export default function LibraryHome() {
     <div className="flex">
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
     <main className="max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-16 pt-8 sm:pt-16 flex-1 min-w-0">
+      {actionError && (
+        <div className="mb-6 px-4 py-3 rounded-lg bg-error/10 border border-error/20 flex items-center justify-between gap-3">
+          <p className="text-sm text-error">{actionError}</p>
+          <button onClick={() => setActionError(null)} className="text-xs text-error/70 hover:text-error shrink-0">Dismiss</button>
+        </div>
+      )}
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 sm:mb-12">
         <div>
           <div className="flex items-center gap-2.5">

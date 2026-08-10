@@ -39,6 +39,7 @@ export default function TrackContextMenu({
   const [downloading, setDownloading] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setMounted(true), []);
@@ -88,25 +89,40 @@ export default function TrackContextMenu({
       a.remove();
       URL.revokeObjectURL(url);
     } catch {
-      alert("Download failed. Try again.");
+      setError("Download failed. Try again.");
+      setDownloading(false);
+      return;
     }
     setDownloading(false);
     onClose();
   };
 
   const moveToAlbum = async (albumId: string) => {
-    await fetch(`/api/tracks/${track.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ albumId }),
-    });
+    try {
+      const res = await fetch(`/api/tracks/${track.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ albumId }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setError("Couldn't move this track. Try again.");
+      return;
+    }
     onDeleteSuccess(); // refreshes the list
     onClose();
   };
 
   const duplicate = async () => {
     setDuplicating(true);
-    await fetch(`/api/tracks/${track.id}/duplicate`, { method: "POST" }).catch(() => {});
+    try {
+      const res = await fetch(`/api/tracks/${track.id}/duplicate`, { method: "POST" });
+      if (!res.ok) throw new Error();
+    } catch {
+      setDuplicating(false);
+      setError("Couldn't duplicate this track. Try again.");
+      return;
+    }
     setDuplicating(false);
     onDeleteSuccess();
     onClose();
@@ -128,6 +144,12 @@ export default function TrackContextMenu({
         <p className="text-primary font-medium truncate">{track.title}</p>
         <p className="text-tertiary text-xs truncate">{track.artist || "Unknown artist"}</p>
       </div>
+
+      {error && (
+        <div className="px-4 py-2 border-b border-border bg-error/10">
+          <p className="text-xs text-error">{error}</p>
+        </div>
+      )}
 
       {/* Group 1: Playback */}
       <div className="py-1 border-b border-border">

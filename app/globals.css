@@ -154,3 +154,15 @@ html::-webkit-scrollbar-thumb:hover {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* iOS home-indicator / gesture-bar clearance for anything pinned to the
+   viewport bottom. Resolves to 0 on devices without a safe area (most
+   Android, older iPhones), so this is safe to apply everywhere without
+   a media query. Needed once the app is installed as a standalone PWA,
+   where the OS chrome that used to create natural clearance is gone. */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}

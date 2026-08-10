@@ -13,6 +13,23 @@ async function getUserId() {
   return session?.user && (session.user as any).id;
 }
 
+// Deletes an album cover object from R2. IMPORTANT: only ever call this for
+// an album's OWN original (no sharedFromAlbumId) — a saved/received copy's
+// coverUrl points at the exact same R2 object as the original (see
+// /api/share/[token]/save, which copies the URL reference directly rather
+// than making a real copy the way track files are copied). Deleting a
+// received copy's cover would delete the original owner's cover out from
+// under them.
+async function deleteAlbumCover(coverUrl: string | null) {
+  if (!coverUrl || !R2_BUCKET) return;
+  try {
+    const key = new URL(coverUrl).pathname.replace(/^\//, "");
+    if (key) await r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: key }));
+  } catch (err) {
+    console.error("Album cover cleanup failed (non-fatal):", err);
+  }
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
@@ -26,6 +43,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   for (const k of allowed) if (k in body) update[k] = body[k];
 
   await db.update(albums).set(update).where(eq(albums.id, params.id));
+
+  // Clean up the old cover object if it's being replaced — but only for a
+  // true original album. A received copy's coverUrl is a shared reference
+  // to the original's object, so deleting it here would break the
+  // original owner's album cover.
+  if ("coverUrl" in update && !existing.sharedFromAlbumId && existing.coverUrl && existing.coverUrl !== update.coverUrl) {
+    await deleteAlbumCover(existing.coverUrl);
+  }
+
   const [row] = await db.select().from(albums).where(eq(albums.id, params.id));
   return NextResponse.json(row);
 }
@@ -74,6 +100,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
     await db.delete(albums).where(eq(albums.id, params.id));
 
+    // NOT cleaning up coverUrl here — a received copy's cover is a shared
+    // R2 object reference with the original album, not its own copy (see
+    // deleteAlbumCover's comment above). Deleting it would break the
+    // original owner's cover.
+
     try {
       await db
         .delete(albumMembers)
@@ -91,5 +122,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   // Own original album — unsort, don't delete, the tracks.
   await db.update(tracks).set({ albumId: null }).where(and(eq(tracks.albumId, params.id), eq(tracks.userId, userId)));
   await db.delete(albums).where(eq(albums.id, params.id));
+  // Safe to clean up here — this branch is only reached for a true
+  // original (no sharedFromAlbumId), so nothing else references this
+  // specific cover object.
+  await deleteAlbumCover(existing.coverUrl);
   return NextResponse.json({ ok: true });
 }

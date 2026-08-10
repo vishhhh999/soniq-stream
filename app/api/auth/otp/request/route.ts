@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { otpCodes, users } from "@/lib/db/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { sendOtpEmail } from "@/lib/email";
+import { isEmailAllowed } from "@/lib/allowedEmails";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,14 @@ export async function POST(req: NextRequest) {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+
+    // Documented (README/handoff) as a real, working restriction on who
+    // can sign up — but the actual allowlist check didn't exist anywhere
+    // in the codebase until now. If ALLOWED_EMAILS is unset, signup stays
+    // fully open (matches documented "leave unset if you want it open").
+    if (!isEmailAllowed(normalizedEmail)) {
+      return NextResponse.json({ error: "Signup isn't open to this email address." }, { status: 403 });
+    }
 
     // Block if an account already exists with this email.
     const [existing] = await db.select().from(users).where(eq(users.email, normalizedEmail));

@@ -130,6 +130,14 @@ export default function RecordModal({
     analyser.fftSize = 1024;
     source.connect(analyser);
     analyserRef.current = analyser;
+    // Doesn't reliably draw anything on the FIRST recording of a session:
+    // this runs synchronously right after setPermission("granted") above,
+    // but React hasn't re-rendered yet, so the <canvas> (which only exists
+    // once permission === "granted" in the JSX) isn't mounted and
+    // canvasRef.current is still null here — drawWaveform() bails
+    // immediately with nothing to retry it. The effect below is the real
+    // trigger for the first take; this call only matters for retry(),
+    // where the canvas already exists from the first render.
     drawWaveform();
 
     const tick = () => {
@@ -138,6 +146,16 @@ export default function RecordModal({
     };
     rafRef.current = requestAnimationFrame(tick);
   };
+
+  // Real fix for the "no waveform on the first recording" bug: once the
+  // canvas has actually mounted (permission === "granted" rendered the
+  // JSX) and a recording is in progress, kick the draw loop for real.
+  // analyserRef is already populated synchronously in beginRecording by
+  // the time this runs, so this only needs to wait on the canvas.
+  useEffect(() => {
+    if (permission === "granted" && recording) drawWaveform();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [permission, recording]);
 
   const drawWaveform = () => {
     const canvas = canvasRef.current;
@@ -253,19 +271,31 @@ export default function RecordModal({
       if (!finalizeRes.ok) throw new Error((await finalizeRes.json().catch(() => ({}))).error || "Upload processing failed.");
       const track = await finalizeRes.json();
 
+      let bpmKeyFailed = false;
       if (bpm || musicalKey) {
         const patch: Record<string, unknown> = {};
         if (bpm) patch.bpm = bpm;
         if (musicalKey) patch.key = musicalKey;
-        await fetch(`/api/tracks/${track.id}`, {
+        const patchRes = await fetch(`/api/tracks/${track.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
-        }).catch(() => {});
+        }).catch(() => null);
+        bpmKeyFailed = !patchRes || !patchRes.ok;
       }
 
-      cleanup();
+      // The recording itself is saved either way at this point. Only close
+      // automatically if the BPM/key attach also succeeded — otherwise
+      // stay open with a clear message so the person knows the recording
+      // is safe but their entered BPM/key wasn't attached, rather than
+      // silently dropping it and closing as if everything worked.
       onRecorded();
+      if (bpmKeyFailed) {
+        setError("Recording saved, but the BPM/key you entered couldn't be attached. Add them from the track panel, then close this.");
+        setSaving(false);
+        return;
+      }
+      cleanup();
       onClose();
     } catch (e: any) {
       setError(e.message || "Could not save the recording.");
@@ -281,7 +311,7 @@ export default function RecordModal({
         exit={{ opacity: 0, scale: 0.97 }}
         className="w-full max-w-xl rounded-2xl border border-border bg-elevated p-4 sm:p-6 relative overflow-hidden"
       >
-        <button onClick={discard} className="absolute top-4 right-4 text-tertiary hover:text-primary transition-colors">
+        <button onClick={discard} className="absolute top-4 right-4 text-tertiary hover:text-primary transition-colors" aria-label="Close">
           <X size={18} strokeWidth={1.5} />
         </button>
 

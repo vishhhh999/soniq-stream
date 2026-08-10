@@ -62,6 +62,10 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const [cancelling, setCancelling] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const refetchMe = () => {
@@ -174,6 +178,26 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
     setCancelling(false);
   };
 
+  const deleteAccount = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/user", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: deleteConfirmText }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Could not delete account.");
+      // Account and all data are gone at this point — sign out and land
+      // somewhere that doesn't assume a session exists.
+      await signOut({ callbackUrl: "/login" });
+    } catch (e: any) {
+      setDeleteError(e.message || "Could not delete account. Try again.");
+      setDeleting(false);
+    }
+  };
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -243,7 +267,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center px-6"
+        className="fixed inset-0 backdrop-ambient-60 z-[60] flex items-center justify-center px-6"
         onClick={onClose}
       >
         <motion.div
@@ -256,7 +280,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         >
           <div className="flex items-center justify-between px-6 py-5 border-b border-border">
             <h2 className="text-md font-medium text-primary">Settings</h2>
-            <button onClick={onClose} className="text-tertiary hover:text-primary transition-colors">
+            <button onClick={onClose} className="text-tertiary hover:text-primary transition-colors" aria-label="Close">
               <X size={18} strokeWidth={1.5} />
             </button>
           </div>
@@ -606,6 +630,55 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                 <LogOut size={15} strokeWidth={1.5} />
                 Sign out
               </button>
+            </div>
+
+            {/* Account deletion — previously didn't exist anywhere in the
+                app at all. Typed confirmation ("DELETE") rather than a
+                single click, since this is genuinely irreversible: every
+                track, album, and file this account owns is actually
+                deleted, not archived. */}
+            <div className="border-t border-border pt-6">
+              {!showDeleteAccount ? (
+                <button
+                  onClick={() => setShowDeleteAccount(true)}
+                  className="text-xs text-tertiary hover:text-error transition-colors"
+                >
+                  Delete account
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-error font-medium">Delete your account?</p>
+                  <p className="text-xs text-secondary leading-relaxed">
+                    This permanently deletes every track, album, and file you own, along with your
+                    account itself. This can&apos;t be undone. Any active subscription is cancelled
+                    automatically. Type DELETE below to confirm.
+                  </p>
+                  <input
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="Type DELETE to confirm"
+                    className="w-full bg-surface border border-error/40 rounded-md px-3 py-2 text-sm text-primary focus:border-error outline-none"
+                  />
+                  {deleteError && <p className="text-xs text-error">{deleteError}</p>}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={deleteAccount}
+                      disabled={deleting || deleteConfirmText !== "DELETE"}
+                      className="text-xs text-white bg-error rounded-md px-3 py-2 hover:opacity-90 transition-opacity disabled:opacity-40"
+                    >
+                      {deleting ? "Deleting..." : "Permanently delete my account"}
+                    </button>
+                    <button
+                      onClick={() => { setShowDeleteAccount(false); setDeleteConfirmText(""); setDeleteError(null); }}
+                      disabled={deleting}
+                      className="text-xs text-secondary hover:text-primary transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Previously there was no way back to the marketing page,

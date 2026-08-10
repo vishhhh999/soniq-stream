@@ -19,7 +19,6 @@
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "bcryptjs": "^3.0.3",
-    "clsx": "^2.1.1",
     "drizzle-orm": "^0.32.1",
     "fflate": "^0.8.2",
     "framer-motion": "^11.3.19",
@@ -32,8 +31,7 @@
     "razorpay": "^2.9.8",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "resend": "^6.18.1",
-    "wavesurfer.js": "^7.8.6"
+    "resend": "^6.18.1"
   },
   "devDependencies": {
     "@next/swc-linux-x64-gnu": "^16.3.0",

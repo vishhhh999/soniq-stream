@@ -98,8 +98,9 @@ export default function NotificationsBell() {
     setNewIds(new Set(items.filter((n) => !n.seen).map((n) => n.id)));
     setOpen(true);
     if (unseenCount > 0) {
+      const previous = unseenCount;
       setUnseenCount(0);
-      fetch("/api/notifications", { method: "PATCH" }).catch(() => {});
+      fetch("/api/notifications", { method: "PATCH" }).catch(() => setUnseenCount(previous));
     }
   };
 

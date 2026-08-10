@@ -7,6 +7,7 @@ import { authConfig } from "./auth.config";
 import { db } from "./lib/db";
 import { users } from "./lib/db/schema";
 import { eq } from "drizzle-orm";
+import { isEmailAllowed } from "./lib/allowedEmails";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -61,7 +62,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       if (!existing) {
-        // New Google-only account.
+        // New Google-only account. This is the actual enforcement point
+        // for ALLOWED_EMAILS on the Google path — previously documented
+        // as working (see the "Access Denied" note in the handoff) but
+        // the check didn't exist anywhere in the code. Existing accounts
+        // signing back in (the `existing` branch above) are never gated
+        // here — this only blocks brand-new account creation.
+        if (!isEmailAllowed(email)) return false;
         await db.insert(users).values({
           id: nanoid(),
           email,

@@ -173,6 +173,17 @@ export const otpCodes = pgTable("otp_codes", {
   createdAt: timestamp("created_at").notNull(),
 });
 
+// One row per contact-form submission, keyed by a hash of the requester's
+// IP (never the raw IP — no reason to keep that around). Purely for rate
+// limiting: the contact route was previously wide open with zero
+// throttling, unlike the OTP route right next to it — trivially scriptable
+// for spam or to burn through the Resend sending quota.
+export const contactRateLimits = pgTable("contact_rate_limits", {
+  id: text("id").primaryKey(),
+  ipHash: text("ip_hash").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+});
+
 // One row per play event. Debounced server-side: a new row is only
 // inserted if the last play_event for this user+track was > 60s ago,
 // so scrubbing and replay within a session don't inflate counts.

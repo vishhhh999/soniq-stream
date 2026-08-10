@@ -16,6 +16,10 @@ export default function UsernamePrompt() {
 
   useEffect(() => {
     if (status !== "authenticated") return;
+    // "Skip for now" previously had no persistence at all — setShow(false)
+    // only hid it until the next reload, then this same check found
+    // username still null and showed it again. Every session. Forever.
+    if (window.localStorage.getItem("soniq-username-prompt-skipped")) return;
     fetch("/api/user/me")
       .then((r) => (r.ok ? r.json() : null))
       .then((u) => {
@@ -23,6 +27,11 @@ export default function UsernamePrompt() {
       })
       .catch(() => {});
   }, [status]);
+
+  const skip = () => {
+    window.localStorage.setItem("soniq-username-prompt-skipped", "1");
+    setShow(false);
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +94,7 @@ export default function UsernamePrompt() {
             </form>
 
             <button
-              onClick={() => setShow(false)}
+              onClick={skip}
               className="w-full text-center text-xs text-tertiary hover:text-secondary transition-colors"
             >
               Skip for now

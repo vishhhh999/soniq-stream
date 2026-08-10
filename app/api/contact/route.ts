@@ -1,12 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { sendContactEmail } from "@/lib/email";
+import { db } from "@/lib/db";
+import { contactRateLimits } from "@/lib/db/schema";
+import { and, gt, sql } from "drizzle-orm";
+import { nanoid } from "nanoid";
 
 export const dynamic = "force-dynamic";
+
+const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const RATE_MAX = 5;
 
 // Public — no auth. Deliberately not stored in the DB anywhere; this is a
 // pure forward-to-inbox endpoint, not a support-ticket system.
 export async function POST(req: NextRequest) {
   try {
+    // Same class of rate limit the OTP route already has — this route had
+    // none at all before, despite sending a real email on every valid
+    // request. IP hashed (never stored raw) purely to throttle, not to
+    // identify anyone.
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
+    const ipHash = crypto.createHash("sha256").update(ip).digest("hex");
+    const windowStart = new Date(Date.now() - RATE_WINDOW_MS);
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(contactRateLimits)
+      .where(and(sql`${contactRateLimits.ipHash} = ${ipHash}`, gt(contactRateLimits.createdAt, windowStart)));
+
+    if (Number(count) >= RATE_MAX) {
+      return NextResponse.json({ error: "Too many messages sent. Try again in a bit." }, { status: 429 });
+    }
+
     const { name, email, message } = await req.json();
 
     if (!name || typeof name !== "string" || !name.trim()) {
@@ -24,6 +48,7 @@ export async function POST(req: NextRequest) {
     }
 
     await sendContactEmail({ name: name.trim(), email: email.trim(), message: message.trim() });
+    await db.insert(contactRateLimits).values({ id: nanoid(), ipHash, createdAt: new Date() });
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("Contact form send failed:", err);

@@ -121,6 +121,15 @@ async function main() {
       created_at TIMESTAMP NOT NULL
     );
   `;
+  // v8.5.0 — contact form rate limiting (previously had none at all).
+  await sql`
+    CREATE TABLE IF NOT EXISTS contact_rate_limits (
+      id TEXT PRIMARY KEY,
+      ip_hash TEXT NOT NULL,
+      created_at TIMESTAMP NOT NULL
+    );
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS contact_rate_limits_ip_hash_idx ON contact_rate_limits (ip_hash, created_at);`;
 
   // Additive migration: first-Google-link timestamp for one-time toast.
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_linked_at TIMESTAMP;`;

@@ -99,6 +99,15 @@ export async function POST(
         .where(eq(tracks.albumId, link.albumId));
 
       const newAlbumId = nanoid();
+      // Uses THIS link's own allowDownload, not originalAlbum.allowDownload
+      // (the separate invite-system flag). Public share links and invite
+      // links are two different access models with their own permission
+      // toggles — a receiver saving via a public link should get exactly
+      // what that link's own "Allow download" checkbox says, regardless of
+      // whatever the invite-system flag happens to be set to. Previously
+      // this read the wrong flag, so a public link created with downloads
+      // OFF could still hand out full download rights on save if the
+      // album's unrelated invite-system flag happened to be on.
       await db.insert(albums).values({
         id: newAlbumId,
         userId,
@@ -107,7 +116,7 @@ export async function POST(
         coverUrl: originalAlbum.coverUrl,
         accessMode: "private",
         allowEdit: false,
-        allowDownload: !!originalAlbum.allowDownload,
+        allowDownload: !!link.allowDownload,
         // Attribution — used to show "Shared by X" on the receiver's album page.
         sharedFromAlbumId: originalAlbum.id,
         sharedByUserId: originalAlbum.userId,
@@ -125,7 +134,7 @@ export async function POST(
         userId,
         ownerId: originalAlbum.userId,
         canEdit: false,
-        canDownload: !!originalAlbum.allowDownload,
+        canDownload: !!link.allowDownload,
         savedAlbumId: newAlbumId,
         createdAt: new Date(),
       });

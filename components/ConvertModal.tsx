@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { X, Film, Upload } from "lucide-react";
 import { detectBPM } from "@/lib/bpm";
 import { detectKey } from "@/lib/key";
+import DuplicateChoiceModal from "./DuplicateChoiceModal";
 
 // Extracts the audio track from a video file and saves it to the library.
 // Runs entirely in the browser via ffmpeg.wasm — Vercel's serverless
@@ -35,6 +36,21 @@ export default function ConvertModal({
   const [progress, setProgress] = useState(0);
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [duplicatePrompt, setDuplicatePrompt] = useState<{ existingTitle: string } | null>(null);
+  const duplicateChoiceResolver = useRef<((choice: "version" | "independent" | "cancel") => void) | null>(null);
+
+  const askDuplicateChoice = (existingTitle: string) => {
+    return new Promise<"version" | "independent" | "cancel">((resolve) => {
+      duplicateChoiceResolver.current = resolve;
+      setDuplicatePrompt({ existingTitle });
+    });
+  };
+
+  const resolveDuplicateChoice = (choice: "version" | "independent" | "cancel") => {
+    duplicateChoiceResolver.current?.(choice);
+    duplicateChoiceResolver.current = null;
+    setDuplicatePrompt(null);
+  };
 
   const handleFile = async (file: File) => {
     setError(null);
@@ -91,10 +107,32 @@ export default function ConvertModal({
   };
 
   const uploadConverted = async (audioBlob: Blob, originalName: string) => {
-    setStage("uploading");
     const baseName = originalName.replace(/\.[^.]+$/, "");
     const filename = `${baseName}.mp3`;
 
+    // Same duplicate-title check every other upload path gives you —
+    // previously this flow skipped it entirely and silently auto-grouped
+    // a same-titled conversion as a new version with no choice offered,
+    // unlike a normal drag-and-drop upload of the exact same scenario.
+    let independent = false;
+    const dupRes = await fetch("/api/tracks/check-duplicate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: baseName, albumId, folderId }),
+    }).catch(() => null);
+    if (dupRes?.ok) {
+      const dup = await dupRes.json();
+      if (dup.duplicate) {
+        const choice = await askDuplicateChoice(dup.existingTitle);
+        if (choice === "cancel") {
+          setStage("pick");
+          return;
+        }
+        independent = choice === "independent";
+      }
+    }
+
+    setStage("uploading");
     const presignRes = await fetch("/api/upload/presign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -116,6 +154,7 @@ export default function ConvertModal({
         fileSize: audioBlob.size,
         albumId,
         folderId,
+        independent,
       }),
     });
     if (!finalizeRes.ok) throw new Error((await finalizeRes.json().catch(() => ({}))).error || "Upload processing failed.");
@@ -152,6 +191,14 @@ export default function ConvertModal({
   };
 
   return (
+    <>
+    {duplicatePrompt && (
+      <DuplicateChoiceModal
+        filename={fileName}
+        existingTitle={duplicatePrompt.existingTitle}
+        onChoose={resolveDuplicateChoice}
+      />
+    )}
     <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-ambient-60 backdrop-blur-sm px-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.97 }}
@@ -159,7 +206,7 @@ export default function ConvertModal({
         exit={{ opacity: 0, scale: 0.97 }}
         className="w-full max-w-md rounded-2xl border border-border bg-elevated p-4 sm:p-6 relative"
       >
-        <button onClick={onClose} className="absolute top-4 right-4 text-tertiary hover:text-primary transition-colors">
+        <button onClick={onClose} className="absolute top-4 right-4 text-tertiary hover:text-primary transition-colors" aria-label="Close">
           <X size={18} strokeWidth={1.5} />
         </button>
 
@@ -213,5 +260,6 @@ export default function ConvertModal({
         </div>
       </motion.div>
     </div>
+    </>
   );
 }

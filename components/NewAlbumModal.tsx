@@ -58,11 +58,12 @@ export default function NewAlbumModal({ onClose, onCreated }: { onClose: () => v
         });
         if (!putRes.ok) throw new Error(`Storage rejected the upload (${putRes.status}).`);
 
-        await fetch("/api/upload/cover/finalize", {
+        const finalizeRes = await fetch("/api/upload/cover/finalize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ albumId: album.id, publicUrl }),
         });
+        if (!finalizeRes.ok) throw new Error((await finalizeRes.json().catch(() => ({}))).error || "Could not finalize cover art.");
       } catch (e: any) {
         // Album itself was created successfully — only the cover art failed.
         // Surface it and let the user decide when to move on, rather than
@@ -96,7 +97,7 @@ export default function NewAlbumModal({ onClose, onCreated }: { onClose: () => v
         >
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-md font-medium text-primary">New album</h3>
-            <button onClick={onClose} className="text-tertiary hover:text-primary transition-colors">
+            <button onClick={onClose} className="text-tertiary hover:text-primary transition-colors" aria-label="Close">
               <X size={18} strokeWidth={1.5} />
             </button>
           </div>

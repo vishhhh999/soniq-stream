@@ -17,8 +17,20 @@ export function useTrackUpload({
   const [busy, setBusy] = useState(false);
   const [label, setLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const errorsRef = useRef<string[]>([]);
   const [duplicatePrompt, setDuplicatePrompt] = useState<{ filename: string; existingTitle: string } | null>(null);
   const duplicateChoiceResolver = useRef<((choice: "version" | "independent" | "cancel") => void) | null>(null);
+
+  // Every failure in a batch previously overwrote `error`, so uploading
+  // several files and having one fail for a different reason than the
+  // last one meant you'd only ever see the LAST message — the actual
+  // failure could be invisible. Accumulate instead, join for display.
+  const addError = (msg: string) => {
+    errorsRef.current = [...errorsRef.current, msg];
+    setError(errorsRef.current.join("\n"));
+  };
+
+  const AUDIO_EXT_RE = /\.(mp3|wav|flac|aac|ogg|m4a|aiff?|wma|opus|webm)$/i;
 
   const askDuplicateChoice = (filename: string, existingTitle: string) => {
     return new Promise<"version" | "independent" | "cancel">((resolve) => {
@@ -35,12 +47,18 @@ export function useTrackUpload({
   const uploadFiles = async (files: FileList | File[]) => {
     setBusy(true);
     setError(null);
+    errorsRef.current = [];
     for (const file of Array.from(files)) {
       // Dropped files aren't guaranteed to be audio (OS drag-drop can
       // include anything) — the button's file input already filters via
       // accept="audio/*", but a drop zone has no such native filtering.
-      if (file.type && !file.type.startsWith("audio/")) {
-        setError(`${file.name}: not an audio file, skipped`);
+      // Some browsers/OSes report an empty file.type for certain formats
+      // (.flac, some .m4a) — previously that empty string skipped the
+      // check entirely (falsy `file.type &&`), letting anything through.
+      // Fall back to checking the extension in that case.
+      const looksLikeAudio = file.type ? file.type.startsWith("audio/") : AUDIO_EXT_RE.test(file.name);
+      if (!looksLikeAudio) {
+        addError(`${file.name}: not an audio file, skipped`);
         continue;
       }
 
@@ -130,19 +148,24 @@ export function useTrackUpload({
             });
           } else {
             const detail = (bpmResult as any).error?.message || (keyResult as any).error?.message || "no error details available";
-            setError(`${file.name}: uploaded, but BPM/key analysis failed (${detail})`);
+            addError(`${file.name}: uploaded, but BPM/key analysis failed (${detail})`);
           }
         } catch {
           // decode failed — track stays without BPM/key, editable manually
         }
         onUploaded();
       } catch (e: any) {
-        setError(`${file.name}: ${e.message || "upload failed"}`);
+        addError(`${file.name}: ${e.message || "upload failed"}`);
       }
     }
     setBusy(false);
     setLabel("");
   };
 
-  return { busy, label, error, setError, duplicatePrompt, uploadFiles, resolveDuplicateChoice };
+  const clearError = (_?: string | null) => {
+    errorsRef.current = [];
+    setError(null);
+  };
+
+  return { busy, label, error, setError: clearError, duplicatePrompt, uploadFiles, resolveDuplicateChoice };
 }

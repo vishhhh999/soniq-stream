@@ -77,7 +77,7 @@ export default function InstallPrompt() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
           transition={MODAL_SPRING}
-          className="fixed bottom-4 left-4 right-4 z-[70] bg-elevated border border-border rounded-xl shadow-2xl p-4"
+          className="fixed bottom-4 left-4 right-4 z-[65] bg-elevated border border-border rounded-xl shadow-2xl p-4 pb-safe"
         >
           <div className="flex items-start gap-3">
             <Logo size={28} className="text-primary shrink-0 mt-0.5" />

@@ -139,7 +139,7 @@ export default function AddMenu({
             className="absolute top-full mt-2 right-0 z-10 w-72 max-w-[calc(100vw-2rem)] bg-elevated border border-error/40 rounded-md px-3 py-2 flex items-start gap-2"
           >
             <AlertCircle size={14} className="text-error shrink-0 mt-0.5" strokeWidth={1.5} />
-            <p className="text-xs text-secondary flex-1">{error}</p>
+            <p className="text-xs text-secondary flex-1 whitespace-pre-line">{error}</p>
             <button onClick={() => setError(null)} className="text-tertiary hover:text-primary text-xs">
               ✕
             </button>

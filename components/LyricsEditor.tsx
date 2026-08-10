@@ -57,21 +57,40 @@ export default function LyricsEditor({
   // track.id only, so they never refetch on their own after an edit here.
   // Without this event, newly saved/synced lyrics only appeared after a
   // full page reload.
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [desyncNotice, setDesyncNotice] = useState(false);
+
   const notifyLyricsUpdated = () => {
     window.dispatchEvent(new CustomEvent("soniq:lyrics-updated", { detail: { trackId: track.id } }));
   };
 
   const saveText = async () => {
     setSaving(true);
+    setSaveError(null);
+    // Editing the raw text invalidates any existing line-by-line sync — the
+    // synced array holds its own separate {time, text} pairs captured
+    // against the OLD wording, so leaving it in place would make the
+    // "Synced" badge lie about content that's since changed. Clearing it
+    // here (rather than silently leaving it stale) means the badge is
+    // never wrong, at the cost of requiring a re-sync — the safer failure
+    // mode of the two.
+    const wasSynced = isSynced;
+    const body: Record<string, unknown> = { lyrics: text };
+    if (wasSynced) body.lyricsSynced = null;
     const res = await fetch(`/api/tracks/${track.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lyrics: text }),
+      body: JSON.stringify(body),
     });
     setSaving(false);
     if (!res.ok) {
-      alert("Couldn't save the lyrics. Try again.");
+      setSaveError("Couldn't save the lyrics. Try again.");
       return;
+    }
+    if (wasSynced) {
+      setIsSynced(false);
+      setDesyncNotice(true);
+      setTimeout(() => setDesyncNotice(false), 4000);
     }
     setSaved(true);
     notifyLyricsUpdated();
@@ -189,7 +208,7 @@ export default function LyricsEditor({
     });
     setSaving(false);
     if (!res.ok) {
-      alert("Couldn't save the synced lyrics. Try again.");
+      setSaveError("Couldn't save the synced lyrics. Try again.");
       return;
     }
     setIsSynced(true);
@@ -346,6 +365,10 @@ export default function LyricsEditor({
 
   return (
     <div className="space-y-3">
+      {saveError && <p className="text-xs text-error">{saveError}</p>}
+      {desyncNotice && (
+        <p className="text-xs text-tertiary">Text updated — timing sync was cleared since it no longer matches. Re-sync when ready.</p>
+      )}
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
