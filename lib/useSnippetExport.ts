@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { SnippetRenderContext, SnippetTemplateId, DiscColor, GradientChoice, VINYL_ASSET_PATHS } from "./snippetTemplates";
+import { SnippetRenderContext, SnippetTemplateId, DiscColor, GradientChoice, TextColor, VINYL_ASSET_PATHS } from "./snippetTemplates";
 import { TEMPLATE_RENDERERS } from "./snippetRenderers";
 
 const OUTPUT_WIDTH = 1080;
@@ -28,6 +28,7 @@ interface ExportOptions {
   trimEnd: number;
   audioUrl: string;
   spinSpeed: number; // multiplier on the base rotation rate, 0.5x-2x
+  textColor: TextColor;
   getFrequencyData: () => Uint8Array | null;
 }
 
@@ -116,6 +117,7 @@ export function useSnippetExport() {
           albumArt, vinylImages: { white, black, orange },
           discColor: opts.discColor, gradient: opts.gradient, useAlbumArt: opts.useAlbumArt,
           spinSpeed: opts.spinSpeed,
+          textColor: opts.textColor,
         };
         renderer(rc);
         setProgress(Math.min(1, elapsed / duration));

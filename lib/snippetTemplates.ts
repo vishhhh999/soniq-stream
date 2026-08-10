@@ -15,6 +15,16 @@ export const GRADIENT_STOPS: Record<GradientChoice, [string, string]> = {
   dark: ["#1a1a1a", "#050505"],
 };
 
+// Text color options for the title/duration overlay — same three-way
+// dark/light/orange choice as disc and background, independently
+// selectable so e.g. an orange background can still take dark text.
+export type TextColor = "dark" | "light" | "orange";
+export const TEXT_COLOR_HEX: Record<TextColor, string> = {
+  dark: "#111111",
+  light: "#ffffff",
+  orange: "#ff8a3d",
+};
+
 export type SnippetTemplateId =
   | "vinyl-rise" | "vinyl-edge" // free
   | "depth-vinyl" | "pulse-grid" | "type-wave" | "orbit"; // premium
@@ -86,4 +96,5 @@ export interface SnippetRenderContext {
   gradient: GradientChoice;
   useAlbumArt: boolean;
   spinSpeed: number; // multiplier on the base disc rotation rate, default 1
+  textColor: TextColor;
 }

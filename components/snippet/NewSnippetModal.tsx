@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, Lock, Volume2, VolumeX, Download, Gauge } from "lucide-react";
 import { usePlayer, Track } from "../PlayerProvider";
-import { SNIPPET_TEMPLATES, SnippetTemplateId, DiscColor, GradientChoice, VINYL_ASSET_PATHS } from "@/lib/snippetTemplates";
+import { SNIPPET_TEMPLATES, SnippetTemplateId, DiscColor, GradientChoice, TextColor, TEXT_COLOR_HEX, VINYL_ASSET_PATHS } from "@/lib/snippetTemplates";
 import { TEMPLATE_RENDERERS } from "@/lib/snippetRenderers";
 import { useSnippetExport } from "@/lib/useSnippetExport";
 import { MODAL_SPRING } from "@/lib/motion";
@@ -24,6 +24,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
   const [useAlbumArt, setUseAlbumArt] = useState(!!track.albumCoverUrl);
   const [muted, setMuted] = useState(false);
   const [spinSpeed, setSpinSpeed] = useState(1);
+  const [textColor, setTextColor] = useState<TextColor>("light");
   const [trimStart, setTrimStart] = useState(0);
   const [trackDuration, setTrackDuration] = useState(track.durationSec ?? MAX_SNIPPET_SEC);
   const [trimEnd, setTrimEndState] = useState(Math.min(MAX_SNIPPET_SEC, track.durationSec ?? MAX_SNIPPET_SEC));
@@ -104,6 +105,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
         albumArt: useAlbumArt ? albumArtImgRef.current : null,
         vinylImages, discColor, gradient, useAlbumArt,
         spinSpeed,
+        textColor,
       });
       previewRafRef.current = requestAnimationFrame(draw);
     };
@@ -115,7 +117,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       previewAudioRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateId, discColor, gradient, useAlbumArt, trimStart, trimEnd, muted, spinSpeed, track.id]);
+  }, [templateId, discColor, gradient, useAlbumArt, trimStart, trimEnd, muted, spinSpeed, textColor, track.id]);
 
   const selectedMeta = SNIPPET_TEMPLATES.find((t) => t.id === templateId)!;
   const locked = selectedMeta.premium && isPaid === false;
@@ -133,6 +135,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       trimStart, trimEnd,
       audioUrl: track.fileUrl,
       spinSpeed,
+      textColor,
       getFrequencyData,
     });
   };
@@ -267,6 +270,18 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
                 onClick={() => setGradient(g)}
                 className={`w-7 h-7 rounded-full border-2 transition-colors capitalize ${gradient === g ? "border-accent" : "border-transparent"}`}
                 style={{ background: g === "dark" ? "#111" : g === "light" ? "#e5e0d8" : "#ff8a3d" }}
+              />
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-tertiary w-16 shrink-0">Text</span>
+            {(["dark", "light", "orange"] as TextColor[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTextColor(t)}
+                title={t}
+                className={`w-7 h-7 rounded-full border-2 transition-colors capitalize ${textColor === t ? "border-accent" : "border-transparent"}`}
+                style={{ background: TEXT_COLOR_HEX[t] }}
               />
             ))}
           </div>

@@ -1,4 +1,11 @@
-import { SnippetRenderContext, GRADIENT_STOPS } from "./snippetTemplates";
+import { SnippetRenderContext, GRADIENT_STOPS, TEXT_COLOR_HEX } from "./snippetTemplates";
+
+function fmtDuration(s: number) {
+  if (!Number.isFinite(s) || s < 0) return "0:00";
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60).toString().padStart(2, "0");
+  return `${m}:${sec}`;
+}
 
 function drawBackground({ ctx, width, height, gradient }: SnippetRenderContext) {
   const [from, to] = GRADIENT_STOPS[gradient];
@@ -44,13 +51,20 @@ function drawVinyl(
   ctx.restore();
 }
 
-// Title only, per Vish's call -- no artist name underneath.
+// Title + duration, in the user-selected text color. No artist name, per
+// Vish's earlier call.
 function drawTrackInfo(rc: SnippetRenderContext, x: number, y: number, align: "left" | "center" | "right" = "center") {
-  const { ctx, trackTitle } = rc;
+  const { ctx, trackTitle, duration, textColor } = rc;
+  const color = TEXT_COLOR_HEX[textColor];
   ctx.textAlign = align;
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = color;
   ctx.font = "600 34px 'General Sans', sans-serif";
   ctx.fillText(trackTitle, x, y);
+  ctx.font = "400 22px 'General Sans', sans-serif";
+  ctx.fillStyle = color;
+  ctx.filter = "opacity(0.65)";
+  ctx.fillText(fmtDuration(duration), x, y + 32);
+  ctx.filter = "none";
 }
 
 // ── Free templates ──────────────────────────────────────────────────────
@@ -137,11 +151,12 @@ export function renderPulseGrid(rc: SnippetRenderContext) {
 // Track title as the visual hero, waveform-shaped underline beneath it.
 // No vinyl at all — deliberately the odd one out in the set.
 export function renderTypeWave(rc: SnippetRenderContext) {
-  const { ctx, width, height, trackTitle, frequencyData } = rc;
+  const { ctx, width, height, trackTitle, duration, textColor, frequencyData } = rc;
   drawBackground(rc);
+  const color = TEXT_COLOR_HEX[textColor];
 
   ctx.textAlign = "center";
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = color;
   ctx.font = "700 64px 'General Sans', sans-serif";
   // Simple word-wrap for longer titles rather than letting them overflow.
   const words = trackTitle.split(" ");
@@ -156,8 +171,15 @@ export function renderTypeWave(rc: SnippetRenderContext) {
   const startY = height * 0.42 - (lines.length - 1) * 36;
   lines.forEach((l, i) => ctx.fillText(l, width / 2, startY + i * 72));
 
+  // Duration, right under the title.
+  ctx.font = "400 24px 'General Sans', sans-serif";
+  ctx.fillStyle = color;
+  ctx.filter = "opacity(0.65)";
+  ctx.fillText(fmtDuration(duration), width / 2, startY + lines.length * 72 + 20);
+  ctx.filter = "none";
+
   // Waveform-shaped underline, audio-reactive when data is available.
-  const wfY = startY + lines.length * 72 + 40;
+  const wfY = startY + lines.length * 72 + 65;
   const barCount = 44;
   const barGap = (width * 0.7) / barCount;
   const startX = width * 0.15;
