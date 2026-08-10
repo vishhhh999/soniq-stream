@@ -44,8 +44,17 @@ export const albums = pgTable("albums", {
   name: text("name").notNull(),
   coverUrl: text("cover_url"),
   createdAt: timestamp("created_at").notNull(),
-  // Sharing settings — null accessMode means 'private' (default).
-  accessMode: text("access_mode").default("private"), // 'private' | 'invite_only' | 'public'
+  // Sharing settings — null accessMode means 'private' (default). 'public'
+  // was a stored-but-unenforced third value: no route ever checked it, so
+  // an album set to "public" wasn't actually reachable by anyone but the
+  // owner. Removed from the UI (AlbumSharePanel) rather than wired up,
+  // since a real public-access model for albums already exists via the
+  // shareLinks table (see /api/albums/[id]/public-share) — building a
+  // second, different "public" mechanism here would just be two competing
+  // ways to do the same thing. Existing rows with 'public' still behave
+  // as unreachable-by-non-owner; harmless, but nothing will set this value
+  // going forward.
+  accessMode: text("access_mode").default("private"), // 'private' | 'invite_only' | 'public' (legacy, unused)
   allowEdit: boolean("allow_edit").default(false),
   allowDownload: boolean("allow_download").default(false),
   // Set when this album was saved from someone else's share link.

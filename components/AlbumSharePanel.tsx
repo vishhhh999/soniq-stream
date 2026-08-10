@@ -36,6 +36,12 @@ type ShareData = {
   inviteLink: InviteLink | null;
 };
 
+type PublicLink = {
+  token: string;
+  allowDownload: boolean;
+  expiresAt: string | null;
+};
+
 type View = "main" | "members" | "access" | "invite";
 
 function Avatar({ userId, username, avatarUrl, size = 8 }: { userId: string; username: string | null; avatarUrl: string | null; size?: number }) {
@@ -78,6 +84,16 @@ export default function AlbumSharePanel({
   const [useType, setUseType] = useState<"uses" | "expiry" | "unlimited">("unlimited");
   const [saving, setSaving] = useState(false);
 
+  // Public link — the plain, no-account-needed share model (shareLinks
+  // table, consumed at /s/[token]). Separate state from the invite link
+  // above on purpose: different table, different route, different access
+  // model. Don't merge these into one "link" concept.
+  const [publicLink, setPublicLink] = useState<PublicLink | null>(null);
+  const [publicLinkLoaded, setPublicLinkLoaded] = useState(false);
+  const [publicLinkError, setPublicLinkError] = useState<string | null>(null);
+  const [publicLinkBusy, setPublicLinkBusy] = useState(false);
+  const [publicCopied, setPublicCopied] = useState(false);
+
   const load = () => {
     setLoadError(null);
     fetch(`/api/albums/${albumId}/share`)
@@ -92,7 +108,68 @@ export default function AlbumSharePanel({
       .catch((e) => setLoadError(e.message));
   };
 
-  useEffect(() => { load(); }, [albumId]);
+  const loadPublicLink = () => {
+    fetch(`/api/albums/${albumId}/public-share`)
+      .then((r) => r.json())
+      .then((d) => setPublicLink(d.link ?? null))
+      .catch(() => {})
+      .finally(() => setPublicLinkLoaded(true));
+  };
+
+  useEffect(() => { load(); loadPublicLink(); }, [albumId]);
+
+  const createPublicLink = async () => {
+    setPublicLinkBusy(true);
+    setPublicLinkError(null);
+    try {
+      const res = await fetch("/api/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ albumId, allowDownload: false }),
+      });
+      if (!res.ok) throw new Error();
+      const link = await res.json();
+      setPublicLink({ token: link.token, allowDownload: link.allowDownload, expiresAt: link.expiresAt });
+    } catch {
+      setPublicLinkError("Couldn't create the link. Try again.");
+    }
+    setPublicLinkBusy(false);
+  };
+
+  const togglePublicDownload = async (next: boolean) => {
+    setPublicLink((p) => (p ? { ...p, allowDownload: next } : p));
+    setPublicLinkError(null);
+    try {
+      const res = await fetch(`/api/albums/${albumId}/public-share`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allowDownload: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setPublicLink((p) => (p ? { ...p, allowDownload: !next } : p));
+      setPublicLinkError("Couldn't update that. Try again.");
+    }
+  };
+
+  const revokePublicLink = async () => {
+    setPublicLinkError(null);
+    try {
+      const res = await fetch(`/api/albums/${albumId}/public-share`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setPublicLink(null);
+    } catch {
+      setPublicLinkError("Couldn't deactivate the link. Try again.");
+    }
+  };
+
+  const copyPublicLink = () => {
+    if (!publicLink) return;
+    navigator.clipboard.writeText(`${window.location.origin}/s/${publicLink.token}`);
+    setPublicCopied(true);
+    triggerFeedback("tap");
+    setTimeout(() => setPublicCopied(false), 1500);
+  };
 
   const patchSettings = async (patch: Partial<Pick<ShareData, "accessMode" | "allowEdit" | "allowDownload">>) => {
     setSaving(true);
@@ -266,8 +343,8 @@ export default function AlbumSharePanel({
                   onClick={() => setView("access")}
                   className="m-4 w-[calc(100%-2rem)] flex items-center gap-3 bg-surface rounded-xl px-4 py-3 hover:bg-border/40 transition-colors"
                 >
-                  {data.accessMode === "public" ? <Globe size={16} strokeWidth={1.5} className="text-secondary" /> : data.accessMode === "invite_only" ? <Users size={16} strokeWidth={1.5} className="text-secondary" /> : <Lock size={16} strokeWidth={1.5} className="text-secondary" />}
-                  <span className="flex-1 text-sm text-primary font-medium capitalize">{data.accessMode === "invite_only" ? "Invite Only" : data.accessMode === "public" ? "Public" : "Private"}</span>
+                  {data.accessMode === "invite_only" ? <Users size={16} strokeWidth={1.5} className="text-secondary" /> : <Lock size={16} strokeWidth={1.5} className="text-secondary" />}
+                  <span className="flex-1 text-sm text-primary font-medium capitalize">{data.accessMode === "invite_only" ? "Invite Only" : "Private"}</span>
                   <ChevronRight size={14} strokeWidth={1.5} className="text-tertiary" />
                 </button>
 
@@ -354,6 +431,59 @@ export default function AlbumSharePanel({
                   )}
                 </div>
 
+                {/* Public link — anyone with this link can listen without
+                    an account. Saving to their own library or downloading
+                    requires login; downloading additionally requires the
+                    toggle below to be on. Separate from the invite system
+                    above, which grants permissioned membership instead. */}
+                <div className="mx-4 mb-4">
+                  <div className="bg-surface rounded-xl overflow-hidden">
+                    <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+                      <Globe size={14} strokeWidth={1.5} className="text-secondary" />
+                      <div>
+                        <p className="text-sm font-medium text-primary">Public link</p>
+                        <p className="text-xs text-tertiary mt-0.5">Anyone with the link can listen. Login is required to save or download.</p>
+                      </div>
+                    </div>
+                    <div className="px-4 py-3">
+                      {publicLinkError && <p className="text-xs text-error mb-2">{publicLinkError}</p>}
+                      {!publicLinkLoaded ? (
+                        <div className="h-9 rounded-lg bg-canvas animate-pulse" />
+                      ) : !publicLink ? (
+                        <button
+                          onClick={createPublicLink}
+                          disabled={publicLinkBusy}
+                          className="w-full flex items-center justify-center gap-2 text-sm text-secondary border border-border rounded-lg px-4 py-2 hover:border-border-strong hover:text-primary transition-colors disabled:opacity-50"
+                        >
+                          <Link2 size={14} strokeWidth={1.5} />
+                          {publicLinkBusy ? "Generating..." : "Create public link"}
+                        </button>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2 bg-canvas rounded-lg px-3 py-2 mb-3">
+                            <p className="text-xs text-secondary truncate flex-1">{`${typeof window !== "undefined" ? window.location.origin : ""}/s/${publicLink.token}`}</p>
+                            <button onClick={copyPublicLink} className="shrink-0">
+                              {publicCopied ? <Check size={14} className="text-accent" /> : <Copy size={14} className="text-tertiary hover:text-primary" />}
+                            </button>
+                          </div>
+                          <label className="flex items-center gap-2 text-xs text-secondary cursor-pointer w-fit mb-3">
+                            <input
+                              type="checkbox"
+                              checked={publicLink.allowDownload}
+                              onChange={(e) => togglePublicDownload(e.target.checked)}
+                              className="accent-[var(--accent)]"
+                            />
+                            Allow download
+                          </label>
+                          <button onClick={revokePublicLink} className="text-xs text-error hover:text-error/80 transition-colors">
+                            Deactivate
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Invite button */}
                 <div className="px-4 pb-5">
                   <button
@@ -372,7 +502,6 @@ export default function AlbumSharePanel({
                 {([
                   { mode: "private", icon: <Lock size={16} strokeWidth={1.5} />, label: "Private", desc: "Only you" },
                   { mode: "invite_only", icon: <Users size={16} strokeWidth={1.5} />, label: "Invite Only", desc: "Invite people directly" },
-                  { mode: "public", icon: <Globe size={16} strokeWidth={1.5} />, label: "Public", desc: "Anyone with the link" },
                 ] as const).map(({ mode, icon, label, desc }) => (
                   <button
                     key={mode}
