@@ -143,6 +143,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [eq, setEqState] = useState({ low: 0, mid: 0, high: 0 });
   const eqRef = useRef(eq);
   useEffect(() => { eqRef.current = eq; }, [eq]);
+  const eqBypassedRef = useRef(false);
+  const stemsMutedRef = useRef(false);
   const [eqBypassed, setEQBypassedState] = useState(false);
   const eqSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Master gain sits between the analyser and destination — silenced while
@@ -206,7 +208,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       // Master gain — inserted after the analyser tap so getFrequencyData
       // still sees the full signal even while this is silenced for stems mode.
-      const master = ctx.createGain(); master.gain.value = stemsMuted ? 0 : 1;
+      const master = ctx.createGain(); master.gain.value = stemsMutedRef.current ? 0 : 1;
       an.disconnect();
       an.connect(master);
       master.connect(ctx.destination);
@@ -220,7 +222,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       graphReady.current = true;
       // Apply whatever EQ state is already pending (e.g. a track played
       // before the user gesture that unlocks AudioContext had a chance to run).
-      applyEQToChains(eqBypassed ? { low: 0, mid: 0, high: 0 } : eqRef.current);
+      applyEQToChains(eqBypassedRef.current ? { low: 0, mid: 0, high: 0 } : eqRef.current);
     } catch (e) { console.warn("Web Audio unavailable:", e); }
   }, []);
 
@@ -656,12 +658,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [eqBypassed, applyEQToChains]);
 
   const setEQBypassed = useCallback((v: boolean) => {
+    eqBypassedRef.current = v;
     setEQBypassedState(v);
     applyEQToChains(v ? { low: 0, mid: 0, high: 0 } : eqRef.current);
   }, [applyEQToChains]);
 
   const audioContext = useCallback(() => audioCtxRef.current, []);
   const setStemsMuted = useCallback((v: boolean) => {
+    stemsMutedRef.current = v;
     setStemsMutedState(v);
     if (masterGainRef.current) masterGainRef.current.gain.value = v ? 0 : 1;
   }, []);
