@@ -4,15 +4,49 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, ChevronDown, Mic2,
+  Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, ChevronDown,
+  ChevronLeft, ListMusic, FileText, Mic2, SlidersHorizontal,
 } from "lucide-react";
 import { usePlayer } from "./PlayerProvider";
 import AlbumArtMorph from "./AlbumArtMorph";
 import WaveformSeekBar from "./WaveformSeekBar";
-import SyncedLyricsList from "./SyncedLyricsList";
-import type { SyncedLine } from "@/lib/lyricsSync";
+import QueuePanel from "./player/QueuePanel";
+import NotesPanel from "./player/NotesPanel";
+import LyricsPanel from "./player/LyricsPanel";
+import EditPanel from "./player/EditPanel";
 import { gradientFromSeed } from "@/lib/gradient";
 import { useAmbientPulse } from "@/lib/useAmbientPulse";
+import { MODAL_SPRING } from "@/lib/motion";
+
+type ViewKey = "queue" | "notes" | "lyrics" | "edit" | null;
+
+// Full-screen view that fully covers the player (not a floating overlay) —
+// matches the reference's own "New Snippet" pattern: back button top-left,
+// title centered, nothing of the player visible behind it. Same shared
+// panel content as desktop's popovers (QueuePanel/NotesPanel/LyricsPanel/
+// EditPanel), just given the full viewport instead of a fixed-width box.
+function FullScreenView({ title, onBack, children }: { title: string; onBack: () => void; children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 24 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 24 }}
+      transition={MODAL_SPRING}
+      className="fixed inset-0 bg-canvas z-[80] flex flex-col"
+    >
+      <div className="flex items-center px-4 pt-6 pb-4 shrink-0">
+        <button onClick={onBack} className="text-tertiary p-2 -m-2">
+          <ChevronLeft size={22} strokeWidth={1.5} />
+        </button>
+        <span className="flex-1 text-center text-xs uppercase tracking-wide text-tertiary -ml-9">{title}</span>
+        <div className="w-9" />
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-6 pb-8">
+        {children}
+      </div>
+    </motion.div>
+  );
+}
 
 export default function MobilePlayerBar() {
   const {
@@ -22,43 +56,14 @@ export default function MobilePlayerBar() {
 
   const [expanded, setExpanded] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [lines, setLines] = useState<SyncedLine[] | null>(null);
-  const [rawText, setRawText] = useState<string | null>(null);
-  const [lyricsLoading, setLyricsLoading] = useState(false);
+  const [activeView, setActiveView] = useState<ViewKey>(null);
   const expandedPlayButtonRef = useRef<HTMLButtonElement>(null);
-  useAmbientPulse(expandedPlayButtonRef); // only the larger expanded-sheet button, not the mini bar one
+  useAmbientPulse(expandedPlayButtonRef);
 
   useEffect(() => setMounted(true), []);
-
-  // Fetch lyrics for the scrollable section below the player, only while expanded.
-  useEffect(() => {
-    if (!expanded || !current) return;
-    const load = () => {
-      setLyricsLoading(true);
-      fetch(`/api/tracks/${current.id}`)
-        .then((r) => {
-          if (!r.ok) throw new Error(`${r.status}`);
-          return r.json();
-        })
-        .then((full) => {
-          if (Array.isArray(full.lyricsSynced) && full.lyricsSynced.length > 0) {
-            setLines(full.lyricsSynced); setRawText(null);
-          } else if (full.lyrics) {
-            setLines(null); setRawText(full.lyrics);
-          } else {
-            setLines(null); setRawText(null);
-          }
-        })
-        .catch(() => { setLines(null); setRawText(null); })
-        .finally(() => setLyricsLoading(false));
-    };
-    load();
-    const onUpdated = (e: Event) => {
-      if ((e as CustomEvent).detail?.trackId === current.id) load();
-    };
-    window.addEventListener("soniq:lyrics-updated", onUpdated);
-    return () => window.removeEventListener("soniq:lyrics-updated", onUpdated);
-  }, [expanded, current?.id]);
+  // Closing the whole sheet always closes any open full-screen view too,
+  // so reopening the player never resumes on Queue/Notes/Lyrics/Edit.
+  useEffect(() => { if (!expanded) setActiveView(null); }, [expanded]);
 
   const fmt = (s: number) => {
     if (!s || Number.isNaN(s)) return "0:00";
@@ -71,7 +76,6 @@ export default function MobilePlayerBar() {
 
   if (!current) return null;
 
-  // Collapsed mini-bar. Fixed to viewport bottom, above the mobile nav-safe area.
   const collapsed = (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-elevated border-t border-border pb-safe">
       <div className="h-16 flex items-center px-4 gap-3" onClick={() => setExpanded(true)}>
@@ -101,29 +105,23 @@ export default function MobilePlayerBar() {
     </div>
   );
 
-  // Expanded sheet — scrollable. Now Playing content is the first screen,
-  // scrolling down reveals lyrics below it (same pattern as Spotify's
-  // full-screen player). No separate lyrics button/overlay needed.
   const sheet = expanded && (
     <motion.div
       initial={{ y: "100%" }}
       animate={{ y: 0 }}
       exit={{ y: "100%" }}
       transition={{ type: "spring", stiffness: 300, damping: 32 }}
-      className="fixed inset-0 bg-canvas z-[70] flex flex-col overflow-y-auto no-scrollbar"
+      className="fixed inset-0 bg-canvas z-[70] flex flex-col"
     >
-      {/* Sticky header so it stays visible while scrolling into lyrics */}
-      <div className="sticky top-0 z-10 flex items-center justify-between px-6 pt-6 pb-4 bg-canvas/95 backdrop-blur-sm shrink-0">
+      <div className="flex items-center justify-between px-6 pt-6 pb-4 shrink-0">
         <button onClick={() => setExpanded(false)} className="text-tertiary p-2 -m-2">
           <ChevronDown size={22} strokeWidth={1.5} />
         </button>
         <span className="text-xs uppercase tracking-wide text-tertiary">Now Playing</span>
-        <div className="w-9" /> {/* balance the header */}
+        <div className="w-9" />
       </div>
 
-      {/* Screen 1 — vinyl, transport controls. min-h so it fills the viewport
-          before lyrics content starts, giving the scroll-down affordance. */}
-      <div className="flex flex-col px-6 pb-8" style={{ minHeight: "calc(100dvh - 76px)" }}>
+      <div className="flex-1 flex flex-col px-6 pb-8 min-h-0">
         <div className="flex-1 flex flex-col items-center justify-center min-h-0">
           <AlbumArtMorph coverUrl={current.albumCoverUrl} size={280} gradientFrom={gradient?.from} gradientTo={gradient?.to} />
           <div className="mt-8 text-center w-full">
@@ -145,7 +143,7 @@ export default function MobilePlayerBar() {
           <span>{fmt(duration)}</span>
         </div>
 
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-6">
           <button onClick={toggleShuffle} className="p-3 -m-3">
             <Shuffle size={19} strokeWidth={1.5} className={shuffleOn ? "text-accent" : "text-secondary"} />
           </button>
@@ -169,35 +167,53 @@ export default function MobilePlayerBar() {
           </button>
         </div>
 
-        {/* Scroll-down affordance */}
-        <div className="flex flex-col items-center gap-1 mt-4 text-tertiary">
-          <Mic2 size={14} strokeWidth={1.5} />
-          <motion.div animate={{ y: [0, 4, 0] }} transition={{ repeat: Infinity, duration: 1.6 }}>
-            <ChevronDown size={16} strokeWidth={1.5} />
-          </motion.div>
+        {/* Bottom icon row — Queue/Notes/Lyrics left, Edit right, same
+           positions and same shared panel content as desktop's popovers.
+           Matches the reference layout directly, per Vish's instruction. */}
+        <div className="flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-5 bg-elevated rounded-full px-4 py-2.5">
+            <button onClick={() => setActiveView("queue")} className="text-secondary hover:text-primary transition-colors">
+              <ListMusic size={16} strokeWidth={1.5} />
+            </button>
+            <button onClick={() => setActiveView("notes")} className="text-secondary hover:text-primary transition-colors">
+              <FileText size={16} strokeWidth={1.5} />
+            </button>
+            <button onClick={() => setActiveView("lyrics")} className="text-secondary hover:text-primary transition-colors">
+              <Mic2 size={16} strokeWidth={1.5} />
+            </button>
+          </div>
+          <button
+            onClick={() => setActiveView("edit")}
+            className="flex items-center gap-1.5 text-xs font-medium px-4 py-2.5 rounded-full bg-elevated text-secondary hover:text-primary transition-colors"
+          >
+            <SlidersHorizontal size={14} strokeWidth={1.5} />
+            Edit
+          </button>
         </div>
       </div>
 
-      {/* Screen 2 — lyrics, revealed by scrolling down */}
-      <div className="px-6 pb-16 pt-4 border-t border-border min-h-[50vh]">
-        <p className="text-xs uppercase tracking-wide text-tertiary mb-4 text-center">Lyrics</p>
-        {lyricsLoading ? (
-          <p className="text-secondary text-sm text-center mt-12">Loading...</p>
-        ) : lines && lines.length > 0 ? (
-          <div style={{ height: "60vh" }}>
-            <SyncedLyricsList lines={lines} currentTime={currentTime} variant="fullscreen" />
-          </div>
-        ) : rawText ? (
-          <div className="text-center">
-            <p className="text-tertiary text-xs mb-6">Not synced to timing yet — showing plain text.</p>
-            <p className="text-primary text-base leading-relaxed whitespace-pre-line">{rawText}</p>
-          </div>
-        ) : (
-          <div className="text-center mt-8">
-            <p className="text-secondary text-sm">No lyrics added yet.</p>
-          </div>
+      <AnimatePresence>
+        {activeView === "queue" && (
+          <FullScreenView title="Queue" onBack={() => setActiveView(null)}>
+            <QueuePanel />
+          </FullScreenView>
         )}
-      </div>
+        {activeView === "notes" && (
+          <FullScreenView title="Notes" onBack={() => setActiveView(null)}>
+            <NotesPanel track={current} />
+          </FullScreenView>
+        )}
+        {activeView === "lyrics" && (
+          <FullScreenView title="Lyrics" onBack={() => setActiveView(null)}>
+            <LyricsPanel track={current} />
+          </FullScreenView>
+        )}
+        {activeView === "edit" && (
+          <FullScreenView title="Edit" onBack={() => setActiveView(null)}>
+            <EditPanel track={current} />
+          </FullScreenView>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 
