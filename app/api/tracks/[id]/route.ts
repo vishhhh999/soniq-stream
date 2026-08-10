@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const body = await req.json();
-  const allowed = ["bpm", "bpmConfidence", "key", "notes", "trimStart", "trimEnd", "pitchShift", "title", "artist", "lyrics", "lyricsSynced", "albumId", "durationSec"];
+  const allowed = ["bpm", "bpmConfidence", "key", "notes", "trimStart", "trimEnd", "pitchShift", "title", "artist", "lyrics", "lyricsSynced", "albumId", "durationSec", "eqLow", "eqMid", "eqHigh"];
   const update: Record<string, unknown> = {};
   for (const k of allowed) if (k in body) update[k] = body[k];
 

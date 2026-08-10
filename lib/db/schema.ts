@@ -86,6 +86,13 @@ export const tracks = pgTable("tracks", {
   trimStart: real("trim_start"),
   trimEnd: real("trim_end"),
   pitchShift: real("pitch_shift").default(0),
+  // Per-track 3-band EQ, dB gain (-15 to +15), applied via a BiquadFilterNode
+  // chain in PlayerProvider (low shelf / mid peaking / high shelf). Same
+  // "small saved number next to bpm/key" shape as the rest of this table —
+  // deliberately not a separate table, there's exactly one EQ per track.
+  eqLow: real("eq_low").default(0),
+  eqMid: real("eq_mid").default(0),
+  eqHigh: real("eq_high").default(0),
   // Duplicate/version handling: tracks uploaded with a matching normalized
   // title into the same album/folder are grouped under one versionGroupId
   // (the id of the first track in the group) instead of rejected or silently

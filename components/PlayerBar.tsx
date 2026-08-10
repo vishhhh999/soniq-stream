@@ -1,22 +1,28 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, ListMusic, Volume2, Volume1, VolumeX, X, Mic2 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import {
+  Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle,
+  ListMusic, Volume2, Volume1, VolumeX, FileText, Mic2, SlidersHorizontal,
+} from "lucide-react";
+import { AnimatePresence } from "framer-motion";
 import { usePlayer } from "./PlayerProvider";
 import InteractiveVinyl from "./InteractiveVinyl";
 import WaveformSeekBar from "./WaveformSeekBar";
-import LyricsView from "./LyricsView";
-import SortableQueueItem from "./SortableQueueItem";
+import PlayerPopover from "./player/PlayerPopover";
+import QueuePanel from "./player/QueuePanel";
+import NotesPanel from "./player/NotesPanel";
+import LyricsPanel from "./player/LyricsPanel";
+import EditPanel from "./player/EditPanel";
 import { gradientFromSeed } from "@/lib/gradient";
 import { useAmbientPulse } from "@/lib/useAmbientPulse";
+
+type PopoverKey = "queue" | "notes" | "lyrics" | "edit" | "volume" | null;
 
 export default function PlayerBar() {
   const {
     current, isPlaying, currentTime, duration, audioRef, toggle, next, previous,
-    queue, queueIndex, shuffleOn, toggleShuffle, jumpToQueueIndex, reorderQueue,
+    queue, queueIndex, shuffleOn, toggleShuffle,
     repeatMode, cycleRepeatMode,
   } = usePlayer();
   const [volume, setVolume] = useState(() => {
@@ -31,40 +37,33 @@ export default function PlayerBar() {
     try { return window.localStorage.getItem("soniq:muted") === "true"; } catch { return false; }
   });
   const [brokenTrack, setBrokenTrack] = useState<{ id: string; title: string } | null>(null);
-  const [showQueue, setShowQueue] = useState(false);
-  const [showLyrics, setShowLyrics] = useState(false);
-  const [showVolume, setShowVolume] = useState(false);
-  const lastTrackIdRef = useRef<string | null>(null);
-  const queueSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  // Single source of truth for which popover is open, instead of five
+  // separate booleans — makes "only one open at a time" free (setting one
+  // implicitly closes the others) rather than something each toggle had to
+  // remember to do itself.
+  const [openPopover, setOpenPopover] = useState<PopoverKey>(null);
   const playButtonRef = useRef<HTMLButtonElement>(null);
   useAmbientPulse(playButtonRef); // glow breathes with the ambient beat pulse
 
-  const handleQueueDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const ids = queue.map((t, i) => `${t.id}-${i}`);
-    const oldIndex = ids.indexOf(active.id as string);
-    const newIndex = ids.indexOf(over.id as string);
-    if (oldIndex === -1 || newIndex === -1) return;
-    reorderQueue(arrayMove(queue, oldIndex, newIndex));
-  };
+  const queueBtnRef = useRef<HTMLButtonElement>(null);
+  const notesBtnRef = useRef<HTMLButtonElement>(null);
+  const lyricsBtnRef = useRef<HTMLButtonElement>(null);
+  const editBtnRef = useRef<HTMLButtonElement>(null);
+  const volumeBtnRef = useRef<HTMLButtonElement>(null);
 
-  // NOTE: audio loading/playing is fully owned by PlayerProvider now (play(),
-  // playQueue(), jumpToQueueIndex(), and crossfade completion all load+play
-  // directly on the audio element at the moment of the action). A manual
-  // "load on current change" effect used to live here — it duplicated that
-  // work and, worse, fired again after crossfade swapped the active element,
-  // reloading the just-crossfaded track from 0:00 and causing the replay/
-  // pause-gap bug. Do not reintroduce it.
+  const toggleOpen = (key: Exclude<PopoverKey, null>) =>
+    setOpenPopover((cur) => (cur === key ? null : key));
+
   useEffect(() => {
     setBrokenTrack(null);
   }, [current?.id]);
 
   // The sidebar's expand button (LyricsSidebar, on the main library pages)
-  // dispatches this same event so both it and the mic button open the one
-  // fullscreen view — no separate code path for "expand from sidebar."
+  // dispatches this same event the mic icon used to open a fullscreen
+  // LyricsView for — now it opens the same Lyrics popover the mic icon
+  // opens, so there's still exactly one lyrics UI, not two.
   useEffect(() => {
-    const onExpand = () => setShowLyrics(true);
+    const onExpand = () => setOpenPopover("lyrics");
     window.addEventListener("soniq:expand-lyrics", onExpand);
     return () => window.removeEventListener("soniq:expand-lyrics", onExpand);
   }, []);
@@ -87,23 +86,14 @@ export default function PlayerBar() {
     window.dispatchEvent(new CustomEvent("soniq:track-deleted"));
   };
 
-  // Re-applies whenever volume/muted change, AND whenever the current track
-  // changes — a crossfade swaps in the OTHER underlying <audio> element,
-  // which PlayerProvider always resets to .volume = 1 for the ramp/fallback
-  // math (see startCrossfade/completeCrossfade). Without `current?.id` here,
-  // the volume slider silently stopped applying after the first crossfade —
-  // audio would jump back to 100% and stay there until the user touched the
-  // slider again.
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = muted ? 0 : volume;
-    // Persisted so volume/mute survive a reload — previously these reset
-    // to 100%/unmuted every time, unlike theme/crossfade/haptics which
-    // all correctly persist.
     try {
       window.localStorage.setItem("soniq:volume", String(volume));
       window.localStorage.setItem("soniq:muted", String(muted));
     } catch {}
   }, [volume, muted, current?.id]);
+
   const fmt = (s: number) => {
     if (!s || Number.isNaN(s)) return "0:00";
     const m = Math.floor(s / 60);
@@ -117,8 +107,6 @@ export default function PlayerBar() {
 
   return (
     <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[min(900px,calc(100vw-2rem))]">
-      {showLyrics && current && <LyricsView track={current} onClose={() => setShowLyrics(false)} />}
-
       {brokenTrack && (
         <div className="mb-2 bg-error/15 border border-error/40 rounded-lg px-4 py-2 flex items-center justify-between gap-4">
           <span className="text-xs text-error">
@@ -135,39 +123,10 @@ export default function PlayerBar() {
         </div>
       )}
 
-      <AnimatePresence>
-        {showQueue && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 12 }}
-            className="absolute bottom-full right-0 mb-2 w-80 max-h-96 overflow-y-auto bg-elevated border border-border rounded-lg shadow-xl"
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border sticky top-0 bg-elevated">
-              <span className="text-xs uppercase tracking-wide text-tertiary">Queue</span>
-              <button onClick={() => setShowQueue(false)} className="text-tertiary hover:text-primary">
-                <X size={14} strokeWidth={1.5} />
-              </button>
-            </div>
-            {queue.length === 0 ? (
-              <p className="text-sm text-tertiary px-4 py-6 text-center">Nothing queued.</p>
-            ) : (
-              <DndContext sensors={queueSensors} collisionDetection={closestCenter} onDragEnd={handleQueueDragEnd}>
-                <SortableContext items={queue.map((t, i) => `${t.id}-${i}`)} strategy={verticalListSortingStrategy}>
-                  {queue.map((t, i) => (
-                    <SortableQueueItem key={`${t.id}-${i}`} track={t} index={i} isCurrent={i === queueIndex} onSelect={() => jumpToQueueIndex(i)} />
-                  ))}
-                </SortableContext>
-              </DndContext>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Floating rounded pill, not edge-to-edge — bounded width with real
          padding so nothing (the volume slider especially) has a chance to
          clip past the container edge the way it did in the full-width bar. */}
-      <div className="h-16 bg-elevated/95 backdrop-blur border border-border rounded-full flex items-center px-5 gap-4 shadow-xl">
+      <div className="h-16 bg-elevated/95 backdrop-blur border border-border rounded-full flex items-center px-5 gap-4 shadow-xl relative">
         <div className="w-44 min-w-0 flex items-center gap-2.5 shrink-0">
           <InteractiveVinyl
             coverUrl={current?.albumCoverUrl}
@@ -175,23 +134,14 @@ export default function PlayerBar() {
             gradientFrom={gradient?.from}
             gradientTo={gradient?.to}
           />
-          <AnimatePresence mode="wait">
-            {current ? (
-              <motion.div
-                key={current.id}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.2 }}
-                className="min-w-0"
-              >
-                <p className="text-xs font-medium text-primary truncate">{current.title}</p>
-                <p className="text-[11px] text-secondary truncate">{current.artist || "Unknown"}</p>
-              </motion.div>
-            ) : (
-              <p className="text-xs text-tertiary">Nothing playing</p>
-            )}
-          </AnimatePresence>
+          {current ? (
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-primary truncate">{current.title}</p>
+              <p className="text-[11px] text-secondary truncate">{current.artist || "Unknown"}</p>
+            </div>
+          ) : (
+            <p className="text-xs text-tertiary">Nothing playing</p>
+          )}
         </div>
 
         <div className="flex items-center gap-2.5 text-secondary shrink-0">
@@ -255,41 +205,80 @@ export default function PlayerBar() {
           {fmt(currentTime)} / {fmt(duration)}
         </span>
 
-        <button
-          onClick={() => setShowLyrics((v) => !v)}
-          disabled={!current}
-          className={`shrink-0 transition-colors disabled:opacity-30 ${showLyrics ? "text-primary" : "text-secondary hover:text-primary"}`}
-          title="Lyrics"
-        >
-          <Mic2 size={14} strokeWidth={1.5} />
-        </button>
+        {/* Left icon group: Queue, Notes, Lyrics */}
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="relative">
+            <button
+              ref={queueBtnRef}
+              onClick={() => toggleOpen("queue")}
+              className={`transition-colors ${openPopover === "queue" ? "text-primary" : "text-secondary hover:text-primary"}`}
+              title="Queue"
+            >
+              <ListMusic size={14} strokeWidth={1.5} />
+            </button>
+            <AnimatePresence>
+              {openPopover === "queue" && (
+                <PlayerPopover onClose={() => setOpenPopover(null)} anchorRefs={[queueBtnRef]} width="w-80">
+                  <QueuePanel />
+                </PlayerPopover>
+              )}
+            </AnimatePresence>
+          </div>
 
-        <button
-          onClick={() => setShowQueue((v) => !v)}
-          className={`shrink-0 transition-colors ${showQueue ? "text-primary" : "text-secondary hover:text-primary"}`}
-        >
-          <ListMusic size={14} strokeWidth={1.5} />
-        </button>
+          <div className="relative">
+            <button
+              ref={notesBtnRef}
+              onClick={() => toggleOpen("notes")}
+              disabled={!current}
+              className={`transition-colors disabled:opacity-30 ${openPopover === "notes" ? "text-primary" : "text-secondary hover:text-primary"}`}
+              title="Notes"
+            >
+              <FileText size={14} strokeWidth={1.5} />
+            </button>
+            <AnimatePresence>
+              {openPopover === "notes" && current && (
+                <PlayerPopover onClose={() => setOpenPopover(null)} anchorRefs={[notesBtnRef]} width="w-80">
+                  <NotesPanel track={current} />
+                </PlayerPopover>
+              )}
+            </AnimatePresence>
+          </div>
 
-        {/* Volume as a popover, not an always-visible inline slider — the
-           inline slider had no reliably bounded width and would clip past
-           the (previously edge-to-edge) bar's edge. A popover has its own
-           contained box, so it can never spill outside the player. */}
+          <div className="relative">
+            <button
+              ref={lyricsBtnRef}
+              onClick={() => toggleOpen("lyrics")}
+              disabled={!current}
+              className={`transition-colors disabled:opacity-30 ${openPopover === "lyrics" ? "text-primary" : "text-secondary hover:text-primary"}`}
+              title="Lyrics"
+            >
+              <Mic2 size={14} strokeWidth={1.5} />
+            </button>
+            <AnimatePresence>
+              {openPopover === "lyrics" && current && (
+                <PlayerPopover onClose={() => setOpenPopover(null)} anchorRefs={[lyricsBtnRef]} width="w-96">
+                  <LyricsPanel track={current} />
+                </PlayerPopover>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Volume popover — same click-outside pattern as the icon group above.
+           Previously this had its own local isolated useState toggle with no
+           outside-click handling at all, so it only closed if you clicked its
+           own button again. */}
         <div className="relative shrink-0">
           <button
-            onClick={() => setShowVolume((v) => !v)}
-            className="text-secondary hover:text-primary transition-colors"
+            ref={volumeBtnRef}
+            onClick={() => toggleOpen("volume")}
+            className={`transition-colors ${openPopover === "volume" ? "text-primary" : "text-secondary hover:text-primary"}`}
           >
             <VolIcon size={14} strokeWidth={1.5} />
           </button>
           <AnimatePresence>
-            {showVolume && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
-                className="absolute bottom-full right-0 mb-2 bg-elevated border border-border rounded-lg shadow-xl p-3 w-32"
-              >
+            {openPopover === "volume" && (
+              <PlayerPopover onClose={() => setOpenPopover(null)} anchorRefs={[volumeBtnRef]} width="w-32">
                 <input
                   type="range"
                   min={0}
@@ -309,7 +298,29 @@ export default function PlayerBar() {
                 >
                   {muted ? "Unmute" : "Mute"}
                 </button>
-              </motion.div>
+              </PlayerPopover>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Right: Edit — opens the Adjust/Stems/EQ tabbed sheet */}
+        <div className="relative shrink-0">
+          <button
+            ref={editBtnRef}
+            onClick={() => toggleOpen("edit")}
+            disabled={!current}
+            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors disabled:opacity-30 ${
+              openPopover === "edit" ? "bg-accent text-on-accent" : "bg-canvas text-secondary hover:text-primary"
+            }`}
+          >
+            <SlidersHorizontal size={13} strokeWidth={1.5} />
+            Edit
+          </button>
+          <AnimatePresence>
+            {openPopover === "edit" && current && (
+              <PlayerPopover onClose={() => setOpenPopover(null)} anchorRefs={[editBtnRef]} width="w-[420px]" align="right">
+                <EditPanel track={current} />
+              </PlayerPopover>
             )}
           </AnimatePresence>
         </div>
