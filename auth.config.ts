@@ -27,6 +27,14 @@ export const authConfig = {
         /^\/api\/share\//,
         /^\/invite\//,         // invite acceptance pages
         /^\/api\/invite\//,    // invite preview API (GET, no auth needed)
+        // Server-to-server callback from Replicate — no browser session,
+        // no cookie, so it was getting bounced through this same
+        // middleware toward /login on every single delivery attempt
+        // (307, every time — that was the actual cause of "stuck
+        // processing forever," not anything in the route's own code).
+        // Safe to leave public: this route verifies Replicate's HMAC
+        // webhook signature itself before trusting anything in the body.
+        /^\/api\/webhooks\/replicate$/,
         /^\/terms$/,
         /^\/privacy$/,
         /^\/cookies$/,

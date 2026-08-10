@@ -179,6 +179,18 @@ export default function TrackDetail({
     setExtractingStems(false);
   };
 
+  const cancelStemJob = async () => {
+    setStemError(null);
+    try {
+      const res = await fetch(`/api/tracks/${track.id}/stems`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Couldn't cancel.");
+      setStemJob((j: any) => (j ? { ...j, status: "failed", errorMessage: "Cancelled." } : j));
+    } catch (e: any) {
+      setStemError(e.message || "Couldn't cancel.");
+    }
+  };
+
   const saveField = async (fields: Record<string, unknown>) => {
     setSaving(true);
     await fetch(`/api/tracks/${track.id}`, {
@@ -557,9 +569,17 @@ export default function TrackDetail({
                           </p>
                         </div>
                       ) : stemJob.status === "processing" ? (
-                        <div className="flex items-center gap-2 text-xs text-secondary">
-                          <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
-                          Processing — this can take a minute or two. You'll get a notification when it's ready.
+                        <div>
+                          <div className="flex items-center gap-2 text-xs text-secondary mb-2">
+                            <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
+                            Processing — this can take a minute or two. You'll get a notification when it's ready.
+                          </div>
+                          <button
+                            onClick={cancelStemJob}
+                            className="text-[11px] text-tertiary hover:text-error transition-colors"
+                          >
+                            Cancel
+                          </button>
                         </div>
                       ) : (
                         <div className="space-y-2">

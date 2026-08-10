@@ -133,3 +133,18 @@ export async function verifyReplicateWebhook(params: {
     }
   });
 }
+
+// Best-effort cancel — used both for explicit user cancellation and for
+// auto-cleanup of stale jobs (see STALE_THRESHOLD_MS in the route). If the
+// prediction already finished on Replicate's end, this just no-ops there;
+// harmless either way.
+export async function cancelPrediction(predictionId: string): Promise<void> {
+  try {
+    await fetch(`https://api.replicate.com/v1/predictions/${predictionId}/cancel`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+  } catch (err) {
+    console.error(`Couldn't cancel Replicate prediction ${predictionId} (non-fatal):`, err);
+  }
+}
