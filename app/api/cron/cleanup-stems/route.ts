@@ -10,6 +10,16 @@ export const maxDuration = 60;
 
 const STEM_RETENTION_MS = 48 * 60 * 60 * 1000;
 
+// Runs once daily (see vercel.json) — Vercel's Hobby plan caps cron jobs
+// to once a day, and hourly was never actually necessary for a 48-hour
+// retention window anyway. One real consequence worth knowing: a job that
+// crosses the 48h mark right after today's run has to wait for tomorrow's,
+// so actual deletion can lag up to ~24h past the nominal 48h cutoff in the
+// worst case. The UI copy says "about 2 days" rather than a precise "48
+// hours" specifically because of this — don't tighten that wording without
+// either upgrading the cron frequency (Pro plan) or checking this comment
+// is still accurate.
+
 // Triggered on a schedule (see vercel.json) — Vercel Cron calls this with
 // an Authorization: Bearer <CRON_SECRET> header, which is how this stays
 // safe despite being reachable without a session (it HAS to be reachable

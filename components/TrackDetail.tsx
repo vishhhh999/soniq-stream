@@ -565,7 +565,7 @@ export default function TrackDetail({
                           )}
                           {stemJob?.status === "expired" && (
                             <p className="text-xs text-tertiary mb-2">
-                              These stems were automatically removed after 48 hours. Extract again if you need them.
+                              These stems were automatically removed. Extract again if you need them.
                             </p>
                           )}
                           <button
@@ -577,7 +577,7 @@ export default function TrackDetail({
                             {extractingStems ? "Starting..." : (stemJob?.status === "failed" || stemJob?.status === "expired") ? "Try again" : "Extract stems"}
                           </button>
                           <p className="text-[11px] text-tertiary mt-2 leading-relaxed">
-                            Splits this track into vocals, drums, bass, and other instruments. Takes a minute or two — you'll get a notification when it's ready. Download them once ready — stems are automatically removed after 48 hours.
+                            Splits this track into vocals, drums, bass, and other instruments. Takes a minute or two — you'll get a notification when it's ready. Download them once ready — stems are automatically removed after about 2 days.
                           </p>
                         </div>
                       ) : stemJob.status === "processing" ? (
@@ -595,7 +595,7 @@ export default function TrackDetail({
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <p className="text-[11px] text-tertiary">Available for 48 hours after extraction, then automatically removed.</p>
+                          <p className="text-[11px] text-tertiary">Available for about 2 days after extraction, then automatically removed.</p>
                           {[
                             { label: "Vocals", url: stemJob.vocalsUrl },
                             { label: "Drums", url: stemJob.drumsUrl },
