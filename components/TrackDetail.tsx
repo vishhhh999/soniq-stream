@@ -547,6 +547,7 @@ export default function TrackDetail({
                     stemJob?.status === "processing" ? "Processing..."
                     : stemJob?.status === "completed" ? "Ready"
                     : stemJob?.status === "failed" ? "Failed"
+                    : stemJob?.status === "expired" ? "Expired"
                     : undefined
                   }
                 >
@@ -555,11 +556,16 @@ export default function TrackDetail({
                   ) : (
                     <>
                       {stemError && <p className="text-xs text-error mb-2">{stemError}</p>}
-                      {!stemJob || stemJob.status === "failed" ? (
+                      {!stemJob || stemJob.status === "failed" || stemJob.status === "expired" ? (
                         <div>
                           {stemJob?.status === "failed" && (
                             <p className="text-xs text-error mb-2">
                               {stemJob.errorMessage || "Stem extraction failed."}
+                            </p>
+                          )}
+                          {stemJob?.status === "expired" && (
+                            <p className="text-xs text-tertiary mb-2">
+                              These stems were automatically removed after 48 hours. Extract again if you need them.
                             </p>
                           )}
                           <button
@@ -568,10 +574,10 @@ export default function TrackDetail({
                             className="flex items-center gap-2 text-xs text-secondary border border-border rounded-md px-3 py-2 hover:border-border-strong hover:text-primary transition-colors disabled:opacity-50"
                           >
                             <AudioLines size={13} strokeWidth={1.5} />
-                            {extractingStems ? "Starting..." : stemJob?.status === "failed" ? "Try again" : "Extract stems"}
+                            {extractingStems ? "Starting..." : (stemJob?.status === "failed" || stemJob?.status === "expired") ? "Try again" : "Extract stems"}
                           </button>
                           <p className="text-[11px] text-tertiary mt-2 leading-relaxed">
-                            Splits this track into vocals, drums, bass, and other instruments. Takes a minute or two — you'll get a notification when it's ready, safe to close this.
+                            Splits this track into vocals, drums, bass, and other instruments. Takes a minute or two — you'll get a notification when it's ready. Download them once ready — stems are automatically removed after 48 hours.
                           </p>
                         </div>
                       ) : stemJob.status === "processing" ? (
@@ -589,6 +595,7 @@ export default function TrackDetail({
                         </div>
                       ) : (
                         <div className="space-y-2">
+                          <p className="text-[11px] text-tertiary">Available for 48 hours after extraction, then automatically removed.</p>
                           {[
                             { label: "Vocals", url: stemJob.vocalsUrl },
                             { label: "Drums", url: stemJob.drumsUrl },

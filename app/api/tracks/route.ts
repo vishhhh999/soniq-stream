@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { tracks, users } from "@/lib/db/schema";
-import { asc, desc, eq, ne } from "drizzle-orm";
+import { asc, desc, eq, ne, isNull, and } from "drizzle-orm";
 import { isAdminUsername } from "@/lib/adminAccess";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,12 @@ export async function GET() {
       .select({ track: tracks, ownerUsername: users.username })
       .from(tracks)
       .innerJoin(users, eq(tracks.userId, users.id))
-      .where(ne(tracks.userId, userId))
+      // Same reasoning as the albums route — exclude other users' saved
+      // COPIES of a track (originalTrackId set), not just their own
+      // uploads. Without this, a track shared with N people would surface
+      // N+1 times in admin search results (the real original plus every
+      // receiver's synced copy of the same audio).
+      .where(and(ne(tracks.userId, userId), isNull(tracks.originalTrackId)))
       .orderBy(desc(tracks.createdAt));
 
     const tagged = otherRows.map((r) => ({ ...r.track, ownerUsername: r.ownerUsername, isAdminView: true }));

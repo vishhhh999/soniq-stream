@@ -9,6 +9,7 @@ import {
 import { eq, or, inArray } from "drizzle-orm";
 import { r2, R2_BUCKET } from "@/lib/r2";
 import { getRazorpay } from "@/lib/razorpay";
+import { deleteStemsForTrack } from "@/lib/stems";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,7 @@ export async function DELETE(req: NextRequest) {
     ...userTracks.map((t) => deleteR2Object(t.fileUrl)),
     ...userAlbums.filter((a) => !a.sharedFromAlbumId).map((a) => deleteR2Object(a.coverUrl)),
     deleteR2Object(user.avatarUrl),
+    ...userTracks.map((t) => deleteStemsForTrack(t.id)),
   ]);
 
   // DB cleanup, dependency-safe order (rows that reference tracks/albums

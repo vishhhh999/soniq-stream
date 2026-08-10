@@ -7,6 +7,7 @@ import { and, eq } from "drizzle-orm";
 import { r2, R2_BUCKET } from "@/lib/r2";
 import { albums } from "@/lib/db/schema";
 import { notifyAlbumFollowers, getUsernameById } from "@/lib/notifications";
+import { deleteStemsForTrack } from "@/lib/stems";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +101,13 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   }
 
   await db.delete(tracks).where(eq(tracks.id, params.id));
+
+  // Stems (if any were ever extracted) aren't tied to the track row via a
+  // foreign key, so they'd otherwise survive the track's own deletion as
+  // orphaned R2 files with nothing pointing back to them.
+  await deleteStemsForTrack(params.id).catch((err) =>
+    console.error(`Stem cleanup failed for deleted track ${params.id} (non-fatal):`, err)
+  );
 
   // Notify album followers about the removal (non-fatal if it fails).
   if (track.albumId) {

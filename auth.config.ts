@@ -35,6 +35,10 @@ export const authConfig = {
         // Safe to leave public: this route verifies Replicate's HMAC
         // webhook signature itself before trusting anything in the body.
         /^\/api\/webhooks\/replicate$/,
+        // Vercel Cron has no browser session either — same reasoning as
+        // the webhook above. Real auth for this one is the CRON_SECRET
+        // bearer check inside the route itself, not this allowlist.
+        /^\/api\/cron\//,
         /^\/terms$/,
         /^\/privacy$/,
         /^\/cookies$/,

@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { albums, users } from "@/lib/db/schema";
-import { desc, eq, ne } from "drizzle-orm";
+import { desc, eq, ne, isNull, and } from "drizzle-orm";
 import { isAdminUsername } from "@/lib/adminAccess";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,12 @@ export async function GET() {
       .select({ album: albums, ownerUsername: users.username, ownerAvatarUrl: users.avatarUrl })
       .from(albums)
       .innerJoin(users, eq(albums.userId, users.id))
-      .where(ne(albums.userId, userId))
+      // Excludes other users' SAVED COPIES of an album (sharedFromAlbumId
+      // set), not just their own originals. Without this, one album
+      // shared with N people showed up N+1 times in the admin view — the
+      // real original plus every receiver's copy of the same content,
+      // when only the original should ever be shown here.
+      .where(and(ne(albums.userId, userId), isNull(albums.sharedFromAlbumId)))
       .orderBy(desc(albums.createdAt));
 
     const tagged = otherRows.map((r) => ({

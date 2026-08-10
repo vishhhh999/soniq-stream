@@ -38,6 +38,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const [allAlbums, setAllAlbums] = useState<Album[]>([]);
+  const [sortMode, setSortMode] = useState<"manual" | "alphabetical">("manual");
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -135,6 +136,16 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   // Same fix as the homepage — was recomputing on every render regardless
   // of whether `tracks` actually changed.
   const groups = useMemo(() => groupVersions(tracks as any), [tracks]);
+
+  // Alphabetical is a VIEW only — it never touches sortOrder or calls
+  // /api/tracks/reorder, so the underlying manual layout is fully intact
+  // the moment you switch back to Manual. Dragging is disabled while this
+  // is active (see the DndContext below) so a drag can't happen against
+  // a display order that doesn't match what's actually stored.
+  const displayGroups = useMemo(() => {
+    if (sortMode !== "alphabetical") return groups;
+    return [...groups].sort((a, b) => a.latest.title.localeCompare(b.latest.title, undefined, { sensitivity: "base" }));
+  }, [groups, sortMode]);
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -337,7 +348,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
           <div className="flex items-center gap-2 flex-wrap">
             {/* Play all */}
             <button
-              onClick={() => playQueue(groups.map((g) => g.latest), 0)}
+              onClick={() => playQueue(displayGroups.map((g) => g.latest), 0)}
               disabled={groups.length === 0}
               className="flex items-center gap-1.5 text-sm font-medium bg-accent text-on-accent px-4 py-2 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-40"
             >
@@ -431,7 +442,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
                     <button
                       onClick={() => {
                         setShowMoreMenu(false);
-                        if (groups.length > 0) reorderQueue([...queue, ...groups.map((g) => g.latest)]);
+                        if (groups.length > 0) reorderQueue([...queue, ...displayGroups.map((g) => g.latest)]);
                       }}
                       disabled={groups.length === 0}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-primary hover:bg-surface transition-colors disabled:opacity-40"
@@ -487,10 +498,30 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
           <p className="text-secondary text-base">No tracks in this album yet.</p>
         </div>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={isReadOnly ? () => {} : handleDragEnd}>
-          <SortableContext items={groups.map((g) => g.latest.id)} strategy={verticalListSortingStrategy}>
+        <>
+        {/* Sort toggle — Alphabetical is a display-only reorder, never
+            written back (see displayGroups above). Hidden when there's
+            nothing to meaningfully reorder. */}
+        {groups.length > 1 && (
+          <div className="flex items-center gap-1 mb-3">
+            <button
+              onClick={() => setSortMode("manual")}
+              className={`text-xs px-2.5 py-1 rounded-md transition-colors ${sortMode === "manual" ? "bg-surface text-primary" : "text-tertiary hover:text-secondary"}`}
+            >
+              Manual
+            </button>
+            <button
+              onClick={() => setSortMode("alphabetical")}
+              className={`text-xs px-2.5 py-1 rounded-md transition-colors ${sortMode === "alphabetical" ? "bg-surface text-primary" : "text-tertiary hover:text-secondary"}`}
+            >
+              A–Z
+            </button>
+          </div>
+        )}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={isReadOnly || sortMode !== "manual" ? () => {} : handleDragEnd}>
+          <SortableContext items={displayGroups.map((g) => g.latest.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-1" onClick={() => setSelectedIds(new Set())}>
-              {groups.map((g, i) => (
+              {displayGroups.map((g, i) => (
                 <motion.div
                   key={g.key}
                   initial={{ opacity: 0, y: 8 }}
@@ -500,12 +531,12 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
                   <SortableTrackRow
                     group={g}
                     onOpenDetail={setDetailTrack}
-                    isReadOnly={isReadOnly}
-                    queueTracks={groups.map((gr) => gr.latest)}
+                    isReadOnly={isReadOnly || sortMode !== "manual"}
+                    queueTracks={displayGroups.map((gr) => gr.latest)}
                     queueIndex={i}
                     isSelected={selectedIds.has(g.latest.id)}
                     onSelect={(mods) => {
-                      const orderedIds = groups.map((gr) => gr.latest.id);
+                      const orderedIds = displayGroups.map((gr) => gr.latest.id);
                       const { next, newLastSelected } = computeSelection(
                         g.latest.id, orderedIds, selectedIds, lastSelectedId, mods
                       );
@@ -518,6 +549,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
             </div>
           </SortableContext>
         </DndContext>
+        </>
       )}
 
       {detailTrack && (
