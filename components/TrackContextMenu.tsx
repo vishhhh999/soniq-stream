@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, ListPlus, Pencil, Download, FolderInput, Copy,
-  Trash2, ChevronRight, X,
+  Trash2, ChevronRight, X, AudioLines,
 } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
 import type { Album } from "./AlbumCard";
@@ -157,12 +157,17 @@ export default function TrackContextMenu({
         <MenuItem icon={<ListPlus size={14} strokeWidth={1.5} />} label="Add to queue" onClick={addToQueue} />
       </div>
 
-      {/* Group 2: Edit — not available on a read-only received album. */}
+      {/* Group 2 — Edit — not available on a read-only received album. */}
       {!isReadOnly && (
         <div className="py-1 border-b border-border">
           <MenuItem
             icon={<Pencil size={14} strokeWidth={1.5} />}
             label="Edit details"
+            onClick={() => { onOpenDetail(track); onClose(); }}
+          />
+          <MenuItem
+            icon={<AudioLines size={14} strokeWidth={1.5} />}
+            label="Extract stems"
             onClick={() => { onOpenDetail(track); onClose(); }}
           />
         </div>

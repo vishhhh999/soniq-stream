@@ -10,7 +10,7 @@ type NotificationItem = {
   id: string;
   actorUserId: string | null;
   actorUsername: string | null;
-  type: "track_added" | "version_added" | "track_removed" | "track_played" | "album_downloaded" | "download_enabled" | "download_disabled";
+  type: "track_added" | "version_added" | "track_removed" | "track_played" | "album_downloaded" | "download_enabled" | "download_disabled" | "stems_ready";
   albumName: string | null;
   trackTitle: string | null;
   seen: boolean;
@@ -41,6 +41,7 @@ function notifText(n: NotificationItem): string {
     case "album_downloaded": return `${actor} downloaded ${album ? album.replace(/^ in /, "") : "an album"}`;
     case "download_enabled": return `${actor} turned on downloads for ${album ? album.replace(/^ in /, "") : "an album"}`;
     case "download_disabled": return `${actor} turned off downloads for ${album ? album.replace(/^ in /, "") : "an album"}`;
+    case "stems_ready": return `Stems are ready for ${track}`;
   }
 }
 

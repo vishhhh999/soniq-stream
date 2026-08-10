@@ -227,6 +227,26 @@ async function main() {
   `;
 
   console.log("Postgres schema ready");
+
+  // v8.7.0 — stem extraction (Replicate + Demucs).
+  await sql`
+    CREATE TABLE IF NOT EXISTS stem_jobs (
+      id TEXT PRIMARY KEY,
+      track_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      replicate_prediction_id TEXT,
+      vocals_url TEXT,
+      drums_url TEXT,
+      bass_url TEXT,
+      other_url TEXT,
+      error_message TEXT,
+      created_at TIMESTAMP NOT NULL,
+      completed_at TIMESTAMP
+    );
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS stem_jobs_track_id_idx ON stem_jobs (track_id, created_at DESC);`;
+
   await sql.end();
 }
 

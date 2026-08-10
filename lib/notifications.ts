@@ -153,3 +153,33 @@ export async function notifyOwnerOfPlay({
     createdAt: new Date(),
   });
 }
+
+// Notify a track owner once their stem-extraction job finishes. No
+// actorUserId — this is a system/automated event, not something another
+// user did, so it renders without an "@username" attribution (see the
+// null-actor handling already in NotificationsBell's Avatar component).
+export async function notifyStemsReady({
+  ownerId,
+  trackId,
+  trackTitle,
+  ownerUsername,
+}: {
+  ownerId: string;
+  trackId: string;
+  trackTitle: string;
+  ownerUsername: string | null;
+}) {
+  await db.insert(notifications).values({
+    id: nanoid(),
+    recipientUserId: ownerId,
+    actorUserId: null,
+    type: "stems_ready",
+    trackId,
+    trackTitle,
+    albumId: null,
+    albumName: null,
+    actorUsername: ownerUsername,
+    seen: false,
+    createdAt: new Date(),
+  });
+}

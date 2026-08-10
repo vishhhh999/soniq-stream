@@ -232,3 +232,25 @@ export const notifications = pgTable("notifications", {
   seen: boolean("seen").notNull().default(false),
   createdAt: timestamp("created_at").notNull(),
 });
+
+// One row per stem-extraction attempt for a track. Owner-only feature (see
+// the ownership check in app/api/tracks/[id]/stems/route.ts) — runs on
+// Replicate (cjwbw/demucs), which reports completion via webhook rather
+// than a synchronous response, since real separation takes 30s-several
+// minutes and can't complete inside a single serverless request.
+export const stemJobs = pgTable("stem_jobs", {
+  id: text("id").primaryKey(),
+  trackId: text("track_id").notNull(),
+  userId: text("user_id").notNull(), // denormalized owner, so the webhook
+                                       // (which has no session) knows who to
+                                       // notify without a join back to tracks
+  status: text("status").notNull(), // 'processing' | 'completed' | 'failed'
+  replicatePredictionId: text("replicate_prediction_id"),
+  vocalsUrl: text("vocals_url"),
+  drumsUrl: text("drums_url"),
+  bassUrl: text("bass_url"),
+  otherUrl: text("other_url"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").notNull(),
+  completedAt: timestamp("completed_at"),
+});

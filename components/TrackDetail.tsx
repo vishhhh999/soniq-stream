@@ -5,7 +5,7 @@ import { triggerFeedback } from "@/lib/feedback";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, Link2, Check, Download, Trash2, ChevronDown, FileText, Mic2,
-  Music2, ListPlus, Copy, Share2, Info,
+  Music2, ListPlus, Copy, Share2, Info, AudioLines, Loader2,
 } from "lucide-react";
 import { usePlayer, Track } from "./PlayerProvider";
 import { detectBPM } from "@/lib/bpm";
@@ -106,6 +106,10 @@ export default function TrackDetail({
   const [confirmingRevoke, setConfirmingRevoke] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
+  const [stemJob, setStemJob] = useState<any>(null);
+  const [stemJobLoaded, setStemJobLoaded] = useState(false);
+  const [extractingStems, setExtractingStems] = useState(false);
+  const [stemError, setStemError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/tracks/${track.id}/play`)
@@ -131,6 +135,49 @@ export default function TrackDetail({
   }, [track.id]);
 
   const toggleRow = (name: string) => setOpenRow((r) => (r === name ? null : name));
+
+  // Stems — loads the latest job on open, then polls every 5s while a job
+  // is actively processing (real separation takes 30s to a few minutes;
+  // no other event tells the client when it's done besides asking again).
+  // Stops polling once the job leaves "processing", so this doesn't run
+  // forever if the panel is left open.
+  useEffect(() => {
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const loadStemJob = () => {
+      fetch(`/api/tracks/${track.id}/stems`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (cancelled) return;
+          setStemJob(d?.job ?? null);
+          setStemJobLoaded(true);
+          if (d?.job?.status !== "processing" && interval) {
+            clearInterval(interval);
+            interval = null;
+          }
+        })
+        .catch(() => { if (!cancelled) setStemJobLoaded(true); });
+    };
+
+    loadStemJob();
+    interval = setInterval(loadStemJob, 5000);
+    return () => { cancelled = true; if (interval) clearInterval(interval); };
+  }, [track.id]);
+
+  const extractStems = async () => {
+    setExtractingStems(true);
+    setStemError(null);
+    try {
+      const res = await fetch(`/api/tracks/${track.id}/stems`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't start stem extraction.");
+      setStemJob(data.job);
+    } catch (e: any) {
+      setStemError(e.message || "Couldn't start stem extraction.");
+    }
+    setExtractingStems(false);
+  };
 
   const saveField = async (fields: Record<string, unknown>) => {
     setSaving(true);
@@ -471,6 +518,85 @@ export default function TrackDetail({
                 <div className="h-px bg-border mx-4" />
                 <Row icon={<Mic2 size={15} strokeWidth={1.5} />} label="Lyrics" open={openRow === "lyrics"} onToggle={() => toggleRow("lyrics")}>
                   <LyricsEditor track={track} initialLyrics={(track as any).lyrics ?? ""} initialSynced={(track as any).lyricsSynced ?? null} />
+                </Row>
+                <div className="h-px bg-border mx-4" />
+                <Row
+                  icon={<AudioLines size={15} strokeWidth={1.5} />}
+                  label="Stems"
+                  open={openRow === "stems"}
+                  onToggle={() => toggleRow("stems")}
+                  rightHint={
+                    stemJob?.status === "processing" ? "Processing..."
+                    : stemJob?.status === "completed" ? "Ready"
+                    : stemJob?.status === "failed" ? "Failed"
+                    : undefined
+                  }
+                >
+                  {!stemJobLoaded ? (
+                    <div className="h-9 rounded-md bg-canvas animate-pulse" />
+                  ) : (
+                    <>
+                      {stemError && <p className="text-xs text-error mb-2">{stemError}</p>}
+                      {!stemJob || stemJob.status === "failed" ? (
+                        <div>
+                          {stemJob?.status === "failed" && (
+                            <p className="text-xs text-error mb-2">
+                              {stemJob.errorMessage || "Stem extraction failed."}
+                            </p>
+                          )}
+                          <button
+                            onClick={extractStems}
+                            disabled={extractingStems}
+                            className="flex items-center gap-2 text-xs text-secondary border border-border rounded-md px-3 py-2 hover:border-border-strong hover:text-primary transition-colors disabled:opacity-50"
+                          >
+                            <AudioLines size={13} strokeWidth={1.5} />
+                            {extractingStems ? "Starting..." : stemJob?.status === "failed" ? "Try again" : "Extract stems"}
+                          </button>
+                          <p className="text-[11px] text-tertiary mt-2 leading-relaxed">
+                            Splits this track into vocals, drums, bass, and other instruments. Takes a minute or two — you'll get a notification when it's ready, safe to close this.
+                          </p>
+                        </div>
+                      ) : stemJob.status === "processing" ? (
+                        <div className="flex items-center gap-2 text-xs text-secondary">
+                          <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
+                          Processing — this can take a minute or two. You'll get a notification when it's ready.
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {[
+                            { label: "Vocals", url: stemJob.vocalsUrl },
+                            { label: "Drums", url: stemJob.drumsUrl },
+                            { label: "Bass", url: stemJob.bassUrl },
+                            { label: "Other", url: stemJob.otherUrl },
+                          ].map((s) => (
+                            <a
+                              key={s.label}
+                              href={s.url}
+                              download
+                              className="flex items-center justify-between text-xs text-secondary hover:text-primary bg-canvas rounded-md px-3 py-2 transition-colors"
+                            >
+                              {s.label}
+                              <Download size={13} strokeWidth={1.5} />
+                            </a>
+                          ))}
+                          <a
+                            href={`/api/tracks/${track.id}/stems/download`}
+                            className="flex items-center justify-center gap-2 text-xs text-primary font-medium border border-border rounded-md px-3 py-2 hover:border-border-strong transition-colors mt-1"
+                          >
+                            <Download size={13} strokeWidth={1.5} />
+                            Download all as ZIP
+                          </a>
+                          <button
+                            onClick={extractStems}
+                            disabled={extractingStems}
+                            className="text-[11px] text-tertiary hover:text-secondary transition-colors"
+                          >
+                            {extractingStems ? "Starting..." : "Re-extract"}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </Row>
                 <div className="h-px bg-border mx-4" />
                 <ActionRow icon={<ListPlus size={15} strokeWidth={1.5} />} label="Add to queue" onClick={() => reorderQueue([...queue, track])} />
