@@ -136,34 +136,40 @@ export default function TrackDetail({
 
   const toggleRow = (name: string) => setOpenRow((r) => (r === name ? null : name));
 
-  // Stems — loads the latest job on open, then polls every 5s while a job
-  // is actively processing (real separation takes 30s to a few minutes;
-  // no other event tells the client when it's done besides asking again).
-  // Stops polling once the job leaves "processing", so this doesn't run
-  // forever if the panel is left open.
+  // Stems — loads the latest job on open. Polling is a SEPARATE effect
+  // below, keyed off stemJob's own status, not this one — this only does
+  // the one-time initial load.
   useEffect(() => {
     let cancelled = false;
-    let interval: ReturnType<typeof setInterval> | null = null;
+    fetch(`/api/tracks/${track.id}/stems`)
+      .then((r) => (r.ok ? r.json().catch(() => null) : null))
+      .then((d) => { if (!cancelled) { setStemJob(d?.job ?? null); setStemJobLoaded(true); } })
+      .catch(() => { if (!cancelled) setStemJobLoaded(true); });
+    return () => { cancelled = true; };
+  }, [track.id]);
 
-    const loadStemJob = () => {
+  // Polls every 5s ONLY while the current job is actively "processing".
+  // Deliberately keyed off stemJob?.status (not just track.id, and not a
+  // one-shot interval set up once) — a single interval that permanently
+  // stops itself the first time a job finishes was the actual bug behind
+  // "stuck on Processing forever, even though it finished on Replicate's
+  // end": clicking Extract stems again for a fresh run set local state
+  // back to "processing", but by then the original interval had already
+  // torn itself down for good and nothing was left polling for the new
+  // job's completion. Keying the effect on status itself means a fresh
+  // interval spins up every time a job goes active again, no matter how
+  // many times that happens in one panel session.
+  useEffect(() => {
+    if (stemJob?.status !== "processing") return;
+    let cancelled = false;
+    const interval = setInterval(() => {
       fetch(`/api/tracks/${track.id}/stems`)
         .then((r) => (r.ok ? r.json().catch(() => null) : null))
-        .then((d) => {
-          if (cancelled) return;
-          setStemJob(d?.job ?? null);
-          setStemJobLoaded(true);
-          if (d?.job?.status !== "processing" && interval) {
-            clearInterval(interval);
-            interval = null;
-          }
-        })
-        .catch(() => { if (!cancelled) setStemJobLoaded(true); });
-    };
-
-    loadStemJob();
-    interval = setInterval(loadStemJob, 5000);
-    return () => { cancelled = true; if (interval) clearInterval(interval); };
-  }, [track.id]);
+        .then((d) => { if (!cancelled) setStemJob(d?.job ?? null); })
+        .catch(() => {});
+    }, 5000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [track.id, stemJob?.status]);
 
   const extractStems = async () => {
     setExtractingStems(true);
