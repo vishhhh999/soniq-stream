@@ -1,27 +1,35 @@
+// New mark (replaces the old broken-ring vinyl abstraction) — a small
+// vertical waveform/equalizer, reading directly as "audio" rather than a
+// stylized turntable. Source: public/logo.svg + the icon set, all
+// generated from the same mark.
+//
+// Uses `fill="currentColor"` with NO background — every call site already
+// passes a text-color className (`text-primary`, etc.), so this tracks
+// whatever color that resolves to. That matters specifically because this
+// app's theme toggle is a manual, user-chosen `.dark` class on <html>
+// (see ThemeProvider), not just the OS's prefers-color-scheme — a user
+// can pick light mode while their OS is set to dark. `currentColor` here
+// follows the APP's actual theme state correctly in both directions.
+// (The standalone favicon at /logo.svg is a different case — that one is
+// rendered directly by browser/OS chrome outside the app's own theming,
+// so it correctly uses a `prefers-color-scheme` media query instead.)
 export default function Logo({ size = 28, className = "" }: { size?: number; className?: string }) {
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 100 100"
+      viewBox="0 0 48 48"
       fill="none"
       className={className}
       aria-label="SONIQ"
     >
-      {/* Broken ring — roughly 270° of a circle, not a full one. Reads as
-         an abstracted vinyl record without becoming a literal turntable
-         icon, and avoids the "generic target/donut" look a full ring with
-         concentric grooves falls into at small sizes. The gap is filled
-         by the solid dot below, echoing the record's spindle while also
-         reading as a simple, distinct mark on its own — legible even at
-         16px favicon scale, which concentric grooves are not. */}
-      <path
-        d="M 50 8 A 42 42 0 1 1 8 50"
-        stroke="currentColor"
-        strokeWidth="9"
-        strokeLinecap="round"
-      />
-      <circle cx="8" cy="50" r="9" fill="currentColor" />
+      <path d="M23.5905 5H23.5688C22.3874 5 21.4297 5.93551 21.4297 7.08952V41.9105C21.4297 43.0645 22.3874 44 23.5688 44H23.5905C24.772 44 25.7297 43.0645 25.7297 41.9105V7.08952C25.7297 5.93551 24.772 5 23.5905 5Z" fill="currentColor" />
+      <path d="M38.9474 32.503H38.8504C37.6856 32.5081 36.7397 31.5697 36.7412 30.4112L36.7566 19.0866C36.7581 17.937 37.6937 17.0044 38.8504 17H38.9195C40.0814 16.9956 41.0265 17.9311 41.028 19.0866L41.0412 30.4105C41.0427 31.5623 40.1064 32.4978 38.9482 32.5022L38.9474 32.503Z" fill="currentColor" />
+      <path d="M8.16938 17H8.13062C6.95391 17 6 17.9355 6 19.0895V30.6466C6 31.8006 6.95391 32.7361 8.13062 32.7361H8.16938C9.34609 32.7361 10.3 31.8006 10.3 30.6466V19.0895C10.3 17.9355 9.34609 17 8.16938 17Z" fill="currentColor" />
+      <path d="M31.2422 40.1553C31.2213 40.1553 31.2011 40.1568 31.1802 40.1568C29.9823 40.1882 28.9978 39.2366 29 38.0629L29.0276 26.5044C29.0306 25.3569 29.9778 24.4265 31.1496 24.42C32.3327 24.4134 33.2948 25.3503 33.2955 26.5087L33.3 38.0658C33.3 39.1913 32.3909 40.121 31.2414 40.1546L31.2422 40.1553Z" fill="currentColor" />
+      <path d="M31.1989 17.4568H31.1981C30.014 17.4744 29.0418 16.5432 29.0329 15.3834L29.0001 11.1049C28.9911 9.95091 29.9387 9.00883 31.1168 9.00006H31.1213C32.3002 8.99129 33.2626 9.92094 33.2709 11.0757L33.3 15.3541C33.3074 16.5008 32.3703 17.44 31.1996 17.4568H31.1989Z" fill="currentColor" />
+      <path d="M16.1902 9H16.1098C14.9446 9 14 9.93551 14 11.0895V22.8563C14 24.0103 14.9446 24.9458 16.1098 24.9458H16.1902C17.3554 24.9458 18.3 24.0103 18.3 22.8563V11.0895C18.3 9.93551 17.3554 9 16.1902 9Z" fill="currentColor" />
+      <path d="M16.1989 40.1228H16.1981C15.014 40.1394 14.0418 39.2586 14.0329 38.1614L14.0001 34.1142C13.9911 33.0226 14.9387 32.1314 16.1168 32.1231H16.1213C17.3002 32.1148 18.2626 32.9942 18.2709 34.0866L18.3 38.1338C18.3074 39.2185 17.3703 40.1069 16.1996 40.1228H16.1989Z" fill="currentColor" />
     </svg>
   );
 }

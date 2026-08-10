@@ -55,6 +55,7 @@ export const metadata: Metadata = {
     description: "SONIQ is a personal library for organizing, sharing, and listening to work-in-progress music.",
     url: "https://www.soniq.lol",
     type: "website",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "SONIQ" }],
   },
 };
 
