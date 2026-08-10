@@ -11,6 +11,7 @@ import { usePlayer, Track } from "./PlayerProvider";
 import type { Album } from "./AlbumCard";
 import { MODAL_SPRING } from "@/lib/motion";
 import NewSnippetModal from "./snippet/NewSnippetModal";
+import SnippetDesktopOnlyModal from "./snippet/SnippetDesktopOnlyModal";
 
 type Props = {
   track: Track;
@@ -281,7 +282,11 @@ export default function TrackContextMenu({
   // below so it isn't torn down along with them.
   const snippetPortal = showSnippetModal
     ? createPortal(
-        <NewSnippetModal track={track} onClose={() => { setShowSnippetModal(false); onClose(); }} />,
+        isMobile ? (
+          <SnippetDesktopOnlyModal onClose={() => { setShowSnippetModal(false); onClose(); }} />
+        ) : (
+          <NewSnippetModal track={track} onClose={() => { setShowSnippetModal(false); onClose(); }} />
+        ),
         document.body
       )
     : null;
