@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, SkipBack, Music4, Gauge, Scissors, Download, Repeat } from "lucide-react";
+import { Play, Pause, SkipBack, Music4, Gauge, Scissors, Download, Repeat, Save, Check } from "lucide-react";
 import { usePlayer } from "../PlayerProvider";
 import WaveformTrimSelector from "../WaveformTrimSelector";
 import { useMetronome } from "@/lib/useMetronome";
@@ -46,6 +46,9 @@ export default function AdjustPanel() {
   useEffect(() => { trimStartRef.current = trimStart; trimEndRef.current = trimEnd; }, [trimStart, trimEnd]);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     setTrimStart(current?.trimStart ?? 0);
@@ -85,6 +88,59 @@ export default function AdjustPanel() {
       setDownloadError(e?.message || "Couldn't export the trimmed audio.");
     }
     setDownloading(false);
+  };
+
+  // Saves the trimmed section as a real new track in the library -- same
+  // presign -> PUT -> finalize pipeline every other upload in the app goes
+  // through (lib/useTrackUpload.ts), just fed a client-generated Blob
+  // instead of a File the person picked. Lands in the same album as the
+  // source track (if any), titled "<title> (trim)", always as an
+  // independent track rather than grouped as a version -- it's a derived
+  // clip, not a new take of the same idea.
+  const handleSaveTrimToLibrary = async () => {
+    if (!current) return;
+    setSaving(true); setSaveError(null); setSaved(false);
+    try {
+      const blob = await exportTrimmedAudio(current.fileUrl, trimStart, trimEnd);
+      const filename = `${current.title} (trim).wav`;
+      const file = new File([blob], filename, { type: "audio/wav" });
+
+      const presignRes = await fetch("/api/upload/presign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename, contentType: "audio/wav", kind: "track" }),
+      });
+      if (!presignRes.ok) {
+        const d = await presignRes.json().catch(() => ({}));
+        throw new Error(d.error || "Couldn't prepare the upload.");
+      }
+      const { uploadUrl, publicUrl } = await presignRes.json();
+
+      const putRes = await fetch(uploadUrl, {
+        method: "PUT", body: file,
+        headers: { "Content-Type": "audio/wav" },
+      });
+      if (!putRes.ok) throw new Error(`Storage rejected the upload (${putRes.status}).`);
+
+      const finalizeRes = await fetch("/api/upload/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publicUrl, filename, contentType: "audio/wav", fileSize: file.size,
+          albumId: current.albumId ?? undefined,
+          independent: true,
+        }),
+      });
+      if (!finalizeRes.ok) {
+        const d = await finalizeRes.json().catch(() => ({}));
+        throw new Error(d.error || "Couldn't save the trimmed track.");
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e: any) {
+      setSaveError(e?.message || "Couldn't save the trimmed audio to your library.");
+    }
+    setSaving(false);
   };
 
   const fmt = (s: number) => {
@@ -184,7 +240,7 @@ export default function AdjustPanel() {
             ))}
           </div>
         )}
-        <div className="flex items-center justify-between mt-3">
+        <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
           <button
             onClick={() => setLoopTrim((v) => !v)}
             className={`flex items-center gap-1.5 text-[11px] uppercase tracking-wide px-3 py-1.5 rounded-full transition-colors ${
@@ -194,16 +250,30 @@ export default function AdjustPanel() {
           >
             <Repeat size={12} strokeWidth={1.5} /> Loop trim
           </button>
-          <button
-            onClick={handleDownloadTrim}
-            disabled={downloading}
-            className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide px-3 py-1.5 rounded-full bg-elevated text-tertiary hover:text-primary transition-colors disabled:opacity-50"
-            title="Download the trimmed section as a WAV file"
-          >
-            <Download size={12} strokeWidth={1.5} /> {downloading ? "Exporting..." : "Download"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSaveTrimToLibrary}
+              disabled={saving}
+              className={`flex items-center gap-1.5 text-[11px] uppercase tracking-wide px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 ${
+                saved ? "bg-accent text-on-accent" : "bg-elevated text-tertiary hover:text-primary"
+              }`}
+              title="Save the trimmed section as a new track in your library"
+            >
+              {saved ? <Check size={12} strokeWidth={2} /> : <Save size={12} strokeWidth={1.5} />}
+              {saving ? "Saving..." : saved ? "Saved" : "Save to library"}
+            </button>
+            <button
+              onClick={handleDownloadTrim}
+              disabled={downloading}
+              className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide px-3 py-1.5 rounded-full bg-elevated text-tertiary hover:text-primary transition-colors disabled:opacity-50"
+              title="Download the trimmed section as a WAV file"
+            >
+              <Download size={12} strokeWidth={1.5} /> {downloading ? "Exporting..." : "Download"}
+            </button>
+          </div>
         </div>
         {downloadError && <p className="text-xs text-error mt-2">{downloadError}</p>}
+        {saveError && <p className="text-xs text-error mt-2">{saveError}</p>}
       </div>
 
       <div className="flex items-center justify-center gap-6 py-2">

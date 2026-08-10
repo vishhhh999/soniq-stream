@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { useSession } from "next-auth/react";
 import {
   FolderOpen, Share2, GitBranch, Bell, Users, BarChart3, Sparkles, Music2, ShieldCheck,
+  SlidersHorizontal, Disc3,
 } from "lucide-react";
 import Logo from "./Logo";
 
@@ -23,6 +25,16 @@ const FEATURES = [
     icon: Share2,
     title: "Share, then decide who does what",
     body: "Send a link or an invite, and set exactly what people can do — listen, download, or add and edit tracks. Change it any time.",
+  },
+  {
+    icon: SlidersHorizontal,
+    title: "A real mixing toolkit, not a toy",
+    body: "5-band EQ, stem separation with live mute, varispeed with pitch held constant or linked, a metronome, a tuner. Built into the player, not bolted on.",
+  },
+  {
+    icon: Disc3,
+    title: "Turn a moment into a share",
+    body: "Trim any section and export it as a vinyl-style video, ready for stories and socials — spin speed, disc color, and text all yours to set.",
   },
   {
     icon: Bell,
@@ -85,52 +97,82 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="max-w-3xl mx-auto px-6 pt-16 sm:pt-24 pb-20 sm:pb-28 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <p className="text-xs uppercase tracking-widest text-tertiary mb-4">
-            Music organization &amp; sharing software for unreleased tracks
-          </p>
-          <h1 className="text-2xl sm:text-3xl font-display font-bold text-primary tracking-tight leading-[1.05]">
-            SONIQ is a private home for the music you're still working on.
-          </h1>
-          <p className="text-secondary text-base sm:text-lg mt-6 max-w-xl mx-auto leading-relaxed">
-            SONIQ is a personal library for organizing, sharing, and
-            listening to work-in-progress music. Upload demos, keep every
-            version, and share them with exactly who you want — with
-            exactly the permissions you choose. Built for work-in-progress,
-            not for streaming to strangers.
-          </p>
-          <div className="flex items-center justify-center gap-3 mt-9">
-            {isAuthed ? (
-              <Link
-                href="/"
-                className="text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
-              >
-                Go to your library
-              </Link>
-            ) : (
-              <>
+      {/* Hero — dark, vinyl-centered treatment matching the Depth Vinyl
+          snippet template's own look (same gradient stops, same ambient
+          shadow), using the real canonical brand asset instead of a stock
+          photo or an illustration. This is the "push the same visual
+          direction into the landing page" pass. */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#1a1a1a] to-[#050505]">
+        <div className="max-w-3xl mx-auto px-6 pt-16 sm:pt-20 pb-20 sm:pb-28 text-center relative">
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="relative w-48 h-48 sm:w-60 sm:h-60 mx-auto mb-10"
+          >
+            {/* Ambient glow behind the disc — soft, not a hard-edged circle */}
+            <div className="absolute inset-0 rounded-full bg-accent/25 blur-3xl scale-90" />
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
+              className="relative w-full h-full"
+            >
+              <Image
+                src="/brand/vinyl-black.png"
+                alt=""
+                fill
+                sizes="240px"
+                className="object-contain drop-shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
+                priority
+              />
+            </motion.div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.15 }}
+          >
+            <p className="text-xs uppercase tracking-widest text-white/50 mb-4">
+              Music organization &amp; sharing software for unreleased tracks
+            </p>
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-white tracking-tight leading-[1.05]">
+              SONIQ is a private home for the music you're still working on.
+            </h1>
+            <p className="text-white/70 text-base sm:text-lg mt-6 max-w-xl mx-auto leading-relaxed">
+              SONIQ is a personal library for organizing, sharing, and
+              listening to work-in-progress music. Upload demos, keep every
+              version, and share them with exactly who you want — with
+              exactly the permissions you choose. Built for work-in-progress,
+              not for streaming to strangers.
+            </p>
+            <div className="flex items-center justify-center gap-3 mt-9">
+              {isAuthed ? (
                 <Link
-                  href="/setup"
+                  href="/"
                   className="text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
                 >
-                  Create your library
+                  Go to your library
                 </Link>
-                <Link
-                  href="/login"
-                  className="text-sm font-medium text-secondary border border-border px-6 py-3 rounded-md hover:border-border-strong hover:text-primary transition-colors"
-                >
-                  Sign in
-                </Link>
-              </>
-            )}
-          </div>
-        </motion.div>
+              ) : (
+                <>
+                  <Link
+                    href="/setup"
+                    className="text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
+                  >
+                    Create your library
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="text-sm font-medium text-white/70 border border-white/20 px-6 py-3 rounded-md hover:border-white/40 hover:text-white transition-colors"
+                  >
+                    Sign in
+                  </Link>
+                </>
+              )}
+            </div>
+          </motion.div>
+        </div>
       </section>
 
       {/* Feature grid */}

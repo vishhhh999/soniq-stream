@@ -15,9 +15,9 @@ export const GRADIENT_STOPS: Record<GradientChoice, [string, string]> = {
   dark: ["#1a1a1a", "#050505"],
 };
 
-// Text color options for the title/duration overlay — same three-way
-// dark/light/orange choice as disc and background, independently
-// selectable so e.g. an orange background can still take dark text.
+// Text color options -- title and duration are independently colorable, so
+// e.g. a bright disc/background combo can still pair a bold title with a
+// quieter duration instead of both being forced to match.
 export type TextColor = "dark" | "light" | "orange";
 export const TEXT_COLOR_HEX: Record<TextColor, string> = {
   dark: "#111111",
@@ -97,6 +97,7 @@ export interface SnippetRenderContext {
   useAlbumArt: boolean;
   spinSpeed: number; // multiplier on the base disc rotation rate, default 1
   textColor: TextColor;
+  durationColor: TextColor; // independent from textColor -- title and duration are separate entities
   trimStartAbs: number; // absolute position in the full track where this snippet starts
   trackDurationAbs: number; // full track length, for the "0:16 / 3:04" live counter
 }

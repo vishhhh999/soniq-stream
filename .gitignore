@@ -1,7 +1,0 @@
-node_modules
-.next
-local.db
-public/uploads/*
-!public/uploads/.gitkeep
-.env
-.env.local

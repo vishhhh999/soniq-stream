@@ -141,8 +141,8 @@ export default function SyncedLyricsList({
 
   const sizing =
     variant === "fullscreen"
-      ? { size: "text-lg", gap: "space-y-5", padY: "py-[45vh]" }
-      : { size: "text-sm", gap: "space-y-4", padY: "py-[40vh]" };
+      ? { size: "text-lg", gap: "space-y-5", padY: "py-[45vh]", weight: "font-semibold" }
+      : { size: "text-sm", gap: "space-y-4", padY: "py-[40vh]", weight: "font-medium" };
 
   return (
     <div
@@ -164,7 +164,7 @@ export default function SyncedLyricsList({
               key={i}
               ref={isActive ? activeLineRef : undefined}
               onClick={() => seekTo(line.time)}
-              className={`cursor-pointer ${sizing.size} font-medium ${
+              className={`cursor-pointer ${sizing.size} ${sizing.weight} ${
                 variant === "fullscreen" ? "text-center" : ""
               } ${isActive ? "text-primary" : "text-tertiary hover:text-secondary"}`}
               style={{

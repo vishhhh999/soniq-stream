@@ -51,22 +51,34 @@ function drawVinyl(
   ctx.restore();
 }
 
-// Title + a live "current / total" counter against the FULL track, not the
-// snippet window -- e.g. "0:16 / 3:04" for a clip starting 16s into a
-// 3:04 track, ticking up every frame while it plays so the overlay reads
-// as "this is playing" rather than a static label.
-function drawTrackInfo(rc: SnippetRenderContext, x: number, y: number, align: "left" | "center" | "right" = "center") {
-  const { ctx, trackTitle, t, trimStartAbs, trackDurationAbs, textColor } = rc;
-  const color = TEXT_COLOR_HEX[textColor];
+// Title and duration are drawn as two separate entities now, not one block
+// with the duration hanging directly off the title -- separate color,
+// separate vertical rhythm (more breathing room between them), separate
+// font treatment.
+function drawTitle(rc: SnippetRenderContext, x: number, y: number, align: "left" | "center" | "right" = "center") {
+  const { ctx, trackTitle, textColor } = rc;
   ctx.textAlign = align;
-  ctx.fillStyle = color;
+  ctx.fillStyle = TEXT_COLOR_HEX[textColor];
   ctx.font = "600 34px 'General Sans', sans-serif";
   ctx.fillText(trackTitle, x, y);
+}
+
+function drawDuration(rc: SnippetRenderContext, x: number, y: number, align: "left" | "center" | "right" = "center") {
+  const { ctx, t, trimStartAbs, trackDurationAbs, durationColor } = rc;
+  ctx.textAlign = align;
   ctx.font = "400 22px 'General Sans', sans-serif";
-  ctx.fillStyle = color;
+  ctx.fillStyle = TEXT_COLOR_HEX[durationColor];
   ctx.filter = "opacity(0.65)";
-  ctx.fillText(`${fmtDuration(trimStartAbs + t)} / ${fmtDuration(trackDurationAbs)}`, x, y + 32);
+  ctx.fillText(`${fmtDuration(trimStartAbs + t)} / ${fmtDuration(trackDurationAbs)}`, x, y);
   ctx.filter = "none";
+}
+
+// Convenience wrapper for the templates that just want both, stacked --
+// duration sits further below the title now (48px gap, was 32px) so it
+// reads as its own line rather than a caption glued to the title.
+function drawTrackInfo(rc: SnippetRenderContext, x: number, y: number, align: "left" | "center" | "right" = "center") {
+  drawTitle(rc, x, y, align);
+  drawDuration(rc, x, y + 48, align);
 }
 
 // ── Free templates ──────────────────────────────────────────────────────
@@ -153,12 +165,11 @@ export function renderPulseGrid(rc: SnippetRenderContext) {
 // Track title as the visual hero, waveform-shaped underline beneath it.
 // No vinyl at all — deliberately the odd one out in the set.
 export function renderTypeWave(rc: SnippetRenderContext) {
-  const { ctx, width, height, trackTitle, t, trimStartAbs, trackDurationAbs, textColor, frequencyData } = rc;
+  const { ctx, width, height, trackTitle, textColor, frequencyData } = rc;
   drawBackground(rc);
-  const color = TEXT_COLOR_HEX[textColor];
 
   ctx.textAlign = "center";
-  ctx.fillStyle = color;
+  ctx.fillStyle = TEXT_COLOR_HEX[textColor];
   ctx.font = "700 64px 'General Sans', sans-serif";
   // Simple word-wrap for longer titles rather than letting them overflow.
   const words = trackTitle.split(" ");
@@ -173,15 +184,13 @@ export function renderTypeWave(rc: SnippetRenderContext) {
   const startY = height * 0.42 - (lines.length - 1) * 36;
   lines.forEach((l, i) => ctx.fillText(l, width / 2, startY + i * 72));
 
-  // Live "current / total" counter, right under the title.
-  ctx.font = "400 24px 'General Sans', sans-serif";
-  ctx.fillStyle = color;
-  ctx.filter = "opacity(0.65)";
-  ctx.fillText(`${fmtDuration(trimStartAbs + t)} / ${fmtDuration(trackDurationAbs)}`, width / 2, startY + lines.length * 72 + 20);
-  ctx.filter = "none";
+  // Duration as its own entity -- own color, pushed further down (36px gap,
+  // was 20px) so it reads as a separate line rather than a caption glued
+  // to the title.
+  drawDuration(rc, width / 2, startY + lines.length * 72 + 36);
 
   // Waveform-shaped underline, audio-reactive when data is available.
-  const wfY = startY + lines.length * 72 + 65;
+  const wfY = startY + lines.length * 72 + 80;
   const barCount = 44;
   const barGap = (width * 0.7) / barCount;
   const startX = width * 0.15;

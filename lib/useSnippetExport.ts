@@ -30,6 +30,7 @@ interface ExportOptions {
   audioUrl: string;
   spinSpeed: number; // multiplier on the base rotation rate, 0.5x-2x
   textColor: TextColor;
+  durationColor: TextColor;
   getFrequencyData: () => Uint8Array | null;
 }
 
@@ -119,6 +120,7 @@ export function useSnippetExport() {
           discColor: opts.discColor, gradient: opts.gradient, useAlbumArt: opts.useAlbumArt,
           spinSpeed: opts.spinSpeed,
           textColor: opts.textColor,
+          durationColor: opts.durationColor,
           trimStartAbs: opts.trimStart,
           trackDurationAbs: opts.trackDuration,
         };

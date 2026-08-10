@@ -25,10 +25,15 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
   const [muted, setMuted] = useState(false);
   const [spinSpeed, setSpinSpeed] = useState(1);
   const [textColor, setTextColor] = useState<TextColor>("light");
+  const [durationColor, setDurationColor] = useState<TextColor>("light");
   const [trimStart, setTrimStart] = useState(0);
   const [trackDuration, setTrackDuration] = useState(track.durationSec ?? MAX_SNIPPET_SEC);
   const [trimEnd, setTrimEndState] = useState(Math.min(MAX_SNIPPET_SEC, track.durationSec ?? MAX_SNIPPET_SEC));
   const [previewPlaying, setPreviewPlaying] = useState(true);
+  const previewPlayingRef = useRef(previewPlaying);
+  useEffect(() => { previewPlayingRef.current = previewPlaying; }, [previewPlaying]);
+  const trackDurationRef = useRef(trackDuration);
+  useEffect(() => { trackDurationRef.current = trackDuration; }, [trackDuration]);
 
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -101,10 +106,12 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       // frame rather than relying on the audio element's own 'ended' event,
       // since currentTime is reset before it ever reaches the track's real
       // end (the trim window ends well before the file does, most of the
-      // time).
+      // time). Reads previewPlayingRef (not the closed-over previewPlaying)
+      // so a pause right at the loop boundary is respected instead of the
+      // stale value captured when this effect last ran.
       if (elapsed >= segDuration || audio.currentTime >= trimEnd) {
         audio.currentTime = trimStart;
-        if (previewPlaying) audio.play().catch(() => {});
+        if (previewPlayingRef.current) audio.play().catch(() => {});
         elapsed = 0;
       }
       const renderer = TEMPLATE_RENDERERS[templateId];
@@ -118,7 +125,8 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
         spinSpeed,
         textColor,
         trimStartAbs: trimStart,
-        trackDurationAbs: trackDuration,
+        trackDurationAbs: trackDurationRef.current,
+        durationColor,
       });
       previewRafRef.current = requestAnimationFrame(draw);
     };
@@ -130,7 +138,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       previewAudioRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateId, discColor, gradient, useAlbumArt, trimStart, trimEnd, muted, spinSpeed, textColor, track.id]);
+  }, [templateId, discColor, gradient, useAlbumArt, trimStart, trimEnd, muted, spinSpeed, textColor, durationColor, track.id]);
 
   // Play/pause toggle for the preview -- separate effect so toggling it
   // doesn't tear down and rebuild the whole draw loop (which would restart
@@ -151,6 +159,13 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
 
   const handleExport = () => {
     if (locked) return;
+    // The preview has its own always-playing audio element; the export
+    // hook spins up a second, separate one to actually render. Without
+    // this, both play at once during export -- audible double-audio, real
+    // bug, not just a UX nit. Pausing here (not muting) also means nobody
+    // gets surprised by the preview audio suddenly resuming mid-export if
+    // some other state change happened to remount it.
+    setPreviewPlaying(false);
     exportState.start({
       templateId, discColor, gradient, useAlbumArt,
       albumArtUrl: track.albumCoverUrl ?? null,
@@ -160,6 +175,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       audioUrl: track.fileUrl,
       spinSpeed,
       textColor,
+      durationColor,
       getFrequencyData,
     });
   };
@@ -188,14 +204,16 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
         <div className="flex items-center gap-2">
           <button
             onClick={() => setPreviewPlaying((p) => !p)}
-            className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-secondary hover:text-primary transition-colors"
+            disabled={exportState.exporting}
+            className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-secondary hover:text-primary transition-colors disabled:opacity-30"
             title={previewPlaying ? "Pause preview" : "Play preview"}
           >
             {previewPlaying ? <Pause size={16} strokeWidth={1.5} /> : <Play size={16} strokeWidth={1.5} className="ml-0.5" />}
           </button>
           <button
             onClick={() => setMuted((m) => !m)}
-            className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-secondary hover:text-primary transition-colors"
+            disabled={exportState.exporting}
+            className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-secondary hover:text-primary transition-colors disabled:opacity-30"
           >
             {muted ? <VolumeX size={16} strokeWidth={1.5} /> : <Volume2 size={16} strokeWidth={1.5} />}
           </button>
@@ -255,8 +273,10 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
         </div>
       </div>
 
-      {/* Template carousel */}
-      <div className="px-6 pt-4 shrink-0 overflow-x-auto no-scrollbar">
+      {/* Template carousel -- disabled during export since changing the
+          template mid-render has no effect on the render already in
+          flight, and leaving it interactive was misleading. */}
+      <div className={`px-6 pt-4 shrink-0 overflow-x-auto no-scrollbar transition-opacity ${exportState.exporting ? "opacity-40 pointer-events-none" : ""}`}>
         <div className="flex gap-2 pb-2 w-max">
           {SNIPPET_TEMPLATES.map((tpl) => {
             const tplLocked = tpl.premium && isPaid === false;
@@ -279,8 +299,9 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       {/* Options: disc color / gradient / spin speed / album art toggle --
           grouped into a card matching AdjustPanel/EQPanel's bg-canvas
           block style, instead of a loose stack of rows that read as
-          visually disconnected from the rest of the app. */}
-      <div className="px-6 pt-2 pb-4 shrink-0">
+          visually disconnected from the rest of the app. Disabled during
+          export for the same reason as the template carousel above. */}
+      <div className={`px-6 pt-2 pb-4 shrink-0 transition-opacity ${exportState.exporting ? "opacity-40 pointer-events-none" : ""}`}>
         <div className="bg-elevated border border-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-3">
             <span className="text-[11px] text-tertiary w-16 shrink-0">Disc</span>
@@ -316,6 +337,18 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
               />
             ))}
           </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-tertiary w-16 shrink-0">Duration</span>
+            {(["dark", "light", "orange"] as TextColor[]).map((d) => (
+              <button
+                key={d}
+                onClick={() => setDurationColor(d)}
+                title={d}
+                className={`w-7 h-7 rounded-full border-2 transition-colors capitalize ${durationColor === d ? "border-accent" : "border-transparent"}`}
+                style={{ background: TEXT_COLOR_HEX[d] }}
+              />
+            ))}
+          </div>
           {selectedMeta.supportsAlbumArt && (
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-tertiary w-16 shrink-0 flex items-center gap-1"><Gauge size={11} strokeWidth={1.5} /> Spin</span>
@@ -339,8 +372,9 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
 
       {/* Trim bar -- shared component with AdjustPanel, capped to the
           30s max snippet length, same card treatment as the options block
-          above. */}
-      <div className="px-6 pb-8 shrink-0">
+          above. Disabled during export -- dragging the handles mid-render
+          doesn't change output already in flight. */}
+      <div className={`px-6 pb-8 shrink-0 transition-opacity ${exportState.exporting ? "opacity-40 pointer-events-none" : ""}`}>
         <div className="bg-elevated border border-border rounded-xl p-4">
           <WaveformTrimSelector
             trackId={track.id}

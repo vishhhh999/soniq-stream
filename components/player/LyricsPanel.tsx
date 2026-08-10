@@ -48,7 +48,7 @@ export default function LyricsPanel({ track }: { track: Track }) {
         ) : rawText ? (
           <div className="text-center overflow-y-auto no-scrollbar h-full">
             <p className="text-tertiary text-xs mb-4">Not synced to timing yet — showing plain text.</p>
-            <p className="text-primary text-sm leading-relaxed whitespace-pre-line">{rawText}</p>
+            <p className="text-primary text-sm leading-relaxed whitespace-pre-line font-medium">{rawText}</p>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center">
