@@ -61,18 +61,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // The output shape for full 4-stem mode is expected to be an object
-  // keyed by stem name ({ vocals, drums, bass, other }), based on the
-  // model's documented examples — but that wasn't independently confirmed
-  // against a live run before shipping this. Failing loudly and clearly
-  // here if the shape doesn't match is deliberate: silently guessing at
-  // an array's ordering could mislabel a stem (e.g. call the drums file
-  // "vocals") with no obvious sign anything's wrong. A visible failure
-  // with the raw output logged is far easier to fix than that.
+  // Two different shapes turned up in research for this model's output —
+  // scraped API docs showed `{ stems: [{ name, audio }, ...] }` (an array),
+  // while the model's actual current predictor.py source
+  // (github.com/Ryan5453/unblend) builds its response as a plain object
+  // keyed directly by stem name ({ vocals, drums, bass, other }). Rather
+  // than bet on either one being current, this accepts both and only
+  // fails if NEITHER matches — with the raw output logged either way, so
+  // if this guess is ever wrong it's fixable from the log instead of
+  // silently mislabeling a stem.
   const output = prediction.output;
-  const isRecognizedShape =
-    output && typeof output === "object" && !Array.isArray(output) &&
-    STEM_NAMES.every((name) => typeof output[name] === "string");
+  let vocals: string | undefined, drums: string | undefined, bass: string | undefined, other: string | undefined;
+
+  if (output && typeof output === "object" && !Array.isArray(output) && STEM_NAMES.every((name) => typeof output[name] === "string")) {
+    ({ vocals, drums, bass, other } = output);
+  } else if (output && Array.isArray(output.stems)) {
+    for (const item of output.stems) {
+      if (item?.name === "vocals") vocals = item.audio;
+      if (item?.name === "drums") drums = item.audio;
+      if (item?.name === "bass") bass = item.audio;
+      if (item?.name === "other") other = item.audio;
+    }
+  }
+
+  const isRecognizedShape = !!(vocals && drums && bass && other);
 
   if (!isRecognizedShape) {
     console.error("Unrecognized Replicate output shape for stem job", jobId, JSON.stringify(output));
@@ -86,10 +98,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const [vocalsUrl, drumsUrl, bassUrl, otherUrl] = await Promise.all([
-      uploadStemToR2(output.vocals, job.userId, job.trackId, "vocals"),
-      uploadStemToR2(output.drums, job.userId, job.trackId, "drums"),
-      uploadStemToR2(output.bass, job.userId, job.trackId, "bass"),
-      uploadStemToR2(output.other, job.userId, job.trackId, "other"),
+      uploadStemToR2(vocals!, job.userId, job.trackId, "vocals"),
+      uploadStemToR2(drums!, job.userId, job.trackId, "drums"),
+      uploadStemToR2(bass!, job.userId, job.trackId, "bass"),
+      uploadStemToR2(other!, job.userId, job.trackId, "other"),
     ]);
 
     await db.update(stemJobs).set({

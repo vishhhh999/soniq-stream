@@ -5,7 +5,7 @@
 // steps) — throws at first use, not at import time, matching the pattern
 // in lib/razorpay.ts.
 
-const REPLICATE_MODEL_OWNER = "cjwbw";
+const REPLICATE_MODEL_OWNER = "ryan5453";
 const REPLICATE_MODEL_NAME = "demucs";
 
 function getToken(): string {
@@ -50,14 +50,16 @@ export async function createStemSeparationPrediction(params: {
       version,
       input: {
         audio: params.audioUrl,
-        // "none" = full 4-stem split (vocals/drums/bass/other). The other
-        // valid values ("vocals", "drums", "bass", "other") instead do a
-        // 2-stem split — that one isolated stem vs. everything else —
-        // which isn't what this feature needs.
-        stem: "none",
-        model_name: "htdemucs",
-        output_format: "mp3",
-        mp3_bitrate: 320,
+        model: "htdemucs",
+        format: "mp3",
+        // "none" = full split into all 4 stems. The other valid values
+        // ("vocals"/"drums"/"bass"/"other") instead do a 2-stem split —
+        // that one isolated stem plus everything else combined — which
+        // isn't what this feature needs. Confirmed against the model's
+        // actual predictor.py source (github.com/Ryan5453/unblend), not
+        // just scraped docs, since this specific parameter name/values
+        // isn't consistently documented across Replicate's own pages.
+        isolate_stem: "none",
       },
       webhook: params.webhookUrl,
       webhook_events_filter: ["completed"], // don't bother us for "starting"/"processing" ticks

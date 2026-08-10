@@ -24,45 +24,56 @@ function webhookUrl(): string {
 }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await auth();
-  const userId = session?.user && (session.user as any).id;
-  if (!userId) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  try {
+    const session = await auth();
+    const userId = session?.user && (session.user as any).id;
+    if (!userId) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
 
-  const track = await getOwnedTrack(userId, params.id);
-  if (!track) return NextResponse.json({ error: "Not found." }, { status: 404 });
+    const track = await getOwnedTrack(userId, params.id);
+    if (!track) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
-  const [job] = await db
-    .select()
-    .from(stemJobs)
-    .where(eq(stemJobs.trackId, params.id))
-    .orderBy(desc(stemJobs.createdAt))
-    .limit(1);
+    const [job] = await db
+      .select()
+      .from(stemJobs)
+      .where(eq(stemJobs.trackId, params.id))
+      .orderBy(desc(stemJobs.createdAt))
+      .limit(1);
 
-  return NextResponse.json({ job: job ?? null });
+    return NextResponse.json({ job: job ?? null });
+  } catch (err: any) {
+    // Any unhandled throw here (a DB error from a table that doesn't
+    // exist yet because db:push hasn't been run against production is
+    // the classic one) would otherwise crash the whole function and
+    // Vercel serves its own HTML error page instead of JSON — which is
+    // exactly what "Unexpected token '<'... is not valid JSON" on the
+    // client means. Wrapping the entire body guarantees JSON comes back
+    // either way.
+    console.error("GET /api/tracks/[id]/stems failed:", err);
+    return NextResponse.json({ error: err?.message || "Something went wrong loading stem status." }, { status: 500 });
+  }
 }
 
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await auth();
-  const userId = session?.user && (session.user as any).id;
-  if (!userId) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
-
-  const track = await getOwnedTrack(userId, params.id);
-  if (!track) return NextResponse.json({ error: "Not found." }, { status: 404 });
-
-  // Don't let a double-click (or a stale open menu) fire two predictions —
-  // real money per run. A already-processing job blocks a new one; a
-  // completed or failed one doesn't (re-extracting is a deliberate choice
-  // the person can make, not something to block).
-  const [existing] = await db
-    .select({ id: stemJobs.id, status: stemJobs.status })
-    .from(stemJobs)
-    .where(and(eq(stemJobs.trackId, params.id), eq(stemJobs.status, "processing")))
-    .limit(1);
-  if (existing) return NextResponse.json({ error: "Stem extraction is already in progress for this track." }, { status: 409 });
-
-  const jobId = nanoid();
-
   try {
+    const session = await auth();
+    const userId = session?.user && (session.user as any).id;
+    if (!userId) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+
+    const track = await getOwnedTrack(userId, params.id);
+    if (!track) return NextResponse.json({ error: "Not found." }, { status: 404 });
+
+    // Don't let a double-click (or a stale open menu) fire two predictions
+    // — real money per run. An already-processing job blocks a new one; a
+    // completed or failed one doesn't (re-extracting is a deliberate
+    // choice the person can make, not something to block).
+    const [existing] = await db
+      .select({ id: stemJobs.id, status: stemJobs.status })
+      .from(stemJobs)
+      .where(and(eq(stemJobs.trackId, params.id), eq(stemJobs.status, "processing")))
+      .limit(1);
+    if (existing) return NextResponse.json({ error: "Stem extraction is already in progress for this track." }, { status: 409 });
+
+    const jobId = nanoid();
     const { predictionId } = await createStemSeparationPrediction({
       audioUrl: track.fileUrl,
       webhookUrl: `${webhookUrl()}?jobId=${jobId}`,
@@ -79,7 +90,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     return NextResponse.json({ job: { id: jobId, status: "processing" } });
   } catch (err: any) {
-    console.error("Stem extraction request failed:", err);
-    return NextResponse.json({ error: err?.message || "Couldn't start stem extraction." }, { status: 502 });
+    console.error("POST /api/tracks/[id]/stems failed:", err);
+    return NextResponse.json({ error: err?.message || "Couldn't start stem extraction." }, { status: 500 });
   }
 }

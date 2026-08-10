@@ -147,7 +147,7 @@ export default function TrackDetail({
 
     const loadStemJob = () => {
       fetch(`/api/tracks/${track.id}/stems`)
-        .then((r) => (r.ok ? r.json() : null))
+        .then((r) => (r.ok ? r.json().catch(() => null) : null))
         .then((d) => {
           if (cancelled) return;
           setStemJob(d?.job ?? null);
@@ -170,8 +170,8 @@ export default function TrackDetail({
     setStemError(null);
     try {
       const res = await fetch(`/api/tracks/${track.id}/stems`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't start stem extraction.");
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `Couldn't start stem extraction (${res.status}).`);
       setStemJob(data.job);
     } catch (e: any) {
       setStemError(e.message || "Couldn't start stem extraction.");
