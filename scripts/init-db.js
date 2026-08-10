@@ -81,6 +81,17 @@ async function main() {
   await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS lyrics TEXT;`;
   await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS lyrics_synced JSONB;`;
 
+  // v8.9.0 added these to lib/db/schema.ts but this raw migration script
+  // was never updated to match — the actual bug behind tracks vanishing
+  // from libraries in production. This project's "db:push" is this
+  // hand-written script, NOT drizzle-kit push, so a Drizzle schema change
+  // alone does nothing to the real database until a matching statement is
+  // added here too. Confirm any future schema.ts change has a
+  // corresponding line in this file before calling it done.
+  await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS eq_low REAL DEFAULT 0;`;
+  await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS eq_mid REAL DEFAULT 0;`;
+  await sql`ALTER TABLE tracks ADD COLUMN IF NOT EXISTS eq_high REAL DEFAULT 0;`;
+
   // Data isolation fix — tracks/albums/folders had NO owner column at all
   // until now, meaning every account could see every other account's
   // files. Adding user_id and backfilling anything created before this
