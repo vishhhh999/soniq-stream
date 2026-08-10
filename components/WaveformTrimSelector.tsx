@@ -1,12 +1,21 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { waveformBars } from "@/lib/waveformBars";
 
 // Shared trim/region selector — used by both AdjustPanel (persisted per-track
 // trimStart/trimEnd) and NewSnippetModal (session-only, capped to a max
 // snippet length). One component, one interaction model, per Vish's explicit
 // call that these shouldn't be two separate trim UIs.
+//
+// Bar rendering matches WaveformSeekBar's look (thin 2px fixed-width bars,
+// densely packed) instead of flex-1 bars that stretch into chunky blocks on
+// wide containers — bar count is measured off the actual container width via
+// ResizeObserver so it stays thin whether this renders in a ~350px popover
+// or a full-width fullscreen modal.
+const BAR_WIDTH = 2;
+const BAR_GAP = 2;
+
 export default function WaveformTrimSelector({
   trackId,
   duration,
@@ -24,8 +33,23 @@ export default function WaveformTrimSelector({
   playhead?: number;
   maxWindowSec?: number; // if set, dragging the handles clamps (end - start) to this
 }) {
-  const bars = useMemo(() => waveformBars(trackId, 80), [trackId]);
   const trackRef = useRef<HTMLDivElement>(null);
+  const [barCount, setBarCount] = useState(80);
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.getBoundingClientRect().width;
+      setBarCount(Math.max(20, Math.floor(w / (BAR_WIDTH + BAR_GAP))));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const bars = useMemo(() => waveformBars(trackId, barCount), [trackId, barCount]);
   const [dragging, setDragging] = useState<"start" | "end" | "region" | null>(null);
   const dragOriginRef = useRef<{ x: number; start: number; end: number } | null>(null);
 
@@ -94,16 +118,19 @@ export default function WaveformTrimSelector({
         onPointerUp={() => setDragging(null)}
         onPointerCancel={() => setDragging(null)}
       >
-        {/* Waveform bars, dimmed outside the selected region */}
-        <div className="absolute inset-0 flex items-center gap-[2px]">
+        {/* Waveform bars, dimmed outside the selected region -- fixed 2px
+            width bars matching the player's own waveform look, not
+            container-stretched blocks. */}
+        <div className="absolute inset-0 flex items-center justify-between">
           {bars.map((h, i) => {
             const barPct = (i / (bars.length - 1)) * 100;
             const inRegion = barPct >= startPct && barPct <= endPct;
             return (
               <div
                 key={i}
-                className="rounded-[1px] flex-1"
+                className="rounded-[1px] shrink-0"
                 style={{
+                  width: `${BAR_WIDTH}px`,
                   height: `${h * 100}%`,
                   backgroundColor: inRegion ? "var(--accent)" : "var(--text-tertiary)",
                   opacity: inRegion ? 1 : 0.35,

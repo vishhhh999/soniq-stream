@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, SkipBack, Music4, Gauge, Scissors } from "lucide-react";
+import { Play, Pause, SkipBack, Music4, Gauge, Scissors, Download, Repeat } from "lucide-react";
 import { usePlayer } from "../PlayerProvider";
 import WaveformTrimSelector from "../WaveformTrimSelector";
 import { useMetronome } from "@/lib/useMetronome";
 import { useTuner } from "@/lib/useTuner";
+import { exportTrimmedAudio } from "@/lib/exportTrimmedAudio";
 
 // Phase 3. Two honest scope notes up front:
 // - Speed uses native playbackRate + preservesPitch. With "preserve pitch"
@@ -34,12 +35,57 @@ export default function AdjustPanel() {
   const [trimStart, setTrimStart] = useState(current?.trimStart ?? 0);
   const [trimEnd, setTrimEnd] = useState(current?.trimEnd ?? duration ?? 0);
   const trimSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Loop-within-trim is what actually makes the trim handles mean
+  // something during playback -- previously they only ever wrote numbers
+  // to the DB with nothing in the app reading them back. Opt-in (not on
+  // by default) so turning on the Adjust tab doesn't silently change how
+  // the track plays elsewhere.
+  const [loopTrim, setLoopTrim] = useState(false);
+  const trimStartRef = useRef(trimStart);
+  const trimEndRef = useRef(trimEnd);
+  useEffect(() => { trimStartRef.current = trimStart; trimEndRef.current = trimEnd; }, [trimStart, trimEnd]);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     setTrimStart(current?.trimStart ?? 0);
     setTrimEnd(current?.trimEnd ?? duration ?? 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
+
+  // Loop-within-trim: while enabled, wraps playback back to trimStart the
+  // moment it crosses trimEnd. Reading from refs (not the trim state
+  // directly) so this doesn't need to re-bind the listener on every drag
+  // frame while adjusting the handles.
+  useEffect(() => {
+    if (!loopTrim) return;
+    const el = audioRef.current;
+    if (!el) return;
+    const onTimeUpdate = () => {
+      if (el.currentTime >= trimEndRef.current) {
+        el.currentTime = trimStartRef.current;
+      }
+    };
+    el.addEventListener("timeupdate", onTimeUpdate);
+    return () => el.removeEventListener("timeupdate", onTimeUpdate);
+  }, [loopTrim, audioRef]);
+
+  const handleDownloadTrim = async () => {
+    if (!current) return;
+    setDownloading(true); setDownloadError(null);
+    try {
+      const blob = await exportTrimmedAudio(current.fileUrl, trimStart, trimEnd);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${current.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-trim.wav`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e: any) {
+      setDownloadError(e?.message || "Couldn't export the trimmed audio.");
+    }
+    setDownloading(false);
+  };
 
   const fmt = (s: number) => {
     if (!s || Number.isNaN(s)) return "0:00";
@@ -104,7 +150,9 @@ export default function AdjustPanel() {
       {/* Trim / region selector — real start/end handles now, not just a
           speed slider with no way to mark a region. Same shared component
           the snippet export flow uses, so both trim UIs stay in sync by
-          construction instead of by discipline. */}
+          construction instead of by discipline. Loop + Download give the
+          handles a real effect instead of just writing numbers to the DB
+          with nothing reading them back. */}
       <div className="bg-canvas rounded-xl p-4 mb-3">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs text-secondary flex items-center gap-1.5">
@@ -136,6 +184,26 @@ export default function AdjustPanel() {
             ))}
           </div>
         )}
+        <div className="flex items-center justify-between mt-3">
+          <button
+            onClick={() => setLoopTrim((v) => !v)}
+            className={`flex items-center gap-1.5 text-[11px] uppercase tracking-wide px-3 py-1.5 rounded-full transition-colors ${
+              loopTrim ? "bg-accent text-on-accent" : "bg-elevated text-tertiary hover:text-primary"
+            }`}
+            title="Loop playback within the trimmed region"
+          >
+            <Repeat size={12} strokeWidth={1.5} /> Loop trim
+          </button>
+          <button
+            onClick={handleDownloadTrim}
+            disabled={downloading}
+            className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide px-3 py-1.5 rounded-full bg-elevated text-tertiary hover:text-primary transition-colors disabled:opacity-50"
+            title="Download the trimmed section as a WAV file"
+          >
+            <Download size={12} strokeWidth={1.5} /> {downloading ? "Exporting..." : "Download"}
+          </button>
+        </div>
+        {downloadError && <p className="text-xs text-error mt-2">{downloadError}</p>}
       </div>
 
       <div className="flex items-center justify-center gap-6 py-2">

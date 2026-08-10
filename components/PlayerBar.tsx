@@ -12,8 +12,8 @@ import WaveformSeekBar from "./WaveformSeekBar";
 import PlayerPopover from "./player/PlayerPopover";
 import QueuePanel from "./player/QueuePanel";
 import NotesPanel from "./player/NotesPanel";
-import LyricsPanel from "./player/LyricsPanel";
-import EditPanel from "./player/EditPanel";
+import LyricsFullscreen from "./player/LyricsFullscreen";
+import EditDialog from "./player/EditDialog";
 import { gradientFromSeed } from "@/lib/gradient";
 import { useAmbientPulse } from "@/lib/useAmbientPulse";
 
@@ -254,13 +254,9 @@ export default function PlayerBar() {
             >
               <Mic2 size={14} strokeWidth={1.5} />
             </button>
-            <AnimatePresence>
-              {openPopover === "lyrics" && current && (
-                <PlayerPopover onClose={() => setOpenPopover(null)} anchorRefs={[lyricsBtnRef]} width="w-96">
-                  <LyricsPanel track={current} />
-                </PlayerPopover>
-              )}
-            </AnimatePresence>
+            {openPopover === "lyrics" && current && (
+              <LyricsFullscreen track={current} onClose={() => setOpenPopover(null)} />
+            )}
           </div>
         </div>
 
@@ -303,7 +299,8 @@ export default function PlayerBar() {
           </AnimatePresence>
         </div>
 
-        {/* Right: Edit — opens the Adjust/Stems/EQ tabbed sheet */}
+        {/* Right: Edit — opens a real centered dialog (Adjust/Stems/EQ),
+            not a small anchored popover; see EditDialog. */}
         <div className="relative shrink-0">
           <button
             ref={editBtnRef}
@@ -316,13 +313,9 @@ export default function PlayerBar() {
             <SlidersHorizontal size={13} strokeWidth={1.5} />
             Edit
           </button>
-          <AnimatePresence>
-            {openPopover === "edit" && current && (
-              <PlayerPopover onClose={() => setOpenPopover(null)} anchorRefs={[editBtnRef]} width="w-[420px]" align="right">
-                <EditPanel track={current} />
-              </PlayerPopover>
-            )}
-          </AnimatePresence>
+          {openPopover === "edit" && current && (
+            <EditDialog track={current} onClose={() => setOpenPopover(null)} />
+          )}
         </div>
       </div>
     </div>
