@@ -43,8 +43,20 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   // Albums saved from someone else's share are read-only for the receiver.
-  const isReadOnly = !!(album?.sharedFromAlbumId);
-  const sharedBy = isReadOnly ? { username: album?.sharedByUsername, avatarUrl: album?.sharedByAvatarUrl } : null;
+  // isAdminView is a separate read-only reason (see lib/adminAccess.ts) —
+  // the admin cross-user account viewing another user's real original
+  // album, not a save-to-library copy. Both end up read-only in the UI,
+  // but sharedBy's fields come from different places for each: a real
+  // stored snapshot for sharedFromAlbumId, vs the live ownerUsername the
+  // API attaches at read-time for isAdminView (there's no "save" event to
+  // snapshot from).
+  const isReadOnly = !!(album?.sharedFromAlbumId) || !!(album?.isAdminView);
+  const isAdminView = !!(album?.isAdminView);
+  const sharedBy = album?.sharedFromAlbumId
+    ? { username: album?.sharedByUsername, avatarUrl: album?.sharedByAvatarUrl }
+    : isAdminView
+    ? { username: album?.ownerUsername, avatarUrl: null }
+    : null;
 
   const load = () => {
     Promise.all([
@@ -78,7 +90,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
       const isTyping = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
       if (isTyping) return;
 
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size > 0) {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size > 0 && !isReadOnly) {
         e.preventDefault();
         handleBulkDelete();
       } else if (e.key === "Escape" && selectedIds.size > 0) {
@@ -88,9 +100,10 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedIds]);
+  }, [selectedIds, isReadOnly]);
 
   const handleBulkDelete = async () => {
+    if (isReadOnly) return; // no bulk destructive actions on a read-only view (received copy or admin cross-user)
     const ids = Array.from(selectedIds);
     setSelectedIds(new Set());
     setLastSelectedId(null);
@@ -103,6 +116,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
   };
 
   const handleBulkMove = async (targetAlbumId: string) => {
+    if (isReadOnly) return;
     const ids = Array.from(selectedIds);
     setSelectedIds(new Set());
     setLastSelectedId(null);
@@ -358,11 +372,12 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
               </button>
             )}
 
-            {/* Delete (owner) / Remove from library (receiver) — receivers
-                used to have no way to get a shared album out of their own
-                library at all, since this whole block only rendered for
-                the owner. Now shows a distinct action either way. */}
-            {!confirmingDelete ? (
+            {/* Delete (owner) / Remove from library (receiver) — not shown
+                for the admin cross-user view. There's no copy to "remove"
+                here (this is the real original row, not a save-to-library
+                copy), so the delete route would just reject it as
+                not-owned — hiding it avoids presenting a dead-end action. */}
+            {!isAdminView && (!confirmingDelete ? (
               <button
                 onClick={() => setConfirmingDelete(true)}
                 className="flex items-center gap-1.5 text-sm text-error border border-error/40 rounded-md px-3 py-2 hover:bg-error/10 transition-colors"
@@ -382,7 +397,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
                   Cancel
                 </button>
               </div>
-            )}
+            ))}
 
             {!isReadOnly && <AddMenu onUploaded={load} albumId={params.id} label="Add tracks" />}
 
@@ -424,11 +439,14 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
                       <ListPlus size={14} strokeWidth={1.5} className="text-secondary" />
                       Add to queue
                     </button>
-                    {/* Owner always sees this; a receiver only when the owner
-                        has allowDownload on (synced onto this album's own
-                        allowDownload field — see the PATCH sync in the share
-                        route and the toggle handler). */}
-                    {(!isReadOnly || album?.allowDownload) && (
+                    {/* Owner and admin cross-user view always see this; a
+                        real receiver only when the owner has allowDownload
+                        on (synced onto this album's own allowDownload
+                        field — see the PATCH sync in the share route and
+                        the toggle handler). Admin bypasses that check
+                        entirely — see the isAdminCrossUser branch in
+                        app/api/albums/[id]/download/route.ts. */}
+                    {(!isReadOnly || album?.allowDownload || isAdminView) && (
                       <a
                         href={`/api/albums/${params.id}/download`}
                         onClick={() => setShowMoreMenu(false)}
@@ -521,16 +539,18 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
         <AlbumSharePanel albumId={params.id} albumName={album.name} albumCoverUrl={album.coverUrl} onClose={() => setShowShare(false)} />
       )}
 
-      <SelectionToolbar
-        count={selectedIds.size}
-        albums={allAlbums}
-        onDelete={handleBulkDelete}
-        onMoveToAlbum={handleBulkMove}
-        onClear={() => {
-          setSelectedIds(new Set());
-          setLastSelectedId(null);
-        }}
-      />
+      {!isReadOnly && (
+        <SelectionToolbar
+          count={selectedIds.size}
+          albums={allAlbums}
+          onDelete={handleBulkDelete}
+          onMoveToAlbum={handleBulkMove}
+          onClear={() => {
+            setSelectedIds(new Set());
+            setLastSelectedId(null);
+          }}
+        />
+      )}
     </main>
     <LyricsSidebar onExpand={() => window.dispatchEvent(new CustomEvent("soniq:expand-lyrics"))} />
     </div>

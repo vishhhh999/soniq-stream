@@ -17,7 +17,8 @@ const MIN_LISTEN_SECONDS = 20;
 
 export default function PlayTracker() {
   const { current, currentTime, duration } = usePlayer();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
+  const sessionUserId = session?.user && (session.user as any).id;
   // Tracks which track id has already been counted, so we don't re-fire on
   // every timeupdate tick once the threshold's been crossed once.
   const firedRef = useRef<string | null>(null);
@@ -25,6 +26,14 @@ export default function PlayTracker() {
   useEffect(() => {
     if (status !== "authenticated" || !current) return;
     if (firedRef.current === current.id) return;
+
+    // Admin cross-user read access (see lib/adminAccess.ts) — current.userId
+    // is only ever populated (and only ever differs from the logged-in
+    // user's own id) for tracks the admin account is viewing read-only via
+    // that feature. Every other track a session can ever have queued is
+    // either the user's own upload or their own saved copy, so this check
+    // is specific to that one case, not a general "don't log" rule.
+    if (current.userId && current.userId !== sessionUserId) return;
 
     // Short tracks shouldn't need the full 20s to register — cap the
     // threshold at 80% of the track's own duration once it's known.
@@ -35,7 +44,7 @@ export default function PlayTracker() {
 
     firedRef.current = current.id;
     fetch(`/api/tracks/${current.id}/play`, { method: "POST" }).catch(() => {});
-  }, [current?.id, currentTime, duration, status]);
+  }, [current?.id, current?.userId, currentTime, duration, status, sessionUserId]);
 
   return null;
 }

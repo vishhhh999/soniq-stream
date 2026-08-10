@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { albums, tracks } from "@/lib/db/schema";
+import { albums, tracks, users } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { notifyOwnerOfDownload, getUsernameById } from "@/lib/notifications";
+import { isAdminUsername } from "@/lib/adminAccess";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -16,18 +17,28 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const [album] = await db.select().from(albums).where(eq(albums.id, params.id));
   if (!album) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
-  // Must own this album copy (owner or receiver both own their respective copy).
-  if (album.userId !== userId) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+  const [me] = await db.select({ username: users.username }).from(users).where(eq(users.id, userId));
+  const isAdminCrossUser = isAdminUsername(me?.username) && album.userId !== userId;
 
-  // Receivers: respect the owner's allowDownload setting.
-  if (album.sharedFromAlbumId && !album.allowDownload) {
+  // Must own this album copy (owner or receiver both own their respective
+  // copy) — UNLESS this is the admin's cross-user read access, which is
+  // allowed to download any album regardless of ownership (see
+  // lib/adminAccess.ts). Everything below this still applies normally.
+  if (album.userId !== userId && !isAdminCrossUser) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+  }
+
+  // Receivers: respect the owner's allowDownload setting. Doesn't apply to
+  // the admin cross-user case — that's a distinct access model, not a
+  // save-to-library copy, so there's no allowDownload toggle to check.
+  if (!isAdminCrossUser && album.sharedFromAlbumId && !album.allowDownload) {
     return NextResponse.json({ error: "The owner hasn't enabled downloads for this album." }, { status: 403 });
   }
 
   const albumTracks = await db
     .select()
     .from(tracks)
-    .where(and(eq(tracks.albumId, params.id), eq(tracks.userId, userId)));
+    .where(and(eq(tracks.albumId, params.id), eq(tracks.userId, album.userId)));
 
   if (albumTracks.length === 0) {
     return NextResponse.json({ error: "No tracks to download." }, { status: 404 });

@@ -5,7 +5,18 @@ import { useRouter } from "next/navigation";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Disc3 } from "lucide-react";
 
-export type Album = { id: string; name: string; coverUrl: string | null; sharedFromAlbumId?: string | null };
+export type Album = {
+  id: string;
+  name: string;
+  coverUrl: string | null;
+  sharedFromAlbumId?: string | null;
+  // Admin cross-user read access only (see lib/adminAccess.ts) — distinct
+  // from sharedFromAlbumId, which means "my own saved copy of someone
+  // else's album." isAdminView albums aren't a copy at all, they're the
+  // real original row, just visible read-only to one hardcoded account.
+  ownerUsername?: string | null;
+  isAdminView?: boolean;
+};
 
 // Both a drag source (drop this album onto another to create a folder) and
 // a drop target (drop a track onto it to add that track to this album).
@@ -63,7 +74,12 @@ export default function AlbumCard({
           )}
         </div>
         <p className="text-base text-primary truncate font-medium">{album.name}</p>
-        <p className="text-sm text-tertiary">{trackCount} track{trackCount === 1 ? "" : "s"}</p>
+        <p className="text-sm text-tertiary">
+          {trackCount} track{trackCount === 1 ? "" : "s"}
+          {album.isAdminView && album.ownerUsername && (
+            <span className="text-tertiary"> · Shared by @{album.ownerUsername}</span>
+          )}
+        </p>
       </motion.button>
     </div>
   );

@@ -68,7 +68,7 @@ export default function LibraryHome() {
   // the difference between search feeling instant and feeling laggy.
   // useMemo keys these to their actual inputs so they only redo the work
   // when tracks/albums/query genuinely change.
-  const unsorted = useMemo(() => tracks.filter((t: any) => !t.albumId), [tracks]);
+  const unsorted = useMemo(() => tracks.filter((t: any) => !t.albumId && !t.isAdminView), [tracks]);
   const groups = useMemo(() => groupVersions(unsorted as any), [unsorted]);
 
   // Was previously a plain function re-scanning the full track list per
@@ -299,7 +299,7 @@ export default function LibraryHome() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05, duration: 0.35 }}
               >
-                <AlbumCard album={a} trackCount={countInAlbum(a.id)} dragDisabled={isMobile || !!a.sharedFromAlbumId} />
+                <AlbumCard album={a} trackCount={countInAlbum(a.id)} dragDisabled={isMobile || !!a.sharedFromAlbumId || !!(a as any).isAdminView} />
               </motion.div>
             ))}
           </div>
@@ -367,7 +367,17 @@ export default function LibraryHome() {
                 queueTracks={filteredGroups.map((gr) => gr.latest)}
                 queueIndex={i}
                 isSelected={selectedIds.has(g.latest.id)}
-                dragEnabled={true}
+                // Per-track, not page-level — search mixes the admin's own
+                // tracks with cross-user ones (see lib/adminAccess.ts) in
+                // the same list, unlike the album detail page where every
+                // track on the page always shares one owner. Without this,
+                // a cross-user track surfaced by search would show full
+                // edit/duplicate/move/delete options in its menu — the
+                // server would still reject any actual mutation via the
+                // ownership check in the PATCH/DELETE routes, but the UI
+                // shouldn't offer actions that are guaranteed to fail.
+                isReadOnly={!!(g.latest as any).isAdminView}
+                dragEnabled={!(g.latest as any).isAdminView}
                 isMobile={isMobile}
                 selectionMode={selectionMode}
                 albums={albums}

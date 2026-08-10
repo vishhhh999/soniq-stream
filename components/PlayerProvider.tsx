@@ -7,6 +7,13 @@ export type Track = {
   id: string; title: string; artist?: string | null; fileUrl: string;
   durationSec?: number | null; bpm?: number | null; key?: string | null;
   albumId?: string | null; albumCoverUrl?: string | null;
+  // Admin cross-user read access only (see lib/adminAccess.ts). userId
+  // lets PlayTracker recognize "this isn't my own track" and skip logging
+  // a play for it — an admin listening to someone else's track shouldn't
+  // inflate that person's play-count insights.
+  userId?: string;
+  ownerUsername?: string | null;
+  isAdminView?: boolean;
 };
 
 type PlayerState = {
