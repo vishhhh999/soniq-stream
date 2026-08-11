@@ -5,11 +5,12 @@ import Image from "next/image";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useSession } from "next-auth/react";
 import {
-  Users, Music2, ShieldCheck,
+  ShieldCheck,
 } from "lucide-react";
 import Logo from "./Logo";
 import { VinylExportDemo, MixingToolkitDemo, PermissionsDemo, VersionGroupDemo } from "./landing/FeatureDemos";
 import { OrganizeIllustration, NotificationsIllustration, AnalyticsIllustration, VaultIllustration } from "./landing/StaticIllustrations";
+import FAQ from "./landing/FAQ";
 
 // The 4 that don't exist on untitled.stream at all (or exist in a much
 // thinner form) get the animated spotlight treatment -- these are the
@@ -247,7 +248,16 @@ export default function LandingPage() {
           untitled.stream), static illustrated cards after. Both reveal on
           scroll via whileInView, staggered, so the page feels alive as you
           move down it without anything auto-playing off-screen. */}
-      <section className="max-w-5xl mx-auto px-6 pb-16 sm:pb-20">
+      <section className="max-w-5xl mx-auto px-6 pt-4 pb-16 sm:pb-20">
+        <div className="text-center mb-14 sm:mb-16">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-tertiary mb-4">What's different</p>
+          <h2
+            className="font-display font-medium text-primary tracking-[-0.02em] leading-[0.95] max-w-xl mx-auto"
+            style={{ fontSize: "clamp(1.75rem, 4.5vw, 3rem)" }}
+          >
+            Four things untitled.stream doesn't do.
+          </h2>
+        </div>
         <div className="grid sm:grid-cols-2 gap-6 sm:gap-8">
           {ANIMATED_FEATURES.map((f, i) => (
             <motion.div
@@ -313,63 +323,103 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Collaboration callout */}
+      {/* Collaboration callout — deliberately extreme scale jump against the
+          tiny eyebrow above it, this is the "go crazy" typography moment:
+          almost nothing on the page gets this large except here and the
+          hero, so when it shows up it reads as an actual statement rather
+          than another section heading. */}
       <section className="border-t border-border">
-        <div className="max-w-3xl mx-auto px-6 py-20 sm:py-28 text-center">
-          <Users size={28} strokeWidth={1.2} className="text-accent mx-auto mb-6" />
-          <h2 className="text-2xl sm:text-3xl font-display font-bold text-primary tracking-tight">
+        <div className="max-w-3xl mx-auto px-6 py-24 sm:py-32 text-center">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-tertiary mb-6">Collaboration</p>
+          <h2
+            className="font-display font-medium text-primary tracking-[-0.02em] leading-[0.92]"
+            style={{ fontSize: "clamp(2.25rem, 6.5vw, 4.75rem)" }}
+          >
             Made for working with people, not broadcasting to everyone.
           </h2>
-          <p className="text-secondary text-base mt-4 max-w-lg mx-auto leading-relaxed">
+          <p className="text-secondary text-base mt-6 max-w-lg mx-auto leading-relaxed">
             Invite a collaborator with a link, set what they can do, and see
             who's actually got access at a glance. Revoke it whenever you want.
           </p>
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* Pricing — real feature-by-feature comparison, not two vague cards.
+          Only two things are actually gated (storage cap, template count),
+          so the table says exactly that instead of implying a longer list
+          of restrictions that don't exist. */}
       <section className="border-t border-border">
-        <div className="max-w-3xl mx-auto px-6 py-20 sm:py-28">
+        <div className="max-w-2xl mx-auto px-6 py-20 sm:py-28">
           <div className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-display font-bold text-primary tracking-tight">
-              Simple pricing.
+            <p className="text-xs uppercase tracking-[0.2em] text-tertiary mb-3">Pricing</p>
+            <h2
+              className="font-display font-medium text-primary tracking-tight leading-[0.95]"
+              style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)" }}
+            >
+              Two tiers. Two real differences.
             </h2>
-            <p className="text-secondary text-base mt-3 max-w-md mx-auto">
-              Start free. Upgrade when your library outgrows it.
-            </p>
           </div>
+
           <div className="grid sm:grid-cols-2 gap-4">
-            <div className="border border-border rounded-xl p-6">
+            <div className="border border-border rounded-2xl p-6">
               <p className="text-xs uppercase tracking-wide text-tertiary mb-2">Free</p>
               <p className="text-3xl font-display font-bold text-primary">$0</p>
-              <p className="text-sm text-secondary mt-3 leading-relaxed">
-                500MB of storage — everything else in SONIQ, no feature limits.
-                Enough to get a real feel for it.
-              </p>
+              <ul className="mt-5 space-y-3 text-sm">
+                <li className="flex items-center gap-2 text-secondary"><span className="w-1 h-1 rounded-full bg-tertiary shrink-0" /> 500MB storage</li>
+                <li className="flex items-center gap-2 text-secondary"><span className="w-1 h-1 rounded-full bg-tertiary shrink-0" /> 2 of 6 export templates</li>
+                <li className="flex items-center gap-2 text-primary"><span className="w-1 h-1 rounded-full bg-accent shrink-0" /> Full mixing toolkit (EQ, stems, metronome, tuner)</li>
+                <li className="flex items-center gap-2 text-primary"><span className="w-1 h-1 rounded-full bg-accent shrink-0" /> Unlimited albums, versions, and shares</li>
+              </ul>
             </div>
-            <div className="border border-accent rounded-xl p-6 relative">
+            <div className="border border-accent rounded-2xl p-6 relative">
               <p className="text-xs uppercase tracking-wide text-accent mb-2">Pro</p>
               <p className="text-3xl font-display font-bold text-primary">
                 $5<span className="text-base font-normal text-secondary">/mo</span>
               </p>
-              <p className="text-sm text-secondary mt-3 leading-relaxed">
-                Unlimited storage. Or $40/year instead — that's 4 months free
-                compared to paying monthly.
-              </p>
+              <ul className="mt-5 space-y-3 text-sm">
+                <li className="flex items-center gap-2 text-primary"><span className="w-1 h-1 rounded-full bg-accent shrink-0" /> Unlimited storage</li>
+                <li className="flex items-center gap-2 text-primary"><span className="w-1 h-1 rounded-full bg-accent shrink-0" /> All 6 export templates</li>
+                <li className="flex items-center gap-2 text-primary"><span className="w-1 h-1 rounded-full bg-accent shrink-0" /> Full mixing toolkit (EQ, stems, metronome, tuner)</li>
+                <li className="flex items-center gap-2 text-primary"><span className="w-1 h-1 rounded-full bg-accent shrink-0" /> Unlimited albums, versions, and shares</li>
+              </ul>
+              <p className="text-xs text-tertiary mt-4">Or $40/year — 4 months free vs. paying monthly.</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="max-w-3xl mx-auto px-6 py-20 sm:py-28 text-center">
-        <Music2 size={28} strokeWidth={1.2} className="text-accent mx-auto mb-6" />
-        <h2 className="text-2xl sm:text-3xl font-display font-bold text-primary tracking-tight">
+      {/* FAQ */}
+      <section className="border-t border-border">
+        <div className="max-w-2xl mx-auto px-6 py-20 sm:py-28">
+          <div className="text-center mb-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-tertiary mb-3">FAQ</p>
+            <h2
+              className="font-display font-medium text-primary tracking-tight leading-[0.95] mb-12"
+              style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)" }}
+            >
+              Questions worth answering.
+            </h2>
+          </div>
+          <FAQ />
+        </div>
+      </section>
+
+
+      {/* Final CTA — smallest possible label directly against the biggest
+          headline on the page (bigger even than the collaboration callout),
+          the most extreme size contrast on the whole site, intentionally,
+          since this is the last thing before the footer. */}
+      <section className="max-w-3xl mx-auto px-6 py-24 sm:py-32 text-center">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-tertiary mb-6">SONIQ</p>
+        <h2
+          className="font-display font-medium text-primary tracking-[-0.03em] leading-[0.9]"
+          style={{ fontSize: "clamp(2.5rem, 8vw, 5.5rem)" }}
+        >
           Your vault's waiting.
         </h2>
         <Link
           href={isAuthed ? "/" : "/setup"}
-          className="inline-block mt-8 text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-full hover:bg-accent-strong transition-colors"
+          className="inline-block mt-10 text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-full hover:bg-accent-strong transition-colors"
         >
           {isAuthed ? "Go to your library" : "Create your library"}
         </Link>
