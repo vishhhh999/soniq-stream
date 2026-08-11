@@ -7,7 +7,7 @@ import { Plus } from "lucide-react";
 const FAQ_ITEMS = [
   {
     q: "Why switch from untitled.stream to SONIQ?",
-    a: "Two things untitled doesn't have at all: a real in-app mixing toolkit (5-band EQ, metronome, tuner, live-mute stems) instead of just pitch/speed, and a branded vinyl-style export for socials instead of handing you off to your phone's share sheet. If you're moving work-in-progress tracks in and out of a DAW and posting clips to fans, those are the two moments SONIQ was actually built around.",
+    a: "It comes down to fit and workflow rather than a missing-features list — untitled has a strong feature set too, including EQ, metronome, tuner, and stem separation. Where SONIQ differs is the branded vinyl-style export built directly into the app for socials, and the granular per-person sharing permissions (listen / download / edit). If those specific things matter to how you work, SONIQ's built around them.",
   },
   {
     q: "What's the difference between Free and Pro?",

@@ -10,6 +10,7 @@ import { useAmbient } from "./AmbientProvider";
 import { isFeedbackEnabled, setFeedbackEnabled, triggerFeedback } from "@/lib/feedback";
 import { usePlayer } from "./PlayerProvider";
 import { APP_VERSION } from "@/lib/version";
+import { PRICING, guessCurrency, formatPrice, isLikelyIndia } from "@/lib/geoPricing";
 import { gradientFromSeed } from "@/lib/gradient";
 import { MODAL_SPRING } from "@/lib/motion";
 
@@ -58,6 +59,13 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
     storageCapBytes: number | null;
   } | null>(null);
   const [upgrading, setUpgrading] = useState(false);
+  // Same client-only timezone guess as the landing page pricing card --
+  // starts USD, swaps in after mount. This only changes what's displayed
+  // here; the actual Razorpay charge amount is whatever currency the
+  // underlying Plan is configured for (see startUpgrade below).
+  const [currency, setCurrency] = useState(guessCurrency);
+  useEffect(() => { setCurrency(guessCurrency()); }, []);
+  const price = PRICING[currency];
   const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">("monthly");
   const [cancelling, setCancelling] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
@@ -128,6 +136,14 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
         name: "SONIQ",
         description: billingInterval === "yearly" ? "SONIQ Pro — yearly" : "SONIQ Pro — monthly",
         theme: { color: "#f2f2f2" },
+        // UPI and netbanking are India-only payment rails -- showing them
+        // to someone outside India is just dead weight in the checkout
+        // modal (they'll never work), so those get switched off and the
+        // modal defaults to card (Razorpay's own PayPal/international
+        // card support lives under the card flow). India keeps every
+        // method enabled, since UPI in particular is the dominant payment
+        // method there and disabling it would be a real regression.
+        method: isLikelyIndia() ? undefined : { netbanking: 0, upi: 0, wallet: 0, card: 1, paylater: 0 },
         // Verifies the signature server-side and, if genuine, flips the UI
         // to Pro immediately — the webhook (subscription.activated) is
         // still the actual source of truth and will independently confirm
@@ -376,7 +392,7 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
                 <>
                   <h3 className="text-primary font-display font-semibold text-lg mt-1 mb-1">Go unlimited with Pro</h3>
                   <p className="text-secondary text-xs leading-relaxed mb-3">
-                    Unlimited storage and all 6 snippet export templates — $5/mo or $40/yr (4 months free).
+                    Unlimited storage and all 6 snippet export templates — {formatPrice(price.monthly, currency)}/mo or {formatPrice(price.yearly, currency)}/yr (4 months free).
                   </p>
 
                   {plan.storageCapBytes && (
@@ -444,13 +460,13 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
                       onClick={() => setBillingInterval("monthly")}
                       className={`text-xs px-3 py-1.5 rounded-full transition-colors ${billingInterval === "monthly" ? "bg-elevated text-primary" : "text-secondary hover:text-primary"}`}
                     >
-                      Monthly — $5/mo
+                      Monthly — {formatPrice(price.monthly, currency)}/mo
                     </button>
                     <button
                       onClick={() => setBillingInterval("yearly")}
                       className={`text-xs px-3 py-1.5 rounded-full transition-colors ${billingInterval === "yearly" ? "bg-elevated text-primary" : "text-secondary hover:text-primary"}`}
                     >
-                      Yearly — $40/yr
+                      Yearly — {formatPrice(price.yearly, currency)}/yr
                       <span className="ml-1.5 text-[10px] text-accent-text">4 months free</span>
                     </button>
                   </div>

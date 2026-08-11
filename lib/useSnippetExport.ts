@@ -32,6 +32,7 @@ interface ExportOptions {
   textColor: TextColor;
   durationColor: TextColor;
   showTrackTitle: boolean;
+  elementColors: Record<string, string>;
 }
 
 // Reverted to client-side rendering (v8.15.0) after the server-render path
@@ -144,6 +145,7 @@ export function useSnippetExport() {
           frequencyData: getFrequencyData(),
           trackTitle: opts.trackTitle,
           showTrackTitle: opts.showTrackTitle,
+          elementColors: opts.elementColors,
           albumArt, vinylImages: { white, black, orange },
           discColor: opts.discColor, gradient: opts.gradient, useAlbumArt: opts.useAlbumArt,
           spinSpeed: opts.spinSpeed,

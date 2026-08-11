@@ -60,6 +60,18 @@ function roundRectPath(ctx: SnippetRenderContext["ctx"], x: number, y: number, w
   ctx.closePath();
 }
 
+function elColor(rc: SnippetRenderContext, key: string, fallback: string) {
+  return rc.elementColors?.[key] || fallback;
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace("#", "");
+  if (clean.length !== 6) return `rgba(255,138,61,${alpha})`;
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 function drawTitle(rc: SnippetRenderContext, x: number, y: number, align: "left" | "center" | "right" = "center") {
   const { ctx, trackTitle, textColor } = rc;
   ctx.textAlign = align;
@@ -177,7 +189,7 @@ export function renderPulseGrid(rc: SnippetRenderContext) {
     const x = gap + i * (barWidth + gap);
     const isLoud = amp > 0.65;
     const r = barWidth / 2;
-    const color = isLoud ? "#ff8a3d" : "rgba(255,255,255,0.55)";
+    const color = isLoud ? elColor(rc, "barAccent", "#ff8a3d") : elColor(rc, "barBase", "rgba(255,255,255,0.55)");
 
     roundRectPath(ctx, x, baseY - h, barWidth, h, r);
     ctx.fillStyle = color;
@@ -234,7 +246,7 @@ export function renderTypeWave(rc: SnippetRenderContext) {
     const y0 = Math.sin(angle) * innerRadius;
     const x1 = Math.cos(angle) * (innerRadius + len);
     const y1 = Math.sin(angle) * (innerRadius + len);
-    ctx.strokeStyle = isLoud ? "#ff8a3d" : "rgba(255,255,255,0.5)";
+    ctx.strokeStyle = isLoud ? elColor(rc, "spokeAccent", "#ff8a3d") : elColor(rc, "spokeBase", "rgba(255,255,255,0.5)");
     ctx.lineWidth = 3;
     ctx.lineCap = "round";
     ctx.beginPath();
@@ -244,14 +256,13 @@ export function renderTypeWave(rc: SnippetRenderContext) {
   }
   ctx.restore();
 
-  // Center medallion — solid gradient disc, deliberately not the vinyl
-  // asset (this template's whole point is being the non-vinyl option).
-  const grad = ctx.createLinearGradient(cx - innerRadius, cy - innerRadius, cx + innerRadius, cy + innerRadius);
-  grad.addColorStop(0, "#2a2a2a");
-  grad.addColorStop(1, "#0a0a0a");
+  // Center medallion — customizable flat fill instead of a fixed gradient,
+  // deliberately not the vinyl asset (this template's whole point is being
+  // the non-vinyl option).
+  const medallionColor = elColor(rc, "medallion", "#111111");
   ctx.beginPath();
   ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2);
-  ctx.fillStyle = grad;
+  ctx.fillStyle = medallionColor;
   ctx.fill();
   ctx.strokeStyle = "rgba(255,255,255,0.15)";
   ctx.lineWidth = 2;
@@ -275,9 +286,10 @@ export function renderOrbit(rc: SnippetRenderContext) {
   const artSize = width * 0.46;
 
   ctx.save();
+  const glowHex = elColor(rc, "glow", "#ff8a3d");
   const glow = ctx.createLinearGradient(cx - artSize, cy - artSize, cx + artSize, cy + artSize);
-  glow.addColorStop(0, "rgba(255,138,61,0.28)");
-  glow.addColorStop(1, "rgba(255,138,61,0)");
+  glow.addColorStop(0, hexToRgba(glowHex, 0.28));
+  glow.addColorStop(1, hexToRgba(glowHex, 0));
   ctx.beginPath();
   ctx.arc(cx, cy, artSize * 0.95, 0, Math.PI * 2);
   ctx.fillStyle = glow;
@@ -287,13 +299,7 @@ export function renderOrbit(rc: SnippetRenderContext) {
 
   ctx.save();
   const r = 24;
-  ctx.beginPath();
-  ctx.moveTo(cx - artSize / 2 + r, cy - artSize / 2);
-  ctx.arcTo(cx + artSize / 2, cy - artSize / 2, cx + artSize / 2, cy + artSize / 2, r);
-  ctx.arcTo(cx + artSize / 2, cy + artSize / 2, cx - artSize / 2, cy + artSize / 2, r);
-  ctx.arcTo(cx - artSize / 2, cy + artSize / 2, cx - artSize / 2, cy - artSize / 2, r);
-  ctx.arcTo(cx - artSize / 2, cy - artSize / 2, cx + artSize / 2, cy - artSize / 2, r);
-  ctx.closePath();
+  roundRectPath(ctx, cx - artSize / 2, cy - artSize / 2, artSize, artSize, r);
   ctx.clip();
   if (albumArt) {
     ctx.drawImage(albumArt, cx - artSize / 2, cy - artSize / 2, artSize, artSize);
@@ -326,7 +332,7 @@ export function renderOrbit(rc: SnippetRenderContext) {
       const dotSize = (isAccent ? ring.size * 1.4 : ring.size) * (1 + avgAmp * 0.3);
       ctx.beginPath();
       ctx.arc(x, y, dotSize, 0, Math.PI * 2);
-      ctx.fillStyle = isAccent ? "#ff8a3d" : `rgba(255,255,255,${Math.max(0.25, 0.75 - ringIdx * 0.15)})`;
+      ctx.fillStyle = isAccent ? elColor(rc, "ringAccent", "#ff8a3d") : `rgba(255,255,255,${Math.max(0.25, 0.75 - ringIdx * 0.15)})`;
       ctx.fill();
     }
   });

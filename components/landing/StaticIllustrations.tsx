@@ -8,13 +8,14 @@ import { Bell, Play, GitBranch } from "lucide-react";
 export function OrganizeIllustration() {
   return (
     <div className="relative h-32 flex items-center justify-center">
-      <div className="absolute w-24 h-16 rounded-xl bg-accent/10 border border-accent/30 rotate-[-6deg] translate-x-3" />
+      <div className="absolute w-24 h-16 rounded-xl bg-accent/15 border-2 border-accent/50 rotate-[-6deg] translate-x-3" />
       <div className="absolute w-24 h-16 rounded-xl bg-white/[0.06] border border-border rotate-[3deg] -translate-x-2" />
       <div className="relative w-24 h-16 rounded-xl bg-elevated border border-border-strong flex flex-col justify-center px-3 gap-1.5">
-        <div className="h-1.5 w-14 rounded-full bg-accent/70" />
+        <div className="h-1.5 w-14 rounded-full bg-accent" />
         <div className="h-1.5 w-10 rounded-full bg-white/15" />
         <div className="h-1.5 w-12 rounded-full bg-white/15" />
       </div>
+      <div className="absolute top-1 right-[calc(50%-46px)] w-3 h-3 rounded-full bg-accent border-2 border-canvas" />
     </div>
   );
 }

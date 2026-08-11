@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useSession } from "next-auth/react";
+import { useState, useEffect } from "react";
 import {
   ShieldCheck,
 } from "lucide-react";
@@ -11,6 +12,7 @@ import Logo from "./Logo";
 import { VinylExportDemo, MixingToolkitDemo, PermissionsDemo, VersionGroupDemo } from "./landing/FeatureDemos";
 import { OrganizeIllustration, NotificationsIllustration, AnalyticsIllustration, VaultIllustration } from "./landing/StaticIllustrations";
 import FAQ from "./landing/FAQ";
+import { PRICING, CurrencyCode, guessCurrency, formatPrice } from "@/lib/geoPricing";
 
 // The 4 that don't exist on untitled.stream at all (or exist in a much
 // thinner form) get the animated spotlight treatment -- these are the
@@ -21,7 +23,7 @@ const ANIMATED_FEATURES = [
   {
     demo: VinylExportDemo,
     title: "Turn a moment into a share",
-    body: "Trim any section and export it as a vinyl-style video, ready for stories and socials — spin speed, disc color, and text all yours to set. untitled.stream hands you off to the OS share sheet; this is a real branded export.",
+    body: "Trim any section and export it as a vinyl-style video, ready for stories and socials — spin speed, disc color, and text all yours to set.",
   },
   {
     demo: MixingToolkitDemo,
@@ -65,6 +67,14 @@ const STATIC_FEATURES = [
 
 
 export default function LandingPage() {
+  // Client-only (Intl.DateTimeFormat isn't reliably available/consistent
+  // during SSR), starts at USD and swaps in after mount to avoid a
+  // hydration mismatch -- a brief USD flash before the real guess lands is
+  // a fine tradeoff for not having a server-side geo lookup at all.
+  const [currency, setCurrency] = useState<CurrencyCode>("USD");
+  useEffect(() => { setCurrency(guessCurrency()); }, []);
+  const price = PRICING[currency];
+
   // Cursor-reactive parallax for the hero's three-disc fan -- raw pointer
   // position feeds a spring per disc, each with its own stiffness/range, so
   // the back two discs drift less than the front one and the whole stack
@@ -138,7 +148,7 @@ export default function LandingPage() {
         onMouseLeave={() => { heroParallaxX.set(0); heroParallaxY.set(0); }}
         className="relative overflow-hidden bg-gradient-to-b from-[#1a1a1a] to-[#050505] min-h-[calc(100vh-76px)] flex items-center"
       >
-        <div className="max-w-5xl mx-auto px-6 py-14 sm:py-16 text-center relative w-full">
+        <div className="max-w-5xl mx-auto px-6 py-8 sm:py-10 text-center relative w-full">
           {/* Three discs, side by side, all equally visible -- no fanning,
               no one hiding the other two. Each spins at its own speed and
               drifts toward the cursor at its own depth, so there's still
@@ -151,14 +161,14 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="relative flex items-center justify-center gap-3 sm:gap-6 mb-10 sm:mb-14"
+            className="relative flex items-center justify-center gap-3 sm:gap-6 mb-6 sm:mb-8"
           >
             <div className="absolute inset-0 rounded-full bg-accent/20 blur-[100px] scale-90" />
             <motion.div
               style={{ x: orangeX, y: orangeY }}
               animate={{ rotate: 360 }}
               transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-              className="relative w-28 h-28 sm:w-48 sm:h-48 md:w-60 md:h-60 lg:w-64 lg:h-64 shrink-0"
+              className="relative w-32 h-32 sm:w-56 sm:h-56 md:w-72 md:h-72 lg:w-80 lg:h-80 xl:w-96 xl:h-96 shrink-0"
             >
               <Image src="/brand/vinyl-orange.png" alt="" fill sizes="192px" className="object-contain drop-shadow-[0_16px_30px_rgba(0,0,0,0.45)]" />
             </motion.div>
@@ -166,7 +176,7 @@ export default function LandingPage() {
               style={{ x: blackX, y: blackY }}
               animate={{ rotate: 360 }}
               transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
-              className="relative w-32 h-32 sm:w-56 sm:h-56 md:w-72 md:h-72 lg:w-80 lg:h-80 shrink-0 z-10"
+              className="relative w-36 h-36 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 xl:w-[26rem] xl:h-[26rem] shrink-0 z-10"
             >
               <Image
                 src="/brand/vinyl-black.png"
@@ -181,7 +191,7 @@ export default function LandingPage() {
               style={{ x: whiteX, y: whiteY }}
               animate={{ rotate: -360 }}
               transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
-              className="relative w-28 h-28 sm:w-48 sm:h-48 md:w-60 md:h-60 lg:w-64 lg:h-64 shrink-0"
+              className="relative w-32 h-32 sm:w-56 sm:h-56 md:w-72 md:h-72 lg:w-80 lg:h-80 xl:w-96 xl:h-96 shrink-0"
             >
               <Image src="/brand/vinyl-white.png" alt="" fill sizes="192px" className="object-contain drop-shadow-[0_16px_30px_rgba(0,0,0,0.45)]" />
             </motion.div>
@@ -250,12 +260,12 @@ export default function LandingPage() {
           move down it without anything auto-playing off-screen. */}
       <section className="max-w-5xl mx-auto px-6 pt-4 pb-16 sm:pb-20">
         <div className="text-center mb-14 sm:mb-16">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-tertiary mb-4">What's different</p>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-tertiary mb-4">Highlights</p>
           <h2
             className="font-display font-medium text-primary tracking-[-0.02em] leading-[0.95] max-w-xl mx-auto"
             style={{ fontSize: "clamp(1.75rem, 4.5vw, 3rem)" }}
           >
-            Four things untitled.stream doesn't do.
+            What SONIQ is built around.
           </h2>
         </div>
         <div className="grid sm:grid-cols-2 gap-6 sm:gap-8">
@@ -374,7 +384,7 @@ export default function LandingPage() {
             <div className="border border-accent rounded-2xl p-6 relative">
               <p className="text-xs uppercase tracking-wide text-accent mb-2">Pro</p>
               <p className="text-3xl font-display font-bold text-primary">
-                $5<span className="text-base font-normal text-secondary">/mo</span>
+                {formatPrice(price.monthly, currency)}<span className="text-base font-normal text-secondary">/mo</span>
               </p>
               <ul className="mt-5 space-y-3 text-sm">
                 <li className="flex items-center gap-2 text-primary"><span className="w-1 h-1 rounded-full bg-accent shrink-0" /> Unlimited storage</li>
@@ -382,7 +392,7 @@ export default function LandingPage() {
                 <li className="flex items-center gap-2 text-primary"><span className="w-1 h-1 rounded-full bg-accent shrink-0" /> Full mixing toolkit (EQ, stems, metronome, tuner)</li>
                 <li className="flex items-center gap-2 text-primary"><span className="w-1 h-1 rounded-full bg-accent shrink-0" /> Unlimited albums, versions, and shares</li>
               </ul>
-              <p className="text-xs text-tertiary mt-4">Or $40/year — 4 months free vs. paying monthly.</p>
+              <p className="text-xs text-tertiary mt-4">Or {formatPrice(price.yearly, currency)}/year — 4 months free vs. paying monthly.</p>
             </div>
           </div>
         </div>

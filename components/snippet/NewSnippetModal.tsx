@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, Lock, Volume2, VolumeX, Download, Gauge, Play, Pause } from "lucide-react";
 import { usePlayer, Track } from "../PlayerProvider";
-import { SNIPPET_TEMPLATES, SnippetTemplateId, DiscColor, GradientChoice, TextColor, TEXT_COLOR_HEX, VINYL_ASSET_PATHS } from "@/lib/snippetTemplates";
+import { SNIPPET_TEMPLATES, SnippetTemplateId, DiscColor, GradientChoice, TextColor, TEXT_COLOR_HEX, VINYL_ASSET_PATHS, ELEMENT_COLOR_PALETTE } from "@/lib/snippetTemplates";
 import { TEMPLATE_RENDERERS } from "@/lib/snippetRenderers";
 import { useSnippetExport } from "@/lib/useSnippetExport";
 import { MODAL_SPRING } from "@/lib/motion";
@@ -27,6 +27,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
   const [textColor, setTextColor] = useState<TextColor>("light");
   const [durationColor, setDurationColor] = useState<TextColor>("light");
   const [showTrackTitle, setShowTrackTitle] = useState(false);
+  const [elementColors, setElementColors] = useState<Record<string, string>>({});
   const [trimStart, setTrimStart] = useState(0);
   const [trackDuration, setTrackDuration] = useState(track.durationSec ?? MAX_SNIPPET_SEC);
   const [trimEnd, setTrimEndState] = useState(Math.min(MAX_SNIPPET_SEC, track.durationSec ?? MAX_SNIPPET_SEC));
@@ -150,6 +151,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
         frequencyData: getPreviewFrequencyData(),
         trackTitle: track.title,
         showTrackTitle,
+        elementColors,
         albumArt: useAlbumArt ? albumArtImgRef.current : null,
         vinylImages, discColor, gradient, useAlbumArt,
         spinSpeed,
@@ -172,7 +174,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       previewAnalyserCtxRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateId, discColor, gradient, useAlbumArt, trimStart, trimEnd, muted, spinSpeed, textColor, durationColor, showTrackTitle, track.id]);
+  }, [templateId, discColor, gradient, useAlbumArt, trimStart, trimEnd, muted, spinSpeed, textColor, durationColor, showTrackTitle, elementColors, track.id]);
 
   // Play/pause toggle for the preview -- separate effect so toggling it
   // doesn't tear down and rebuild the whole draw loop (which would restart
@@ -185,6 +187,18 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
   }, [previewPlaying]);
 
   const selectedMeta = SNIPPET_TEMPLATES.find((t) => t.id === templateId)!;
+
+  // Reset element colors to this template's defaults when switching
+  // templates -- otherwise a color picked for e.g. Pulse Grid's "barAccent"
+  // would silently carry over and mean nothing on a template that doesn't
+  // have that element, or worse, collide with a same-named key on another
+  // template with different visual intent.
+  useEffect(() => {
+    const defaults: Record<string, string> = {};
+    selectedMeta.elements.forEach((el) => { defaults[el.key] = el.default; });
+    setElementColors(defaults);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateId]);
   const locked = selectedMeta.premium && isPaid === false;
 
   const handleTrimChange = (s: number, e: number) => {
@@ -205,6 +219,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       albumArtUrl: track.albumCoverUrl ?? null,
       trackTitle: track.title,
       showTrackTitle,
+      elementColors,
       trimStart, trimEnd,
       trackDuration,
       audioUrl: track.fileUrl,
@@ -352,18 +367,20 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
                 />
               ))}
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] text-tertiary w-16 shrink-0">Text</span>
-              {(["dark", "light", "orange"] as TextColor[]).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTextColor(t)}
-                  title={t}
-                  className={`w-7 h-7 rounded-full border-2 transition-colors capitalize ${textColor === t ? "border-accent" : "border-transparent"}`}
-                  style={{ background: TEXT_COLOR_HEX[t] }}
-                />
-              ))}
-            </div>
+            {selectedMeta.supportsTitleToggle && showTrackTitle && (
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-tertiary w-16 shrink-0">Text</span>
+                {(["dark", "light", "orange"] as TextColor[]).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTextColor(t)}
+                    title={t}
+                    className={`w-7 h-7 rounded-full border-2 transition-colors capitalize ${textColor === t ? "border-accent" : "border-transparent"}`}
+                    style={{ background: TEXT_COLOR_HEX[t] }}
+                  />
+                ))}
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-tertiary w-16 shrink-0">Background</span>
               {(["dark", "light", "orange"] as GradientChoice[]).map((g) => (
@@ -388,6 +405,33 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
               ))}
             </div>
           </div>
+
+          {/* Per-template customizable elements -- only rendered when the
+              current template actually has any, since Pulse Grid/Frequency
+              Bloom/Orbit each have different visual parts worth coloring
+              independently, and the vinyl templates don't have any of
+              these at all. */}
+          {selectedMeta.elements.length > 0 && (
+            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3 pt-1 border-t border-border">
+              {selectedMeta.elements.map((el) => (
+                <div key={el.key} className="flex items-center gap-2 pt-3">
+                  <span className="text-[11px] text-tertiary w-16 shrink-0">{el.label}</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {ELEMENT_COLOR_PALETTE.map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => setElementColors((prev) => ({ ...prev, [el.key]: c }))}
+                        className={`w-5 h-5 rounded-full border-2 transition-colors ${
+                          (elementColors[el.key] ?? el.default) === c ? "border-accent" : "border-transparent"
+                        }`}
+                        style={{ background: c }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           {selectedMeta.supportsAlbumArt && (
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-tertiary w-16 shrink-0 flex items-center gap-1"><Gauge size={11} strokeWidth={1.5} /> Spin</span>

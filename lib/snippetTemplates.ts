@@ -25,6 +25,18 @@ export const TEXT_COLOR_HEX: Record<TextColor, string> = {
   orange: "#ff8a3d",
 };
 
+// A small fixed palette used for the per-template customizable elements
+// below (bars, medallion, rings, glow, etc). Deliberately not a full hex
+// picker -- keeps every template's options UI consistent and fast to use,
+// same reasoning as the existing disc/background/text swatch rows.
+export const ELEMENT_COLOR_PALETTE = ["#ff8a3d", "#ffffff", "#111111", "#ef4444", "#3b82f6", "#22c55e", "#a855f7"];
+
+export interface SnippetElementConfig {
+  key: string;
+  label: string;
+  default: string;
+}
+
 export type SnippetTemplateId =
   | "vinyl-rise" | "vinyl-edge" // free
   | "depth-vinyl" | "pulse-grid" | "type-wave" | "orbit"; // premium
@@ -42,15 +54,40 @@ export interface SnippetTemplateMeta {
   // text on every template) -- Depth Vinyl is the one exception, where it's
   // an opt-in toggle, off by default.
   supportsTitleToggle: boolean;
+  // Elements unique to this template that aren't already covered by the
+  // universal disc/background/duration controls -- each template only
+  // declares what it actually has (bars, medallion, rings, glow) instead
+  // of every template sharing one fixed 4-row options set regardless of
+  // whether those rows mean anything for it.
+  elements: SnippetElementConfig[];
 }
 
 export const SNIPPET_TEMPLATES: SnippetTemplateMeta[] = [
-  { id: "vinyl-rise", name: "Vinyl Rise", premium: false, supportsAlbumArt: true, supportsTitleToggle: false },
-  { id: "vinyl-edge", name: "Vinyl Edge", premium: false, supportsAlbumArt: true, supportsTitleToggle: false },
-  { id: "depth-vinyl", name: "Depth Vinyl", premium: true, supportsAlbumArt: true, supportsTitleToggle: true },
-  { id: "pulse-grid", name: "Pulse Grid", premium: true, supportsAlbumArt: false, supportsTitleToggle: false },
-  { id: "type-wave", name: "Frequency Bloom", premium: true, supportsAlbumArt: false, supportsTitleToggle: false },
-  { id: "orbit", name: "Orbit", premium: true, supportsAlbumArt: true, supportsTitleToggle: false },
+  { id: "vinyl-rise", name: "Vinyl Rise", premium: false, supportsAlbumArt: true, supportsTitleToggle: false, elements: [] },
+  { id: "vinyl-edge", name: "Vinyl Edge", premium: false, supportsAlbumArt: true, supportsTitleToggle: false, elements: [] },
+  { id: "depth-vinyl", name: "Depth Vinyl", premium: true, supportsAlbumArt: true, supportsTitleToggle: true, elements: [] },
+  {
+    id: "pulse-grid", name: "Pulse Grid", premium: true, supportsAlbumArt: false, supportsTitleToggle: false,
+    elements: [
+      { key: "barAccent", label: "Loud bars", default: "#ff8a3d" },
+      { key: "barBase", label: "Bars", default: "#ffffff" },
+    ],
+  },
+  {
+    id: "type-wave", name: "Frequency Bloom", premium: true, supportsAlbumArt: false, supportsTitleToggle: false,
+    elements: [
+      { key: "spokeAccent", label: "Loud spokes", default: "#ff8a3d" },
+      { key: "spokeBase", label: "Spokes", default: "#ffffff" },
+      { key: "medallion", label: "Medallion", default: "#111111" },
+    ],
+  },
+  {
+    id: "orbit", name: "Orbit", premium: true, supportsAlbumArt: true, supportsTitleToggle: false,
+    elements: [
+      { key: "glow", label: "Glow", default: "#ff8a3d" },
+      { key: "ringAccent", label: "Ring accent", default: "#ff8a3d" },
+    ],
+  },
 ];
 
 // Loosely typed so the exact same renderer functions could in principle
@@ -96,6 +133,7 @@ export interface SnippetRenderContext {
   frequencyData: Uint8Array | null; // live analyser data, may be null before first frame
   trackTitle: string;
   showTrackTitle: boolean; // off by default everywhere; Depth Vinyl is the only template that exposes this as a toggle
+  elementColors: Record<string, string>; // per-template customizable elements, keyed by SnippetElementConfig.key
   albumArt: any | null; // HTMLImageElement (browser) or napi-rs Image (server); null if no cover or opted out
   vinylImages: Record<DiscColor, any>;
   discColor: DiscColor;
