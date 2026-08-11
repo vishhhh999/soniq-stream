@@ -54,6 +54,13 @@ export interface SnippetTemplateMeta {
   // text on every template) -- Depth Vinyl is the one exception, where it's
   // an opt-in toggle, off by default.
   supportsTitleToggle: boolean;
+  // Spin only means something for templates that actually render the
+  // rotating vinyl asset via drawVinyl -- Orbit uses static album art with
+  // orbiting dots, so the spin slider was showing up and visibly doing
+  // nothing (spinSpeed is silently ignored by renderOrbit). Split out from
+  // supportsAlbumArt so a template can use album art without inheriting a
+  // spin control that has no effect for it.
+  supportsSpin: boolean;
   // Elements unique to this template that aren't already covered by the
   // universal disc/background/duration controls -- each template only
   // declares what it actually has (bars, medallion, rings, glow) instead
@@ -63,18 +70,18 @@ export interface SnippetTemplateMeta {
 }
 
 export const SNIPPET_TEMPLATES: SnippetTemplateMeta[] = [
-  { id: "vinyl-rise", name: "Vinyl Rise", premium: false, supportsAlbumArt: true, supportsTitleToggle: false, elements: [] },
-  { id: "vinyl-edge", name: "Vinyl Edge", premium: false, supportsAlbumArt: true, supportsTitleToggle: false, elements: [] },
-  { id: "depth-vinyl", name: "Depth Vinyl", premium: true, supportsAlbumArt: true, supportsTitleToggle: true, elements: [] },
+  { id: "vinyl-rise", name: "Vinyl Rise", premium: false, supportsAlbumArt: true, supportsTitleToggle: false, supportsSpin: true, elements: [] },
+  { id: "vinyl-edge", name: "Vinyl Edge", premium: false, supportsAlbumArt: true, supportsTitleToggle: false, supportsSpin: true, elements: [] },
+  { id: "depth-vinyl", name: "Depth Vinyl", premium: true, supportsAlbumArt: true, supportsTitleToggle: true, supportsSpin: true, elements: [] },
   {
-    id: "pulse-grid", name: "Pulse Grid", premium: true, supportsAlbumArt: false, supportsTitleToggle: false,
+    id: "pulse-grid", name: "Pulse Grid", premium: true, supportsAlbumArt: false, supportsTitleToggle: false, supportsSpin: false,
     elements: [
       { key: "barAccent", label: "Loud bars", default: "#ff8a3d" },
       { key: "barBase", label: "Bars", default: "#ffffff" },
     ],
   },
   {
-    id: "type-wave", name: "Frequency Bloom", premium: true, supportsAlbumArt: false, supportsTitleToggle: false,
+    id: "type-wave", name: "Frequency Bloom", premium: true, supportsAlbumArt: false, supportsTitleToggle: false, supportsSpin: false,
     elements: [
       { key: "spokeAccent", label: "Loud spokes", default: "#ff8a3d" },
       { key: "spokeBase", label: "Spokes", default: "#ffffff" },
@@ -82,7 +89,7 @@ export const SNIPPET_TEMPLATES: SnippetTemplateMeta[] = [
     ],
   },
   {
-    id: "orbit", name: "Orbit", premium: true, supportsAlbumArt: true, supportsTitleToggle: false,
+    id: "orbit", name: "Orbit", premium: true, supportsAlbumArt: true, supportsTitleToggle: false, supportsSpin: false,
     elements: [
       { key: "glow", label: "Glow", default: "#ff8a3d" },
       { key: "ringAccent", label: "Ring accent", default: "#ff8a3d" },
