@@ -15,7 +15,7 @@ import { openSettings } from "@/lib/settingsBus";
 const MAX_SNIPPET_SEC = 30;
 
 export default function NewSnippetModal({ track, onClose }: { track: Track; onClose: () => void }) {
-  const { audioContext, getFrequencyData } = usePlayer();
+  const { audioContext } = usePlayer();
   const [mounted, setMounted] = useState(false);
   const [isPaid, setIsPaid] = useState<boolean | null>(null);
   const [templateId, setTemplateId] = useState<SnippetTemplateId>("vinyl-rise");
@@ -38,6 +38,22 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const previewRafRef = useRef<number | null>(null);
+  // Dedicated analyser for the preview's own audio -- previously the bars
+  // (Pulse Grid / Type Wave) read getFrequencyData() off the MAIN app
+  // player's analyser, so they went flat/wrong whenever the main player
+  // wasn't actively playing this exact track. This mirrors PlayerProvider's
+  // own analyser wiring (fftSize 256, tapped between source and
+  // destination) but scoped to previewAudioRef specifically.
+  const previewAnalyserCtxRef = useRef<AudioContext | null>(null);
+  const previewAnalyserRef = useRef<AnalyserNode | null>(null);
+  const previewFreqDataRef = useRef<Uint8Array | null>(null);
+  const getPreviewFrequencyData = () => {
+    const analyser = previewAnalyserRef.current;
+    const data = previewFreqDataRef.current;
+    if (!analyser || !data) return null;
+    analyser.getByteFrequencyData(data as Uint8Array<ArrayBuffer>);
+    return data;
+  };
   const albumArtImgRef = useRef<HTMLImageElement | null>(null);
   const vinylImgsRef = useRef<Record<DiscColor, HTMLImageElement> | null>(null);
 
@@ -89,6 +105,18 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
     audio.muted = muted;
     audio.currentTime = trimStart;
     previewAudioRef.current = audio;
+
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    const analyserCtx = new Ctx();
+    const analyser = analyserCtx.createAnalyser();
+    analyser.fftSize = 256;
+    const source = analyserCtx.createMediaElementSource(audio);
+    source.connect(analyser);
+    analyser.connect(analyserCtx.destination);
+    previewAnalyserCtxRef.current = analyserCtx;
+    previewAnalyserRef.current = analyser;
+    previewFreqDataRef.current = new Uint8Array(analyser.frequencyBinCount);
+
     if (previewPlaying) audio.play().catch(() => {});
     audio.addEventListener("loadedmetadata", () => {
       if (Number.isFinite(audio.duration) && audio.duration > 0 && !track.durationSec) {
@@ -118,7 +146,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       renderer({
         ctx, width: canvas.width, height: canvas.height,
         t: elapsed, duration: segDuration, progress: elapsed / segDuration,
-        frequencyData: getFrequencyData(),
+        frequencyData: getPreviewFrequencyData(),
         trackTitle: track.title,
         albumArt: useAlbumArt ? albumArtImgRef.current : null,
         vinylImages, discColor, gradient, useAlbumArt,
@@ -136,6 +164,10 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       if (previewRafRef.current) cancelAnimationFrame(previewRafRef.current);
       audio.pause();
       previewAudioRef.current = null;
+      previewAnalyserRef.current = null;
+      previewFreqDataRef.current = null;
+      analyserCtx.close().catch(() => {});
+      previewAnalyserCtxRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateId, discColor, gradient, useAlbumArt, trimStart, trimEnd, muted, spinSpeed, textColor, durationColor, track.id]);
@@ -176,15 +208,15 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       spinSpeed,
       textColor,
       durationColor,
-      getFrequencyData,
     });
   };
 
   const handleDownload = () => {
     if (!exportState.resultUrl) return;
+    const ext = exportState.resultMimeType === "video/mp4" ? "mp4" : "webm";
     const a = document.createElement("a");
     a.href = exportState.resultUrl;
-    a.download = `${track.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-snippet.webm`;
+    a.download = `${track.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-snippet.${ext}`;
     document.body.appendChild(a); a.click(); a.remove();
   };
 

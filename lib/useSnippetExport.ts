@@ -31,7 +31,6 @@ interface ExportOptions {
   spinSpeed: number; // multiplier on the base rotation rate, 0.5x-2x
   textColor: TextColor;
   durationColor: TextColor;
-  getFrequencyData: () => Uint8Array | null;
 }
 
 // Reverted to client-side rendering (v8.15.0) after the server-render path
@@ -45,6 +44,7 @@ export function useSnippetExport() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultMimeType, setResultMimeType] = useState<string>("video/webm");
   const cancelRef = useRef(false);
 
   // MediaRecorder + canvas.captureStream is the only browser-native route
@@ -80,8 +80,22 @@ export function useSnippetExport() {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const source = audioCtx.createMediaElementSource(audio);
       const dest = audioCtx.createMediaStreamDestination();
-      source.connect(dest);
-      source.connect(audioCtx.destination);
+      // Dedicated analyser on this export's own audio graph -- previously
+      // the renderer was handed a getFrequencyData() callback that read
+      // off the main app player's analyser, which went flat/wrong if the
+      // main player wasn't actively playing this exact track. This taps
+      // the actual export audio, so Pulse Grid / Type Wave always reflect
+      // what's really being rendered.
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      const analyserData = new Uint8Array(analyser.frequencyBinCount);
+      source.connect(analyser);
+      analyser.connect(dest);
+      analyser.connect(audioCtx.destination);
+      const getFrequencyData = () => {
+        analyser.getByteFrequencyData(analyserData as Uint8Array<ArrayBuffer>);
+        return analyserData;
+      };
 
       const canvasStream = canvas.captureStream(30);
       const combined = new MediaStream([
@@ -89,8 +103,20 @@ export function useSnippetExport() {
         ...dest.stream.getAudioTracks(),
       ]);
 
-      const mimeType = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
-        .find((t) => MediaRecorder.isTypeSupported(t)) || "video/webm";
+      // Prefer MP4 (H.264) when the browser can actually record it -- iOS
+      // Safari and current Chrome/Edge builds support this directly via
+      // MediaRecorder, no transcode step needed. Most phones can't play a
+      // .webm file at all (this matters a lot for a 9:16 export meant for
+      // IG/WhatsApp story uploads), so MP4 support is checked first and
+      // webm is the fallback, not the default.
+      const mimeType = [
+        "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+        "video/mp4",
+        "video/webm;codecs=vp9,opus",
+        "video/webm;codecs=vp8,opus",
+        "video/webm",
+      ].find((t) => MediaRecorder.isTypeSupported(t)) || "video/webm";
+      const isMp4 = mimeType.startsWith("video/mp4");
       const recorder = new MediaRecorder(combined, { mimeType, videoBitsPerSecond: 8_000_000 });
       const chunks: Blob[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
@@ -114,7 +140,7 @@ export function useSnippetExport() {
         const rc: SnippetRenderContext = {
           ctx, width: OUTPUT_WIDTH, height: OUTPUT_HEIGHT,
           t, duration, progress: t / duration,
-          frequencyData: opts.getFrequencyData(),
+          frequencyData: getFrequencyData(),
           trackTitle: opts.trackTitle,
           albumArt, vinylImages: { white, black, orange },
           discColor: opts.discColor, gradient: opts.gradient, useAlbumArt: opts.useAlbumArt,
@@ -142,8 +168,10 @@ export function useSnippetExport() {
 
       if (cancelRef.current) { setExporting(false); return; }
 
-      const blob = new Blob(chunks, { type: "video/webm" });
+      const outputType = isMp4 ? "video/mp4" : "video/webm";
+      const blob = new Blob(chunks, { type: outputType });
       const url = URL.createObjectURL(blob);
+      setResultMimeType(outputType);
       setResultUrl(url);
     } catch (e: any) {
       setError(e?.message || "Export failed.");
@@ -154,5 +182,5 @@ export function useSnippetExport() {
 
   const cancel = useCallback(() => { cancelRef.current = true; }, []);
 
-  return { start, cancel, exporting, progress, error, resultUrl };
+  return { start, cancel, exporting, progress, error, resultUrl, resultMimeType };
 }

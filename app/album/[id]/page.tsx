@@ -20,6 +20,7 @@ import { computeSelection } from "@/lib/selection";
 import { gradientFromSeed } from "@/lib/gradient";
 import { usePlayer } from "@/components/PlayerProvider";
 import type { Track } from "@/components/PlayerProvider";
+import { onTrackCreated } from "@/lib/libraryBus";
 import type { Album } from "@/components/AlbumCard";
 
 export default function AlbumPage({ params }: { params: { id: string } }) {
@@ -78,7 +79,11 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
     load();
     const onDeleted = () => load();
     window.addEventListener("soniq:track-deleted", onDeleted);
-    return () => window.removeEventListener("soniq:track-deleted", onDeleted);
+    const offCreated = onTrackCreated(load);
+    return () => {
+      window.removeEventListener("soniq:track-deleted", onDeleted);
+      offCreated();
+    };
   }, [params.id]);
 
   // Keyboard shortcuts. Delete/Backspace removes the current selection —

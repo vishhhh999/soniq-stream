@@ -7,6 +7,7 @@ import WaveformTrimSelector from "../WaveformTrimSelector";
 import { useMetronome } from "@/lib/useMetronome";
 import { useTuner } from "@/lib/useTuner";
 import { exportTrimmedAudio } from "@/lib/exportTrimmedAudio";
+import { notifyTrackCreated } from "@/lib/libraryBus";
 
 // Phase 3. Two honest scope notes up front:
 // - Speed uses native playbackRate + preservesPitch. With "preserve pitch"
@@ -135,6 +136,7 @@ export default function AdjustPanel() {
         const d = await finalizeRes.json().catch(() => ({}));
         throw new Error(d.error || "Couldn't save the trimmed track.");
       }
+      notifyTrackCreated();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e: any) {

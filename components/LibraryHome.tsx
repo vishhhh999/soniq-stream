@@ -7,6 +7,7 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, u
 import AddMenu from "@/components/AddMenu";
 import UploadDropZone from "@/components/UploadDropZone";
 import { openSettings } from "@/lib/settingsBus";
+import { onTrackCreated } from "@/lib/libraryBus";
 import Logo from "@/components/Logo";
 import TrackDetail from "@/components/TrackDetail";
 import TrackRowGroup from "@/components/TrackRow";
@@ -60,7 +61,11 @@ export default function LibraryHome() {
     load();
     const onDeleted = () => load();
     window.addEventListener("soniq:track-deleted", onDeleted);
-    return () => window.removeEventListener("soniq:track-deleted", onDeleted);
+    const offCreated = onTrackCreated(load);
+    return () => {
+      window.removeEventListener("soniq:track-deleted", onDeleted);
+      offCreated();
+    };
   }, []);
 
   // Previously none of this was memoized — tracks.filter(), groupVersions(),
