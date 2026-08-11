@@ -89,6 +89,20 @@ body {
   color: var(--bg-base);
 }
 
+/* Consistent, on-brand keyboard-focus ring app-wide. Text inputs keep
+   their existing focus:border-border-strong treatment (that Tailwind
+   utility class wins on specificity, so no conflict) -- this rule exists
+   for everything else, especially the handful of non-<button> interactive
+   elements (icon-as-button transport controls, the cellophane unwrap
+   overlay) that got role="button"/tabIndex added for keyboard support but
+   previously had no defined focus state at all, meaning they fell back to
+   the browser's default ring instead of something that matches the rest
+   of the system. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .waveform-container wave {
   overflow: hidden !important;
 }

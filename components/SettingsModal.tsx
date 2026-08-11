@@ -320,7 +320,7 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
                   <button
                     onClick={() => avatarInputRef.current?.click()}
                     disabled={uploadingAvatar}
-                    className="relative w-16 h-16 rounded-full overflow-hidden shrink-0 focus:outline-none"
+                    className="relative w-16 h-16 rounded-full overflow-hidden shrink-0"
                   >
                     {avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
