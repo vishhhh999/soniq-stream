@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { usePathname } from "next/navigation";
 import AmbientBackground from "./AmbientBackground";
 import PlayerBar from "./PlayerBar";
 import MobilePlayerBar from "./MobilePlayerBar";
@@ -27,12 +28,17 @@ import { onOpenSettings, SettingsSection } from "@/lib/settingsBus";
 export default function AuthedPlayerShell() {
   const { status } = useSession();
   const isMobile = useIsMobile();
+  const pathname = usePathname();
   useAmbientBackdropTint();
   const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
 
   useEffect(() => onOpenSettings((section) => setSettingsSection(section ?? undefined)), []);
 
-  if (status !== "authenticated") return null;
+  // /about is the marketing page, reachable even while signed in (see its
+  // route comment) -- auth status alone isn't enough to decide whether the
+  // player bar belongs on screen, a signed-in visitor looking at the pitch
+  // page still doesn't want a music player floating over it.
+  if (status !== "authenticated" || pathname === "/about") return null;
   return (
     <>
       <AmbientBackground />

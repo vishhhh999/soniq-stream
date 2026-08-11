@@ -137,51 +137,52 @@ export default function LandingPage() {
         onMouseLeave={() => { heroParallaxX.set(0); heroParallaxY.set(0); }}
         className="relative overflow-hidden bg-gradient-to-b from-[#1a1a1a] to-[#050505]"
       >
-        <div className="max-w-3xl mx-auto px-6 pt-16 sm:pt-20 pb-20 sm:pb-28 text-center relative">
+        <div className="max-w-5xl mx-auto px-6 pt-14 sm:pt-20 pb-20 sm:pb-28 text-center relative">
+          {/* Three discs, side by side, all equally visible -- no fanning,
+              no one hiding the other two. Each spins at its own speed and
+              drifts toward the cursor at its own depth, so there's still
+              motion and dimensionality, it's just not achieved by stacking
+              them on top of each other. Same row on mobile, just smaller,
+              rather than a different composition -- keeps "all three
+              visible at once" true at every size instead of only on
+              desktop. */}
           <motion.div
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="relative w-56 h-56 sm:w-72 sm:h-72 mx-auto mb-10"
+            className="relative flex items-center justify-center gap-3 sm:gap-6 mb-10 sm:mb-14"
           >
-            {/* Ambient glow behind the discs — soft, not a hard-edged circle */}
-            <div className="absolute inset-0 rounded-full bg-accent/25 blur-3xl scale-90" />
-
-            {/* Three-disc fan, cursor-reactive parallax (not scroll-triggered
-                -- this stack lives in one place, drifting subtly toward the
-                cursor rather than firing on scroll position). Each disc gets
-                its own depth multiplier so the back two feel like they're
-                genuinely behind the front one, not just smaller. */}
+            <div className="absolute inset-0 rounded-full bg-accent/20 blur-[100px] scale-90" />
             <motion.div
               style={{ x: orangeX, y: orangeY }}
               animate={{ rotate: 360 }}
-              transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-0 -translate-x-8 translate-y-4 -rotate-12 opacity-70 scale-[0.82]"
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              className="relative w-24 h-24 sm:w-40 sm:h-40 md:w-48 md:h-48 shrink-0"
             >
-              <Image src="/brand/vinyl-orange.png" alt="" fill sizes="200px" className="object-contain drop-shadow-[0_16px_30px_rgba(0,0,0,0.45)]" />
-            </motion.div>
-            <motion.div
-              style={{ x: whiteX, y: whiteY }}
-              animate={{ rotate: -360 }}
-              transition={{ duration: 26, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-0 translate-x-8 translate-y-6 rotate-12 opacity-80 scale-[0.88]"
-            >
-              <Image src="/brand/vinyl-white.png" alt="" fill sizes="220px" className="object-contain drop-shadow-[0_16px_30px_rgba(0,0,0,0.45)]" />
+              <Image src="/brand/vinyl-orange.png" alt="" fill sizes="192px" className="object-contain drop-shadow-[0_16px_30px_rgba(0,0,0,0.45)]" />
             </motion.div>
             <motion.div
               style={{ x: blackX, y: blackY }}
               animate={{ rotate: 360 }}
               transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
-              className="relative w-full h-full"
+              className="relative w-28 h-28 sm:w-48 sm:h-48 md:w-56 md:h-56 shrink-0 z-10"
             >
               <Image
                 src="/brand/vinyl-black.png"
                 alt=""
                 fill
-                sizes="288px"
+                sizes="224px"
                 className="object-contain drop-shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
                 priority
               />
+            </motion.div>
+            <motion.div
+              style={{ x: whiteX, y: whiteY }}
+              animate={{ rotate: -360 }}
+              transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
+              className="relative w-24 h-24 sm:w-40 sm:h-40 md:w-48 md:h-48 shrink-0"
+            >
+              <Image src="/brand/vinyl-white.png" alt="" fill sizes="192px" className="object-contain drop-shadow-[0_16px_30px_rgba(0,0,0,0.45)]" />
             </motion.div>
           </motion.div>
 
@@ -190,18 +191,28 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.15 }}
           >
-            <p className="text-xs uppercase tracking-widest text-white/50 mb-4">
-              Music organization &amp; sharing software for unreleased tracks
-            </p>
-            <h1 className="text-2xl sm:text-3xl font-display font-bold text-white tracking-tight leading-[1.05]">
-              SONIQ is a private home for the music you're still working on.
+            {/* The one-liner -- viewport-scaled with clamp() so it reads
+                "big" at the same relative weight on a phone as on a 32"
+                monitor, instead of jumping between a handful of fixed
+                breakpoint sizes. Tight negative tracking at this size is
+                what keeps a single-word-per-line moment from feeling
+                bloated rather than confident. */}
+            <h1
+              className="font-display font-medium text-white tracking-[-0.03em] leading-[0.95]"
+              style={{ fontSize: "clamp(2.75rem, 9vw, 6.5rem)" }}
+            >
+              SONIQ
             </h1>
-            <p className="text-white/70 text-base sm:text-lg mt-6 max-w-xl mx-auto leading-relaxed">
-              SONIQ is a personal library for organizing, sharing, and
-              listening to work-in-progress music. Upload demos, keep every
-              version, and share them with exactly who you want — with
-              exactly the permissions you choose. Built for work-in-progress,
-              not for streaming to strangers.
+            <p
+              className="text-white/60 mx-auto mt-4"
+              style={{ fontSize: "clamp(1rem, 2.2vw, 1.375rem)", maxWidth: "38rem" }}
+            >
+              A private home for the music you're still working on.
+            </p>
+            <p className="text-white/40 text-sm mt-5 max-w-lg mx-auto leading-relaxed">
+              Upload demos, keep every version, and share them with exactly
+              who you want — with exactly the permissions you choose. Built
+              for work-in-progress, not for streaming to strangers.
             </p>
             <div className="flex items-center justify-center gap-3 mt-9">
               {isAuthed ? (
