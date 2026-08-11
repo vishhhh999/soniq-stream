@@ -5,53 +5,63 @@ import Image from "next/image";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useSession } from "next-auth/react";
 import {
-  FolderOpen, Share2, GitBranch, Bell, Users, BarChart3, Sparkles, Music2, ShieldCheck,
-  SlidersHorizontal, Disc3,
+  Users, Music2, ShieldCheck,
 } from "lucide-react";
 import Logo from "./Logo";
+import { VinylExportDemo, MixingToolkitDemo, PermissionsDemo, VersionGroupDemo } from "./landing/FeatureDemos";
+import { OrganizeIllustration, NotificationsIllustration, AnalyticsIllustration, VaultIllustration } from "./landing/StaticIllustrations";
 
-const FEATURES = [
+// The 4 that don't exist on untitled.stream at all (or exist in a much
+// thinner form) get the animated spotlight treatment -- these are the
+// actual wedge, not just "our favorite features." The other 4 are real
+// and worth showing well, but they're parity/polish rather than
+// differentiators, so they stay static and smaller.
+const ANIMATED_FEATURES = [
   {
-    icon: FolderOpen,
-    title: "Organize it your way",
-    body: "Group tracks into albums, keep versions of the same idea together, and drag files in from your desktop whenever inspiration hits.",
+    demo: VinylExportDemo,
+    title: "Turn a moment into a share",
+    body: "Trim any section and export it as a vinyl-style video, ready for stories and socials — spin speed, disc color, and text all yours to set. untitled.stream hands you off to the OS share sheet; this is a real branded export.",
   },
   {
-    icon: GitBranch,
-    title: "Never lose a version",
-    body: "Upload a new take of a track and it's grouped with the old ones automatically — every version stays reachable, nothing gets overwritten.",
-  },
-  {
-    icon: Share2,
-    title: "Share, then decide who does what",
-    body: "Send a link or an invite, and set exactly what people can do — listen, download, or add and edit tracks. Change it any time.",
-  },
-  {
-    icon: SlidersHorizontal,
+    demo: MixingToolkitDemo,
     title: "A real mixing toolkit, not a toy",
     body: "5-band EQ, stem separation with live mute, varispeed with pitch held constant or linked, a metronome, a tuner. Built into the player, not bolted on.",
   },
   {
-    icon: Disc3,
-    title: "Turn a moment into a share",
-    body: "Trim any section and export it as a vinyl-style video, ready for stories and socials — spin speed, disc color, and text all yours to set.",
+    demo: PermissionsDemo,
+    title: "Share, then decide who does what",
+    body: "Send a link or an invite, and set exactly what people can do — listen, download, or add and edit tracks. Change it any time, per person.",
   },
   {
-    icon: Bell,
+    demo: VersionGroupDemo,
+    title: "Never lose a version",
+    body: "Upload a new take of a track and it's grouped with the old ones automatically — every version stays reachable, nothing gets overwritten, no folder work required.",
+  },
+];
+
+const STATIC_FEATURES = [
+  {
+    illustration: OrganizeIllustration,
+    title: "Organize it your way",
+    body: "Group tracks into albums, keep versions of the same idea together, and drag files in from your desktop whenever inspiration hits.",
+  },
+  {
+    illustration: NotificationsIllustration,
     title: "Know when someone listens",
     body: "Get notified when a track's played, a version's added, or someone joins a shared album — no need to check back and wonder.",
   },
   {
-    icon: BarChart3,
+    illustration: AnalyticsIllustration,
     title: "See what's landing",
     body: "Play counts by track and by listener, so you know which version people are actually going back to.",
   },
   {
-    icon: Sparkles,
+    illustration: VaultIllustration,
     title: "Built for the vault, not the feed",
     body: "Crossfade between tracks, synced lyrics, BPM and key detection — the small things that make going through a session's worth of work feel less like a chore.",
   },
 ];
+
 
 export default function LandingPage() {
   // Cursor-reactive parallax for the hero's three-disc fan -- raw pointer
@@ -222,21 +232,43 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Feature grid */}
+      {/* Feature grid — animated spotlights first (the actual wedge vs.
+          untitled.stream), static illustrated cards after. Both reveal on
+          scroll via whileInView, staggered, so the page feels alive as you
+          move down it without anything auto-playing off-screen. */}
+      <section className="max-w-5xl mx-auto px-6 pb-16 sm:pb-20">
+        <div className="grid sm:grid-cols-2 gap-6 sm:gap-8">
+          {ANIMATED_FEATURES.map((f, i) => (
+            <motion.div
+              key={f.title}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5, delay: (i % 2) * 0.08 }}
+              className="border border-border rounded-2xl p-5 sm:p-6 bg-surface/40"
+            >
+              <f.demo />
+              <h3 className="text-primary font-medium mt-5 mb-2">{f.title}</h3>
+              <p className="text-secondary text-sm leading-relaxed">{f.body}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
       <section className="max-w-5xl mx-auto px-6 pb-24 sm:pb-32">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-          {FEATURES.map((f, i) => (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
+          {STATIC_FEATURES.map((f, i) => (
             <motion.div
               key={f.title}
               initial={{ opacity: 0, y: 12 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
-              transition={{ duration: 0.4, delay: (i % 3) * 0.06 }}
-              className="border border-border rounded-xl p-6"
+              transition={{ duration: 0.4, delay: (i % 4) * 0.06 }}
+              className="border border-border rounded-2xl p-5"
             >
-              <f.icon size={20} strokeWidth={1.5} className="text-accent mb-4" />
-              <h3 className="text-primary font-medium mb-2">{f.title}</h3>
-              <p className="text-secondary text-sm leading-relaxed">{f.body}</p>
+              <f.illustration />
+              <h3 className="text-primary font-medium mt-3 mb-1.5 text-sm">{f.title}</h3>
+              <p className="text-tertiary text-xs leading-relaxed">{f.body}</p>
             </motion.div>
           ))}
         </div>
