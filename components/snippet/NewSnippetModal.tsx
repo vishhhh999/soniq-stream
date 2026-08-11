@@ -2,13 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { X, Check, Lock, Volume2, VolumeX, Download, Gauge, Play, Pause } from "lucide-react";
 import { usePlayer, Track } from "../PlayerProvider";
 import { SNIPPET_TEMPLATES, SnippetTemplateId, DiscColor, GradientChoice, TextColor, TEXT_COLOR_HEX, VINYL_ASSET_PATHS, ELEMENT_COLOR_PALETTE } from "@/lib/snippetTemplates";
 import { TEMPLATE_RENDERERS } from "@/lib/snippetRenderers";
 import { useSnippetExport } from "@/lib/useSnippetExport";
-import { MODAL_SPRING } from "@/lib/motion";
 import WaveformTrimSelector from "../WaveformTrimSelector";
 import { openSettings } from "@/lib/settingsBus";
 
@@ -415,13 +414,13 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
             <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3 pt-1 border-t border-border">
               {selectedMeta.elements.map((el) => (
                 <div key={el.key} className="flex items-center gap-2 pt-3">
-                  <span className="text-[11px] text-tertiary w-16 shrink-0">{el.label}</span>
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] text-tertiary w-20 shrink-0">{el.label}</span>
+                  <div className="flex items-center gap-2 flex-wrap">
                     {ELEMENT_COLOR_PALETTE.map((c) => (
                       <button
                         key={c}
                         onClick={() => setElementColors((prev) => ({ ...prev, [el.key]: c }))}
-                        className={`w-5 h-5 rounded-full border-2 transition-colors ${
+                        className={`w-7 h-7 rounded-full border-2 transition-colors ${
                           (elementColors[el.key] ?? el.default) === c ? "border-accent" : "border-transparent"
                         }`}
                         style={{ background: c }}
@@ -432,7 +431,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
               ))}
             </div>
           )}
-          {selectedMeta.supportsAlbumArt && (
+          {selectedMeta.supportsSpin && (
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-tertiary w-16 shrink-0 flex items-center gap-1"><Gauge size={11} strokeWidth={1.5} /> Spin</span>
               <input
@@ -446,7 +445,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
           {selectedMeta.supportsAlbumArt && track.albumCoverUrl && (
             <label className="flex items-center gap-2 text-[11px] text-tertiary pt-1">
               <input type="checkbox" checked={useAlbumArt} onChange={(e) => setUseAlbumArt(e.target.checked)} className="accent-[var(--accent)]" />
-              Overlay album art on label
+              {selectedMeta.supportsSpin ? "Overlay album art on label" : "Use album cover art"}
             </label>
           )}
           {selectedMeta.supportsTitleToggle && (

@@ -57,7 +57,6 @@ export function useAmbientPulse(targetRef: React.RefObject<HTMLElement>) {
 // it's already always mounted whenever a modal could be open).
 export function useAmbientBackdropTint() {
   const { enabled, colorStateRef } = useAmbient();
-  const rafRef = useRef<number>();
 
   useEffect(() => {
     if (!enabled) {

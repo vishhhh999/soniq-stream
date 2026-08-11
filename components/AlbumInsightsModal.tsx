@@ -147,7 +147,7 @@ export default function AlbumInsightsModal({
                     <p className="text-sm text-tertiary text-center py-4">No plays recorded yet.</p>
                   ) : (
                     <div className="space-y-3">
-                      {data.byListener.map((l, i) => (
+                      {data.byListener.map((l) => (
                         <div key={l.userId ?? "anon"} className="flex items-center gap-3">
                           <Avatar userId={l.userId} username={l.username} />
                           <div className="flex-1 min-w-0">

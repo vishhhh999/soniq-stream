@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, Download, Library, Check, MoreHorizontal, Shuffle } from "lucide-react";
+import { Play, Pause, Download, Library, Check, Shuffle } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import VinylArt from "@/components/VinylArt";

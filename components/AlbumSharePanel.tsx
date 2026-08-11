@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { triggerFeedback } from "@/lib/feedback";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -374,12 +374,14 @@ export default function AlbumSharePanel({
                     description="Those invited can edit and add tracks"
                     value={data.allowEdit}
                     onChange={(v) => patchSettings({ allowEdit: v })}
+                    disabled={saving}
                   />
                   <ToggleRow
                     label="Allow downloads"
                     description="Those invited can download audio"
                     value={data.allowDownload}
                     onChange={(v) => patchSettings({ allowDownload: v })}
+                    disabled={saving}
                   />
                 </div>
 
@@ -387,7 +389,8 @@ export default function AlbumSharePanel({
                 {data.accessMode !== "private" && (
                   <button
                     onClick={() => patchSettings({ accessMode: "private" })}
-                    className="mx-4 w-[calc(100%-2rem)] flex items-center gap-3 bg-error/10 border border-error/20 rounded-xl px-4 py-3 hover:bg-error/15 transition-colors mb-4"
+                    disabled={saving}
+                    className="mx-4 w-[calc(100%-2rem)] flex items-center gap-3 bg-error/10 border border-error/20 rounded-xl px-4 py-3 hover:bg-error/15 transition-colors mb-4 disabled:opacity-50"
                   >
                     <Lock size={15} strokeWidth={1.5} className="text-error" />
                     <span className="text-sm text-error font-medium">Make project private</span>
@@ -506,7 +509,8 @@ export default function AlbumSharePanel({
                   <button
                     key={mode}
                     onClick={() => patchSettings({ accessMode: mode })}
-                    className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl border transition-colors ${
+                    disabled={saving}
+                    className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl border transition-colors disabled:opacity-50 ${
                       data.accessMode === mode
                         ? "border-border-strong bg-surface"
                         : "border-border hover:border-border-strong"
@@ -528,12 +532,14 @@ export default function AlbumSharePanel({
                   description="Those invited can download audio"
                   value={data.allowDownload}
                   onChange={(v) => patchSettings({ allowDownload: v })}
+                  disabled={saving}
                 />
 
                 {data.accessMode !== "private" && (
                   <button
                     onClick={() => patchSettings({ accessMode: "private" })}
-                    className="w-full flex items-center gap-3 bg-error/10 border border-error/20 rounded-xl px-4 py-3 hover:bg-error/15 transition-colors"
+                    disabled={saving}
+                    className="w-full flex items-center gap-3 bg-error/10 border border-error/20 rounded-xl px-4 py-3 hover:bg-error/15 transition-colors disabled:opacity-50"
                   >
                     <Lock size={15} strokeWidth={1.5} className="text-error" />
                     <span className="text-sm text-error font-medium">Make project private</span>
@@ -649,7 +655,7 @@ export default function AlbumSharePanel({
   );
 }
 
-function ToggleRow({ label, description, value, onChange }: { label: string; description: string; value: boolean; onChange: (v: boolean) => void }) {
+function ToggleRow({ label, description, value, onChange, disabled }: { label: string; description: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <div className="flex items-center justify-between px-4 py-3">
       <div>
@@ -658,7 +664,8 @@ function ToggleRow({ label, description, value, onChange }: { label: string; des
       </div>
       <button
         onClick={() => onChange(!value)}
-        className={`relative w-10 h-6 rounded-full transition-colors shrink-0 ${value ? "bg-accent" : "bg-border"}`}
+        disabled={disabled}
+        className={`relative w-10 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50 ${value ? "bg-accent" : "bg-border"}`}
       >
         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${value ? "translate-x-5" : "translate-x-1"}`} />
       </button>

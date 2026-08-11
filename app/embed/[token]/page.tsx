@@ -37,7 +37,6 @@ export default function EmbedPage() {
   const [error, setError] = useState<string | null>(null);
   const [allowDownload, setAllowDownload] = useState(false);
   const [tracks, setTracks] = useState<EmbedTrack[]>([]);
-  const [title, setTitle] = useState("");
   const [ownerUsername, setOwnerUsername] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -55,7 +54,6 @@ export default function EmbedPage() {
       .then((d) => {
         setAllowDownload(!!d.allowDownload);
         if (d.album) {
-          setTitle(d.album.name);
           setTracks(
             (d.tracks || []).map((t: any) => ({
               id: t.id,
@@ -67,7 +65,6 @@ export default function EmbedPage() {
             }))
           );
         } else if (d.track) {
-          setTitle(d.track.title);
           setTracks([
             {
               id: d.track.id,

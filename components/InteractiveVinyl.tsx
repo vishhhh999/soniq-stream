@@ -22,7 +22,7 @@ export default function InteractiveVinyl({
   gradientFrom?: string;
   gradientTo?: string;
 }) {
-  const { isPlaying, currentTime, duration, audioRef } = usePlayer();
+  const { isPlaying, duration, audioRef } = usePlayer();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragRotation, setDragRotation] = useState<number | null>(null);
   const dragState = useRef<{ startAngle: number; startTime: number; accumulated: number } | null>(null);

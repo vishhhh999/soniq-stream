@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { usePlayer } from "./PlayerProvider";
 import { useAmbient } from "./AmbientProvider";
 import { useTheme } from "./ThemeProvider";

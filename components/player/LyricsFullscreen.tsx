@@ -20,7 +20,7 @@ export default function LyricsFullscreen({ track, onClose }: { track: Track; onC
   return createPortal(
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[90] bg-canvas flex flex-col relative overflow-hidden"
+      className="fixed inset-0 z-[90] bg-canvas flex flex-col overflow-hidden"
     >
       {/* Ambient gradient wash -- soft accent glow, not the full
           audio-reactive canvas engine (too heavy/distracting for a page

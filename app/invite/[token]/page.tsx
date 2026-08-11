@@ -134,7 +134,7 @@ function CellophaneOverlay({ size, onClick }: { size: number; onClick: () => voi
 }
 
 export default function InvitePage({ params }: { params: { token: string } }) {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   const [info, setInfo] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);

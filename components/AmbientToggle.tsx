@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles, SparklesIcon } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useAmbient } from "./AmbientProvider";
 
 export default function AmbientToggle() {

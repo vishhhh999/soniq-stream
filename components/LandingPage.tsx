@@ -146,7 +146,7 @@ export default function LandingPage() {
           heroParallaxY.set(((e.clientY - r.top) / r.height - 0.5) * 2);
         }}
         onMouseLeave={() => { heroParallaxX.set(0); heroParallaxY.set(0); }}
-        className="relative overflow-hidden bg-gradient-to-b from-[#1a1a1a] to-[#050505] min-h-[calc(100vh-76px)] flex items-center"
+        className="relative overflow-hidden bg-gradient-to-b from-[#1a1a1a] to-[#050505] min-h-[85vh] flex items-center"
       >
         <div className="max-w-5xl mx-auto px-6 py-8 sm:py-10 text-center relative w-full">
           {/* Three discs, side by side, all equally visible -- no fanning,

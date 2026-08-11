@@ -145,13 +145,6 @@ export default function AdjustPanel() {
     setSaving(false);
   };
 
-  const fmt = (s: number) => {
-    if (!s || Number.isNaN(s)) return "0:00";
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60).toString().padStart(2, "0");
-    return `${m}:${sec}`;
-  };
-
   if (!current) return null;
 
   const beatTimes: number[] = [];
