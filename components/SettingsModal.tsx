@@ -500,6 +500,7 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
                           value={usernameDraft}
                           onChange={(e) => setUsernameDraft(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
                           onKeyDown={(e) => e.key === "Enter" && saveUsername()}
+                          aria-label="Username"
                           className="flex-1 bg-surface border border-border rounded-md px-3 py-1.5 text-sm text-primary focus:border-border-strong outline-none"
                         />
                       </div>
@@ -612,6 +613,7 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
                       min={1}
                       max={12}
                       step={0.5}
+                      aria-label="Crossfade duration in seconds"
                       value={crossfadeDuration}
                       onChange={(e) => setCrossfade(true, parseFloat(e.target.value))}
                       className="w-full accent-[var(--accent)]"

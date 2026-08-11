@@ -74,7 +74,7 @@ export default function ShareModal({
         >
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-md font-medium text-primary truncate">Share &ldquo;{title}&rdquo;</h3>
-            <button onClick={onClose} className="text-tertiary hover:text-primary transition-colors shrink-0 ml-3">
+            <button onClick={onClose} aria-label="Close" className="text-tertiary hover:text-primary transition-colors shrink-0 ml-3">
               <X size={18} strokeWidth={1.5} />
             </button>
           </div>
@@ -119,7 +119,7 @@ export default function ShareModal({
           ) : (
             <div className="flex items-center gap-2">
               <input readOnly value={shareUrl} className="flex-1 bg-surface border border-border rounded-md px-3 py-2 text-xs text-secondary" />
-              <button onClick={copy} className="w-9 h-9 flex items-center justify-center rounded-md border border-border hover:border-border-strong shrink-0">
+              <button onClick={copy} aria-label="Copy share link" className="w-9 h-9 flex items-center justify-center rounded-md border border-border hover:border-border-strong shrink-0">
                 {copied ? <Check size={14} className="text-accent" /> : <Link2 size={14} className="text-secondary" />}
               </button>
             </div>

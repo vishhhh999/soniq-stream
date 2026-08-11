@@ -30,7 +30,7 @@ export default function SortableQueueItem({
       style={style}
       className={`flex items-center gap-2 px-2 hover:bg-surface transition-colors ${isCurrent ? "bg-surface" : ""}`}
     >
-      <button {...attributes} {...listeners} className="text-tertiary hover:text-primary cursor-grab active:cursor-grabbing shrink-0 p-1.5 touch-none">
+      <button {...attributes} {...listeners} aria-label="Drag to reorder" className="text-tertiary hover:text-primary cursor-grab active:cursor-grabbing shrink-0 p-1.5 touch-none">
         <GripVertical size={12} strokeWidth={1.5} />
       </button>
       <button onClick={onSelect} className="flex-1 text-left py-2 flex items-center gap-3 min-w-0">

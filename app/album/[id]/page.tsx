@@ -310,6 +310,7 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
                 onChange={(e) => setNameDraft(e.target.value)}
                 onBlur={saveNameEdit}
                 onKeyDown={(e) => e.key === "Enter" && saveNameEdit()}
+                aria-label="Album name"
                 className="text-xl sm:text-2xl font-display font-bold text-primary tracking-tight bg-transparent border-b border-border-strong outline-none w-full"
               />
             ) : (

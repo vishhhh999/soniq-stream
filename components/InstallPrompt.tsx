@@ -104,7 +104,7 @@ export default function InstallPrompt() {
                 <p className="text-xs text-secondary mt-1">Use your browser's menu to add this site to your home screen.</p>
               )}
             </div>
-            <button onClick={dismiss} className="text-tertiary hover:text-primary transition-colors shrink-0">
+            <button onClick={dismiss} aria-label="Dismiss" className="text-tertiary hover:text-primary transition-colors shrink-0">
               <X size={16} strokeWidth={1.5} />
             </button>
           </div>

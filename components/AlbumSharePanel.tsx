@@ -413,7 +413,7 @@ export default function AlbumSharePanel({
                       <div className="px-4 py-3">
                         <div className="flex items-center gap-2 bg-canvas rounded-lg px-3 py-2 mb-3">
                           <p className="text-xs text-secondary truncate flex-1">{inviteUrl}</p>
-                          <button onClick={copyInviteLink} className="shrink-0">
+                          <button onClick={copyInviteLink} aria-label="Copy invite link" className="shrink-0">
                             {copied ? <Check size={14} className="text-accent" /> : <Copy size={14} className="text-tertiary hover:text-primary" />}
                           </button>
                         </div>
@@ -465,7 +465,7 @@ export default function AlbumSharePanel({
                         <>
                           <div className="flex items-center gap-2 bg-canvas rounded-lg px-3 py-2 mb-3">
                             <p className="text-xs text-secondary truncate flex-1">{`${typeof window !== "undefined" ? window.location.origin : ""}/s/${publicLink.token}`}</p>
-                            <button onClick={copyPublicLink} className="shrink-0">
+                            <button onClick={copyPublicLink} aria-label="Copy public link" className="shrink-0">
                               {publicCopied ? <Check size={14} className="text-accent" /> : <Copy size={14} className="text-tertiary hover:text-primary" />}
                             </button>
                           </div>
@@ -634,6 +634,7 @@ export default function AlbumSharePanel({
                       value={inviteExpiry}
                       onChange={(e) => setInviteExpiry(e.target.value)}
                       min={new Date().toISOString().split("T")[0]}
+                      aria-label="Expiry date"
                       className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-primary focus:border-border-strong outline-none"
                     />
                   )}

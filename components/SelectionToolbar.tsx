@@ -98,7 +98,7 @@ export default function SelectionToolbar({
           </div>
         )}
 
-        <button onClick={onClear} className="text-tertiary hover:text-primary transition-colors">
+        <button onClick={onClear} aria-label="Clear selection" className="text-tertiary hover:text-primary transition-colors">
           <X size={16} strokeWidth={1.5} />
         </button>
       </motion.div>

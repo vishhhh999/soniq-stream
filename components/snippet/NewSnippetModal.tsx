@@ -437,6 +437,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
               <input
                 type="range" min={0.5} max={2} step={0.1} value={spinSpeed}
                 onChange={(e) => setSpinSpeed(Number(e.target.value))}
+                aria-label="Spin speed"
                 className="flex-1 accent-[var(--accent)] cursor-pointer"
               />
               <span className="text-[11px] text-tertiary tabular-nums w-8 text-right">{spinSpeed.toFixed(1)}x</span>

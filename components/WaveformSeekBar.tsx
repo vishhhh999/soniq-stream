@@ -55,6 +55,7 @@ export default function WaveformSeekBar({
         step={0.01}
         value={progress}
         onChange={(e) => onSeek(Number(e.target.value))}
+        aria-label="Seek"
         disabled={!duration}
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-default"
       />

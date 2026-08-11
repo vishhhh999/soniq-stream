@@ -23,7 +23,7 @@ export default function SnippetDesktopOnlyModal({ onClose }: { onClose: () => vo
             themselves (Depth Vinyl's dark gradient bg) instead of a flat
             neutral card -- the "bland" screen Vish flagged. */}
         <div className="relative bg-gradient-to-b from-[#1a1a1a] to-[#050505] px-8 pt-10 pb-8 text-center">
-          <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Close" className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors">
             <X size={16} strokeWidth={1.5} />
           </button>
           <div className="w-14 h-14 rounded-full bg-white/8 border border-white/10 flex items-center justify-center mx-auto mb-5">

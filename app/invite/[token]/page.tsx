@@ -347,6 +347,7 @@ export default function InvitePage({ params }: { params: { token: string } }) {
                     {tracksList.length > 1 && (
                       <button
                         onClick={shuffle}
+                        aria-label="Shuffle and play"
                         className="w-10 h-10 rounded-full border border-border text-secondary flex items-center justify-center hover:border-border-strong hover:text-primary transition-colors shrink-0"
                       >
                         <Shuffle size={15} strokeWidth={1.5} />

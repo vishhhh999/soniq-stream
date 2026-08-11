@@ -188,6 +188,7 @@ export default function AdjustPanel() {
           step={0.01}
           value={playbackRate}
           onChange={(e) => setPlaybackRate(Number(e.target.value))}
+          aria-label="Playback speed"
           className="w-full accent-[var(--accent)] cursor-pointer"
         />
         <button
@@ -281,6 +282,7 @@ export default function AdjustPanel() {
         </button>
         <button
           onClick={toggle}
+          aria-label={isPlaying ? "Pause" : "Play"}
           className="w-12 h-12 rounded-full bg-accent text-on-accent flex items-center justify-center hover:bg-accent-strong transition-colors"
         >
           {isPlaying ? <Pause size={18} strokeWidth={2} /> : <Play size={18} strokeWidth={2} className="ml-0.5" />}

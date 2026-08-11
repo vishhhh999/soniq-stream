@@ -35,7 +35,7 @@ function FullScreenView({ title, onBack, children }: { title: string; onBack: ()
       className="fixed inset-0 bg-canvas z-[80] flex flex-col"
     >
       <div className="flex items-center px-4 pt-6 pb-4 shrink-0">
-        <button onClick={onBack} className="text-tertiary p-2 -m-2">
+        <button onClick={onBack} aria-label="Back" className="text-tertiary p-2 -m-2">
           <ChevronLeft size={22} strokeWidth={1.5} />
         </button>
         <span className="flex-1 text-center text-xs uppercase tracking-wide text-tertiary -ml-9">{title}</span>

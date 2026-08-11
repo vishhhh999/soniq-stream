@@ -344,6 +344,7 @@ export default function RecordModal({
                     max={300}
                     value={bpm}
                     onChange={(e) => setBpm(Math.max(40, Math.min(300, Number(e.target.value) || 120)))}
+                    aria-label="BPM"
                     className="w-14 bg-transparent text-sm text-primary outline-none text-center"
                   />
                   <span className="text-xs text-tertiary">BPM</span>

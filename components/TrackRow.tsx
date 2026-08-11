@@ -154,6 +154,7 @@ function Row({
         <button
           ref={dotButtonRef}
           onClick={openMenu}
+          aria-label="Track options"
           className={`text-tertiary hover:text-primary transition-opacity p-1 -m-1 ${
             isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           }`}

@@ -186,19 +186,20 @@ export default function EmbedPage() {
 
       <div className="flex items-center gap-2">
         {tracks.length > 1 && (
-          <button onClick={() => skip(-1)} className="text-white/50 hover:text-white transition-colors shrink-0">
+          <button onClick={() => skip(-1)} aria-label="Previous track" className="text-white/50 hover:text-white transition-colors shrink-0">
             <SkipBack size={14} strokeWidth={1.5} />
           </button>
         )}
         <button
           onClick={toggle}
+          aria-label={isPlaying ? "Pause" : "Play"}
           className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
           style={{ backgroundColor: "#e8650a" }}
         >
           {isPlaying ? <Pause size={12} strokeWidth={2} className="text-white" /> : <Play size={12} strokeWidth={2} className="text-white ml-0.5" />}
         </button>
         {tracks.length > 1 && (
-          <button onClick={() => skip(1)} className="text-white/50 hover:text-white transition-colors shrink-0">
+          <button onClick={() => skip(1)} aria-label="Next track" className="text-white/50 hover:text-white transition-colors shrink-0">
             <SkipForward size={14} strokeWidth={1.5} />
           </button>
         )}
@@ -231,6 +232,7 @@ export default function EmbedPage() {
             step={0.01}
             value={currentTime}
             onChange={(e) => seek(Number(e.target.value))}
+            aria-label="Seek"
             disabled={!duration}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           />

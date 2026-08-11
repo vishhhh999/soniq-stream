@@ -360,6 +360,7 @@ export default function TrackDetail({
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  aria-label="Track title"
                   onBlur={() => {
                     const t = title.trim();
                     if (t && t !== track.title) saveField({ title: t });
@@ -478,7 +479,7 @@ export default function TrackDetail({
                   ) : (
                     <div className="space-y-4">
                       <div className="flex items-center gap-2">
-                        <input readOnly value={shareUrl} className="flex-1 bg-canvas border border-border rounded-md px-3 py-2.5 text-xs text-secondary" />
+                        <input readOnly value={shareUrl} aria-label="Share link" className="flex-1 bg-canvas border border-border rounded-md px-3 py-2.5 text-xs text-secondary" />
                         <button onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); triggerFeedback("tap"); setTimeout(() => setCopied(false), 1500); }} className="w-9 h-9 flex items-center justify-center rounded-md border border-border hover:border-border-strong shrink-0">
                           {copied ? <Check size={13} className="text-accent" /> : <Link2 size={13} className="text-secondary" />}
                         </button>
@@ -522,11 +523,11 @@ export default function TrackDetail({
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
                       <label className="text-xs text-tertiary mb-1.5 block">BPM</label>
-                      <input value={bpm} onChange={(e) => setBpm(e.target.value === "" ? "" : Number(e.target.value))} onBlur={() => saveField({ bpm: bpm === "" ? null : Number(bpm) })} type="number" className="w-full bg-canvas border border-border rounded-md px-3 py-2 text-sm text-primary focus:border-border-strong outline-none" placeholder="—" />
+                      <input value={bpm} onChange={(e) => setBpm(e.target.value === "" ? "" : Number(e.target.value))} onBlur={() => saveField({ bpm: bpm === "" ? null : Number(bpm) })} type="number" aria-label="BPM" className="w-full bg-canvas border border-border rounded-md px-3 py-2 text-sm text-primary focus:border-border-strong outline-none" placeholder="—" />
                     </div>
                     <div>
                       <label className="text-xs text-tertiary mb-1.5 block">Key</label>
-                      <input value={key} onChange={(e) => setKey(e.target.value)} onBlur={() => saveField({ key: key || null })} className="w-full bg-canvas border border-border rounded-md px-3 py-2 text-sm text-primary focus:border-border-strong outline-none" placeholder="e.g. A min" />
+                      <input value={key} onChange={(e) => setKey(e.target.value)} onBlur={() => saveField({ key: key || null })} aria-label="Musical key" className="w-full bg-canvas border border-border rounded-md px-3 py-2 text-sm text-primary focus:border-border-strong outline-none" placeholder="e.g. A min" />
                     </div>
                   </div>
                   <button onClick={runDetection} disabled={detecting} className="text-xs text-secondary border border-border rounded-md px-3 py-1.5 hover:border-border-strong hover:text-primary transition-colors disabled:opacity-50">
