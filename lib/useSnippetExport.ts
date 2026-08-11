@@ -31,6 +31,7 @@ interface ExportOptions {
   spinSpeed: number; // multiplier on the base rotation rate, 0.5x-2x
   textColor: TextColor;
   durationColor: TextColor;
+  showTrackTitle: boolean;
 }
 
 // Reverted to client-side rendering (v8.15.0) after the server-render path
@@ -142,6 +143,7 @@ export function useSnippetExport() {
           t, duration, progress: t / duration,
           frequencyData: getFrequencyData(),
           trackTitle: opts.trackTitle,
+          showTrackTitle: opts.showTrackTitle,
           albumArt, vinylImages: { white, black, orange },
           discColor: opts.discColor, gradient: opts.gradient, useAlbumArt: opts.useAlbumArt,
           spinSpeed: opts.spinSpeed,

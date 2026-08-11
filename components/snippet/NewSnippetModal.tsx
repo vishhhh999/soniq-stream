@@ -26,6 +26,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
   const [spinSpeed, setSpinSpeed] = useState(1);
   const [textColor, setTextColor] = useState<TextColor>("light");
   const [durationColor, setDurationColor] = useState<TextColor>("light");
+  const [showTrackTitle, setShowTrackTitle] = useState(false);
   const [trimStart, setTrimStart] = useState(0);
   const [trackDuration, setTrackDuration] = useState(track.durationSec ?? MAX_SNIPPET_SEC);
   const [trimEnd, setTrimEndState] = useState(Math.min(MAX_SNIPPET_SEC, track.durationSec ?? MAX_SNIPPET_SEC));
@@ -148,6 +149,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
         t: elapsed, duration: segDuration, progress: elapsed / segDuration,
         frequencyData: getPreviewFrequencyData(),
         trackTitle: track.title,
+        showTrackTitle,
         albumArt: useAlbumArt ? albumArtImgRef.current : null,
         vinylImages, discColor, gradient, useAlbumArt,
         spinSpeed,
@@ -170,7 +172,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       previewAnalyserCtxRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateId, discColor, gradient, useAlbumArt, trimStart, trimEnd, muted, spinSpeed, textColor, durationColor, track.id]);
+  }, [templateId, discColor, gradient, useAlbumArt, trimStart, trimEnd, muted, spinSpeed, textColor, durationColor, showTrackTitle, track.id]);
 
   // Play/pause toggle for the preview -- separate effect so toggling it
   // doesn't tear down and rebuild the whole draw loop (which would restart
@@ -202,6 +204,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       templateId, discColor, gradient, useAlbumArt,
       albumArtUrl: track.albumCoverUrl ?? null,
       trackTitle: track.title,
+      showTrackTitle,
       trimStart, trimEnd,
       trackDuration,
       audioUrl: track.fileUrl,
@@ -329,57 +332,61 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       </div>
 
       {/* Options: disc color / gradient / spin speed / album art toggle --
-          grouped into a card matching AdjustPanel/EQPanel's bg-canvas
-          block style, instead of a loose stack of rows that read as
-          visually disconnected from the rest of the app. Disabled during
-          export for the same reason as the template carousel above. */}
+          2-column layout at sm+ widths (disc + background on the left,
+          text + duration on the right) instead of a single full-width
+          stack, which left the entire right half of the dialog empty on
+          anything wider than a phone. Spin speed, album art, and the title
+          toggle stay full-width below since they're conditional rows, not
+          part of the fixed 4-item color grid. */}
       <div className={`px-6 pt-2 pb-4 shrink-0 transition-opacity ${exportState.exporting ? "opacity-40 pointer-events-none" : ""}`}>
         <div className="bg-elevated border border-border rounded-xl p-4 space-y-3">
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-tertiary w-16 shrink-0">Disc</span>
-            {(["black", "white", "orange"] as DiscColor[]).map((c) => (
-              <button
-                key={c}
-                onClick={() => setDiscColor(c)}
-                className={`w-7 h-7 rounded-full border-2 transition-colors ${discColor === c ? "border-accent" : "border-transparent"}`}
-                style={{ background: c === "black" ? "#111" : c === "white" ? "#eee" : "#e8650a" }}
-              />
-            ))}
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-tertiary w-16 shrink-0">Background</span>
-            {(["dark", "light", "orange"] as GradientChoice[]).map((g) => (
-              <button
-                key={g}
-                onClick={() => setGradient(g)}
-                className={`w-7 h-7 rounded-full border-2 transition-colors capitalize ${gradient === g ? "border-accent" : "border-transparent"}`}
-                style={{ background: g === "dark" ? "#111" : g === "light" ? "#e5e0d8" : "#ff8a3d" }}
-              />
-            ))}
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-tertiary w-16 shrink-0">Text</span>
-            {(["dark", "light", "orange"] as TextColor[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTextColor(t)}
-                title={t}
-                className={`w-7 h-7 rounded-full border-2 transition-colors capitalize ${textColor === t ? "border-accent" : "border-transparent"}`}
-                style={{ background: TEXT_COLOR_HEX[t] }}
-              />
-            ))}
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-tertiary w-16 shrink-0">Duration</span>
-            {(["dark", "light", "orange"] as TextColor[]).map((d) => (
-              <button
-                key={d}
-                onClick={() => setDurationColor(d)}
-                title={d}
-                className={`w-7 h-7 rounded-full border-2 transition-colors capitalize ${durationColor === d ? "border-accent" : "border-transparent"}`}
-                style={{ background: TEXT_COLOR_HEX[d] }}
-              />
-            ))}
+          <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3">
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-tertiary w-16 shrink-0">Disc</span>
+              {(["black", "white", "orange"] as DiscColor[]).map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setDiscColor(c)}
+                  className={`w-7 h-7 rounded-full border-2 transition-colors ${discColor === c ? "border-accent" : "border-transparent"}`}
+                  style={{ background: c === "black" ? "#111" : c === "white" ? "#eee" : "#e8650a" }}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-tertiary w-16 shrink-0">Text</span>
+              {(["dark", "light", "orange"] as TextColor[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTextColor(t)}
+                  title={t}
+                  className={`w-7 h-7 rounded-full border-2 transition-colors capitalize ${textColor === t ? "border-accent" : "border-transparent"}`}
+                  style={{ background: TEXT_COLOR_HEX[t] }}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-tertiary w-16 shrink-0">Background</span>
+              {(["dark", "light", "orange"] as GradientChoice[]).map((g) => (
+                <button
+                  key={g}
+                  onClick={() => setGradient(g)}
+                  className={`w-7 h-7 rounded-full border-2 transition-colors capitalize ${gradient === g ? "border-accent" : "border-transparent"}`}
+                  style={{ background: g === "dark" ? "#111" : g === "light" ? "#e5e0d8" : "#ff8a3d" }}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-tertiary w-16 shrink-0">Duration</span>
+              {(["dark", "light", "orange"] as TextColor[]).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDurationColor(d)}
+                  title={d}
+                  className={`w-7 h-7 rounded-full border-2 transition-colors capitalize ${durationColor === d ? "border-accent" : "border-transparent"}`}
+                  style={{ background: TEXT_COLOR_HEX[d] }}
+                />
+              ))}
+            </div>
           </div>
           {selectedMeta.supportsAlbumArt && (
             <div className="flex items-center gap-3">
@@ -396,6 +403,12 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
             <label className="flex items-center gap-2 text-[11px] text-tertiary pt-1">
               <input type="checkbox" checked={useAlbumArt} onChange={(e) => setUseAlbumArt(e.target.checked)} className="accent-[var(--accent)]" />
               Overlay album art on label
+            </label>
+          )}
+          {selectedMeta.supportsTitleToggle && (
+            <label className="flex items-center gap-2 text-[11px] text-tertiary pt-1">
+              <input type="checkbox" checked={showTrackTitle} onChange={(e) => setShowTrackTitle(e.target.checked)} className="accent-[var(--accent)]" />
+              Show track name (duration only by default)
             </label>
           )}
         </div>

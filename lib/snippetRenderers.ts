@@ -34,10 +34,6 @@ function drawVinyl(
   ctx.rotate(rotation);
 
   if (useAlbumArt && albumArt) {
-    // Album art drawn first, clipped to the label circle, so the disc PNG's
-    // own translucent label area composites on top of it naturally (the
-    // asset's label is a light card color, not fully opaque white, which
-    // is why this order — art under label — reads correctly).
     const labelRadius = radius * 0.3;
     ctx.save();
     ctx.beginPath();
@@ -51,10 +47,19 @@ function drawVinyl(
   ctx.restore();
 }
 
-// Title and duration are drawn as two separate entities now, not one block
-// with the duration hanging directly off the title -- separate color,
-// separate vertical rhythm (more breathing room between them), separate
-// font treatment.
+// Rounded-rect path, built from arcTo since that's what Canvas2DLike
+// actually exposes — used by Pulse Grid's bars.
+function roundRectPath(ctx: SnippetRenderContext["ctx"], x: number, y: number, w: number, h: number, r: number) {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
 function drawTitle(rc: SnippetRenderContext, x: number, y: number, align: "left" | "center" | "right" = "center") {
   const { ctx, trackTitle, textColor } = rc;
   ctx.textAlign = align;
@@ -63,51 +68,67 @@ function drawTitle(rc: SnippetRenderContext, x: number, y: number, align: "left"
   ctx.fillText(trackTitle, x, y);
 }
 
+// Duration is now the sole identifying text on every template except
+// Depth Vinyl with its title toggle on — bumped from 22px to 28px
+// (roughly the midpoint between the old 22px duration and 34px title) so
+// it carries the visual weight the title used to.
 function drawDuration(rc: SnippetRenderContext, x: number, y: number, align: "left" | "center" | "right" = "center") {
   const { ctx, t, trimStartAbs, trackDurationAbs, durationColor } = rc;
   ctx.textAlign = align;
-  ctx.font = "400 22px 'General Sans', sans-serif";
+  ctx.font = "500 28px 'General Sans', sans-serif";
   ctx.fillStyle = TEXT_COLOR_HEX[durationColor];
-  ctx.filter = "opacity(0.65)";
+  ctx.filter = "opacity(0.7)";
   ctx.fillText(`${fmtDuration(trimStartAbs + t)} / ${fmtDuration(trackDurationAbs)}`, x, y);
   ctx.filter = "none";
 }
 
-// Convenience wrapper for the templates that just want both, stacked --
-// duration sits further below the title now (48px gap, was 32px) so it
-// reads as its own line rather than a caption glued to the title.
+// Title (only when a template opts in and it's toggled on) + duration,
+// stacked. When title is off, duration alone sits vertically centered in
+// the same footprint this block would have occupied, so switching the
+// toggle doesn't jump the whole composition around.
 function drawTrackInfo(rc: SnippetRenderContext, x: number, y: number, align: "left" | "center" | "right" = "center") {
-  drawTitle(rc, x, y, align);
-  drawDuration(rc, x, y + 48, align);
+  if (rc.showTrackTitle) {
+    drawTitle(rc, x, y, align);
+    drawDuration(rc, x, y + 52, align);
+  } else {
+    drawDuration(rc, x, y + 18, align);
+  }
 }
 
 // ── Free templates ──────────────────────────────────────────────────────
 
-// Vinyl rises from the bottom edge, mostly off-frame, rotating — reference
-// image 2's layout, rebuilt with our own asset instead of theirs.
+// Vinyl rises from the bottom edge, mostly off-frame, rotating.
 export function renderVinylRise(rc: SnippetRenderContext) {
-  const { ctx, width, height, t } = rc;
+  const { width, height, t } = rc;
   drawBackground(rc);
   const radius = width * 0.62;
   drawVinyl(rc, width / 2, height - radius * 0.35, radius, t);
   drawTrackInfo(rc, width / 2, height * 0.16);
 }
 
-// Vinyl anchored at the left edge, mostly off-frame — reference image 10's
-// layout.
+// Vinyl Edge — disc's center sits exactly on the left border (not just
+// near it), which opens up real room on the right instead of the disc
+// eating half the frame. Duration lives in that opened-up space, centered
+// between the disc's right edge and the frame's right border, at the same
+// vertical height as the disc's own center — reads as a deliberate two-zone
+// layout (disc left, info right) rather than a disc with a caption
+// underneath.
 export function renderVinylEdge(rc: SnippetRenderContext) {
-  const { ctx, width, height, t } = rc;
+  const { width, height, t } = rc;
   drawBackground(rc);
   const radius = height * 0.34;
-  drawVinyl(rc, radius * 0.25, height / 2, radius, t);
-  drawTrackInfo(rc, width / 2, height * 0.91);
+  const cx = 0;
+  const cy = height / 2;
+  drawVinyl(rc, cx, cy, radius, t);
+  const textX = (radius + width) / 2;
+  drawDuration(rc, textX, cy, "center");
 }
 
 // ── Premium templates ───────────────────────────────────────────────────
 
 // Flagship: centered vinyl with real depth — drop shadow, subtle scale
-// breathing, this is the one built around the photoreal asset quality
-// rather than vector tricks.
+// breathing. The only template where the title is available at all,
+// off by default (duration-only, matching everything else) but toggleable.
 export function renderDepthVinyl(rc: SnippetRenderContext) {
   const { ctx, width, height, t } = rc;
   drawBackground(rc);
@@ -115,7 +136,6 @@ export function renderDepthVinyl(rc: SnippetRenderContext) {
   const cx = width / 2;
   const cy = height * 0.42;
 
-  // Soft ambient shadow beneath the disc for depth.
   ctx.save();
   ctx.beginPath();
   ctx.ellipse(cx, cy + radius * 0.92, radius * 0.8, radius * 0.18, 0, 0, Math.PI * 2);
@@ -124,8 +144,6 @@ export function renderDepthVinyl(rc: SnippetRenderContext) {
   ctx.fill();
   ctx.restore();
 
-  // Gentle breathing scale — not a spin-only effect, gives the "expensive"
-  // feel the concept was scoped around rather than a flat rotation.
   const breathe = 1 + Math.sin(t * 1.3) * 0.015;
   ctx.save();
   ctx.translate(cx, cy);
@@ -137,89 +155,136 @@ export function renderDepthVinyl(rc: SnippetRenderContext) {
   drawTrackInfo(rc, width / 2, height * 0.86);
 }
 
-// Audio-reactive bar grid — live frequency data drives each bar's height,
-// orange accent picks out the loudest bins against a monochrome base.
+// Pulse Grid v2 — "Mirrored Skyline". Bars rise from a center baseline with
+// a faded reflection below (instead of a flat bottom-anchored EQ, which
+// read as basic and static-looking even with live data), rounded caps,
+// loud bins pick out the accent color against a translucent white base.
 export function renderPulseGrid(rc: SnippetRenderContext) {
-  const { ctx, width, height, frequencyData } = rc;
+  const { width, height, frequencyData } = rc;
+  const ctx = rc.ctx;
   drawBackground(rc);
 
-  const barCount = 40;
-  const gap = 6;
+  const barCount = 32;
+  const gap = 8;
   const barWidth = (width - gap * (barCount + 1)) / barCount;
-  const baseY = height * 0.6;
-  const maxBarHeight = height * 0.32;
+  const baseY = height * 0.5;
+  const maxBarHeight = height * 0.26;
 
   for (let i = 0; i < barCount; i++) {
     const dataIndex = frequencyData ? Math.floor((i / barCount) * frequencyData.length) : 0;
-    const amp = frequencyData ? frequencyData[dataIndex] / 255 : 0.15 + Math.random() * 0.05;
-    const h = Math.max(6, amp * maxBarHeight);
+    const amp = frequencyData ? frequencyData[dataIndex] / 255 : 0.2 + 0.15 * Math.sin(i * 0.4);
+    const h = Math.max(8, amp * maxBarHeight);
     const x = gap + i * (barWidth + gap);
-    const isLoud = amp > 0.7;
-    ctx.fillStyle = isLoud ? "#ff8a3d" : "rgba(255,255,255,0.5)";
-    ctx.fillRect(x, baseY - h, barWidth, h);
+    const isLoud = amp > 0.65;
+    const r = barWidth / 2;
+    const color = isLoud ? "#ff8a3d" : "rgba(255,255,255,0.55)";
+
+    roundRectPath(ctx, x, baseY - h, barWidth, h, r);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    ctx.save();
+    ctx.filter = "opacity(0.22)";
+    roundRectPath(ctx, x, baseY, barWidth, h * 0.55, r);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.restore();
   }
 
-  drawTrackInfo(rc, width * 0.08, height * 0.78, "left");
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, baseY);
+  ctx.lineTo(width, baseY);
+  ctx.stroke();
+  ctx.restore();
+
+  drawDuration(rc, width / 2, height * 0.86);
 }
 
-// Track title as the visual hero, waveform-shaped underline beneath it.
-// No vinyl at all — deliberately the odd one out in the set.
+// Frequency Bloom (was "Type Wave") — the old concept was built entirely
+// around rendering the track title as giant hero text, which stops making
+// sense with title removed by default. Rebuilt as a radial spectrum: bars
+// fan out from a center medallion in a full circle, audio-reactive,
+// rotating slowly, with the loudest bins picked out in accent. This is the
+// one template built to feel alive with sound rather than around text.
 export function renderTypeWave(rc: SnippetRenderContext) {
-  const { ctx, width, height, trackTitle, textColor, frequencyData } = rc;
-  drawBackground(rc);
-
-  ctx.textAlign = "center";
-  ctx.fillStyle = TEXT_COLOR_HEX[textColor];
-  ctx.font = "700 64px 'General Sans', sans-serif";
-  // Simple word-wrap for longer titles rather than letting them overflow.
-  const words = trackTitle.split(" ");
-  const lines: string[] = [];
-  let line = "";
-  for (const w of words) {
-    const test = line ? `${line} ${w}` : w;
-    if (ctx.measureText(test).width > width * 0.82 && line) { lines.push(line); line = w; }
-    else line = test;
-  }
-  if (line) lines.push(line);
-  const startY = height * 0.42 - (lines.length - 1) * 36;
-  lines.forEach((l, i) => ctx.fillText(l, width / 2, startY + i * 72));
-
-  // Duration as its own entity -- own color, pushed further down (36px gap,
-  // was 20px) so it reads as a separate line rather than a caption glued
-  // to the title.
-  drawDuration(rc, width / 2, startY + lines.length * 72 + 36);
-
-  // Waveform-shaped underline, audio-reactive when data is available.
-  const wfY = startY + lines.length * 72 + 80;
-  const barCount = 44;
-  const barGap = (width * 0.7) / barCount;
-  const startX = width * 0.15;
-  ctx.strokeStyle = "#ff8a3d";
-  ctx.lineWidth = 3;
-  ctx.lineCap = "round";
-  for (let i = 0; i < barCount; i++) {
-    const dataIndex = frequencyData ? Math.floor((i / barCount) * frequencyData.length) : 0;
-    const amp = frequencyData ? frequencyData[dataIndex] / 255 : 0.3 + 0.2 * Math.sin(i * 0.5);
-    const h = Math.max(4, amp * 40);
-    const x = startX + i * barGap;
-    ctx.beginPath();
-    ctx.moveTo(x, wfY - h / 2);
-    ctx.lineTo(x, wfY + h / 2);
-    ctx.stroke();
-  }
-}
-
-// Small particles orbit the (static, sharp) album art — the one template
-// where the art itself doesn't move, everything moves around it instead.
-export function renderOrbit(rc: SnippetRenderContext) {
-  const { ctx, width, height, t, albumArt } = rc;
+  const { width, height, t, frequencyData } = rc;
+  const ctx = rc.ctx;
   drawBackground(rc);
 
   const cx = width / 2;
   const cy = height * 0.42;
-  const artSize = width * 0.5;
+  const innerRadius = width * 0.16;
+  const maxBarLen = width * 0.24;
+  const barCount = 64;
+  const rotation = t * 0.15;
 
-  // Static, sharp album art (or a neutral placeholder square if none).
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(rotation);
+  for (let i = 0; i < barCount; i++) {
+    const angle = (i / barCount) * Math.PI * 2;
+    const dataIndex = frequencyData ? Math.floor((i / barCount) * frequencyData.length) : 0;
+    const amp = frequencyData ? frequencyData[dataIndex] / 255 : 0.25 + 0.15 * Math.sin(i * 0.3 + t * 2);
+    const len = Math.max(6, amp * maxBarLen);
+    const isLoud = amp > 0.65;
+    const x0 = Math.cos(angle) * innerRadius;
+    const y0 = Math.sin(angle) * innerRadius;
+    const x1 = Math.cos(angle) * (innerRadius + len);
+    const y1 = Math.sin(angle) * (innerRadius + len);
+    ctx.strokeStyle = isLoud ? "#ff8a3d" : "rgba(255,255,255,0.5)";
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Center medallion — solid gradient disc, deliberately not the vinyl
+  // asset (this template's whole point is being the non-vinyl option).
+  const grad = ctx.createLinearGradient(cx - innerRadius, cy - innerRadius, cx + innerRadius, cy + innerRadius);
+  grad.addColorStop(0, "#2a2a2a");
+  grad.addColorStop(1, "#0a0a0a");
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  drawDuration(rc, width / 2, height * 0.82);
+}
+
+// Orbit v2 — the static album-art centerpiece stays (that part worked),
+// rebuilt with three concentric rings instead of one, each with its own
+// speed/direction/dot size, plus a soft ambient glow and an audio-reactive
+// wobble driven by the average frequency amplitude, so it's not just dots
+// moving at a fixed rate regardless of what's playing.
+export function renderOrbit(rc: SnippetRenderContext) {
+  const { width, height, t, albumArt, frequencyData } = rc;
+  const ctx = rc.ctx;
+  drawBackground(rc);
+
+  const cx = width / 2;
+  const cy = height * 0.42;
+  const artSize = width * 0.46;
+
+  ctx.save();
+  const glow = ctx.createLinearGradient(cx - artSize, cy - artSize, cx + artSize, cy + artSize);
+  glow.addColorStop(0, "rgba(255,138,61,0.28)");
+  glow.addColorStop(1, "rgba(255,138,61,0)");
+  ctx.beginPath();
+  ctx.arc(cx, cy, artSize * 0.95, 0, Math.PI * 2);
+  ctx.fillStyle = glow;
+  ctx.filter = "blur(30px)";
+  ctx.fill();
+  ctx.restore();
+
   ctx.save();
   const r = 24;
   ctx.beginPath();
@@ -238,22 +303,35 @@ export function renderOrbit(rc: SnippetRenderContext) {
   }
   ctx.restore();
 
-  // Orbiting dots — count/speed loosely tied to a pleasant default since
-  // BPM may not be available at render time; kept deliberately simple.
-  const dotCount = 10;
-  const orbitRadius = artSize * 0.72;
-  for (let i = 0; i < dotCount; i++) {
-    const angle = (i / dotCount) * Math.PI * 2 + t * 0.6;
-    const x = cx + Math.cos(angle) * orbitRadius;
-    const y = cy + Math.sin(angle) * orbitRadius * 0.94;
-    const isAccent = i % 3 === 0;
-    ctx.beginPath();
-    ctx.arc(x, y, isAccent ? 6 : 4, 0, Math.PI * 2);
-    ctx.fillStyle = isAccent ? "#ff8a3d" : "rgba(255,255,255,0.7)";
-    ctx.fill();
+  let avgAmp = 0.3;
+  if (frequencyData && frequencyData.length) {
+    let sum = 0;
+    for (let i = 0; i < frequencyData.length; i++) sum += frequencyData[i];
+    avgAmp = sum / frequencyData.length / 255;
   }
 
-  drawTrackInfo(rc, width / 2, height * 0.86);
+  const rings = [
+    { radius: artSize * 0.68, count: 8, speed: 0.6, size: 5 },
+    { radius: artSize * 0.94, count: 12, speed: -0.35, size: 3.5 },
+    { radius: artSize * 1.2, count: 16, speed: 0.22, size: 2.5 },
+  ];
+
+  rings.forEach((ring, ringIdx) => {
+    for (let i = 0; i < ring.count; i++) {
+      const angle = (i / ring.count) * Math.PI * 2 + t * ring.speed;
+      const wobble = 1 + avgAmp * 0.15;
+      const x = cx + Math.cos(angle) * ring.radius * wobble;
+      const y = cy + Math.sin(angle) * ring.radius * 0.94 * wobble;
+      const isAccent = (i + ringIdx) % 4 === 0;
+      const dotSize = (isAccent ? ring.size * 1.4 : ring.size) * (1 + avgAmp * 0.3);
+      ctx.beginPath();
+      ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+      ctx.fillStyle = isAccent ? "#ff8a3d" : `rgba(255,255,255,${Math.max(0.25, 0.75 - ringIdx * 0.15)})`;
+      ctx.fill();
+    }
+  });
+
+  drawDuration(rc, width / 2, height * 0.86);
 }
 
 export const TEMPLATE_RENDERERS: Record<string, (rc: SnippetRenderContext) => void> = {

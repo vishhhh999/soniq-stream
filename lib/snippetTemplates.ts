@@ -37,15 +37,20 @@ export interface SnippetTemplateMeta {
   // toggle. Vinyl-based templates do; the others don't feature a disc at
   // all, so the option doesn't apply.
   supportsAlbumArt: boolean;
+  // Whether this template can show the track title at all. Title is
+  // removed everywhere by default now (duration alone is the identifying
+  // text on every template) -- Depth Vinyl is the one exception, where it's
+  // an opt-in toggle, off by default.
+  supportsTitleToggle: boolean;
 }
 
 export const SNIPPET_TEMPLATES: SnippetTemplateMeta[] = [
-  { id: "vinyl-rise", name: "Vinyl Rise", premium: false, supportsAlbumArt: true },
-  { id: "vinyl-edge", name: "Vinyl Edge", premium: false, supportsAlbumArt: true },
-  { id: "depth-vinyl", name: "Depth Vinyl", premium: true, supportsAlbumArt: true },
-  { id: "pulse-grid", name: "Pulse Grid", premium: true, supportsAlbumArt: false },
-  { id: "type-wave", name: "Type Wave", premium: true, supportsAlbumArt: false },
-  { id: "orbit", name: "Orbit", premium: true, supportsAlbumArt: false },
+  { id: "vinyl-rise", name: "Vinyl Rise", premium: false, supportsAlbumArt: true, supportsTitleToggle: false },
+  { id: "vinyl-edge", name: "Vinyl Edge", premium: false, supportsAlbumArt: true, supportsTitleToggle: false },
+  { id: "depth-vinyl", name: "Depth Vinyl", premium: true, supportsAlbumArt: true, supportsTitleToggle: true },
+  { id: "pulse-grid", name: "Pulse Grid", premium: true, supportsAlbumArt: false, supportsTitleToggle: false },
+  { id: "type-wave", name: "Frequency Bloom", premium: true, supportsAlbumArt: false, supportsTitleToggle: false },
+  { id: "orbit", name: "Orbit", premium: true, supportsAlbumArt: true, supportsTitleToggle: false },
 ];
 
 // Loosely typed so the exact same renderer functions could in principle
@@ -90,6 +95,7 @@ export interface SnippetRenderContext {
   progress: number; // t / duration, 0-1
   frequencyData: Uint8Array | null; // live analyser data, may be null before first frame
   trackTitle: string;
+  showTrackTitle: boolean; // off by default everywhere; Depth Vinyl is the only template that exposes this as a toggle
   albumArt: any | null; // HTMLImageElement (browser) or napi-rs Image (server); null if no cover or opted out
   vinylImages: Record<DiscColor, any>;
   discColor: DiscColor;
