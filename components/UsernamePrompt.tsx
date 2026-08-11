@@ -56,7 +56,7 @@ export default function UsernamePrompt() {
 
   return (
     <div className="fixed inset-0 backdrop-ambient-60 z-50 flex items-center justify-center px-6">
-      <div className="bg-elevated border border-border rounded-xl p-8 w-full max-w-sm">
+      <div className="bg-elevated border border-border rounded-2xl p-8 w-full max-w-sm">
         {done ? (
           <div className="text-center">
             <p className="text-primary font-medium">You're all set.</p>
@@ -87,7 +87,7 @@ export default function UsernamePrompt() {
               <button
                 type="submit"
                 disabled={busy || username.length < 3}
-                className="w-full bg-accent text-on-accent text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50 mb-3"
+                className="w-full bg-accent text-on-accent text-sm font-medium py-3 rounded-full hover:bg-accent-strong transition-colors disabled:opacity-50 mb-3"
               >
                 {busy ? "Saving..." : "Set username"}
               </button>

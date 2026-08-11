@@ -28,7 +28,7 @@ export default function CreateFolderModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
           transition={MODAL_SPRING}
-          className="bg-elevated border border-border rounded-lg w-full max-w-sm p-6"
+          className="bg-elevated border border-border rounded-2xl w-full max-w-sm p-6"
           onClick={(e) => e.stopPropagation()}
         >
           <h3 className="text-md font-medium text-primary mb-2">Create a folder?</h3>
@@ -39,7 +39,7 @@ export default function CreateFolderModal({
           <div className="flex items-center gap-3">
             <button
               onClick={onConfirm}
-              className="flex-1 bg-accent text-on-accent text-sm font-medium py-2.5 rounded-md hover:bg-accent-strong transition-colors"
+              className="flex-1 bg-accent text-on-accent text-sm font-medium py-2.5 rounded-full hover:bg-accent-strong transition-colors"
             >
               Create folder
             </button>

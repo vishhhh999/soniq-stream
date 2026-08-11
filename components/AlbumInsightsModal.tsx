@@ -71,7 +71,7 @@ export default function AlbumInsightsModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
           transition={MODAL_SPRING}
-          className="bg-elevated border border-border rounded-lg w-full max-w-sm max-h-[85vh] overflow-y-auto no-scrollbar"
+          className="bg-elevated border border-border rounded-2xl w-full max-w-sm max-h-[85vh] overflow-y-auto no-scrollbar"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-6 py-5 border-b border-border">

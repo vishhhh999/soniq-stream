@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useSession } from "next-auth/react";
 import {
   FolderOpen, Share2, GitBranch, Bell, Users, BarChart3, Sparkles, Music2, ShieldCheck,
@@ -54,6 +54,22 @@ const FEATURES = [
 ];
 
 export default function LandingPage() {
+  // Cursor-reactive parallax for the hero's three-disc fan -- raw pointer
+  // position feeds a spring per disc, each with its own stiffness/range, so
+  // the back two discs drift less than the front one and the whole stack
+  // reads as genuinely layered rather than three flat images moving in
+  // lockstep. Deliberately NOT scroll-driven; this is a "the discs are
+  // alive" effect, independent of where you are on the page.
+  const heroParallaxX = useMotionValue(0);
+  const heroParallaxY = useMotionValue(0);
+  const springCfg = { stiffness: 60, damping: 14, mass: 0.6 };
+  const blackX = useSpring(useTransform(heroParallaxX, (v) => v * 6), springCfg);
+  const blackY = useSpring(useTransform(heroParallaxY, (v) => v * 6), springCfg);
+  const whiteX = useSpring(useTransform(heroParallaxX, (v) => v * 14), springCfg);
+  const whiteY = useSpring(useTransform(heroParallaxY, (v) => v * 14), springCfg);
+  const orangeX = useSpring(useTransform(heroParallaxX, (v) => v * 20), springCfg);
+  const orangeY = useSpring(useTransform(heroParallaxY, (v) => v * 20), springCfg);
+
   // Previously this component only ever rendered for logged-out visitors
   // (app/page.tsx redirected anyone signed in straight to the library), so
   // every CTA on the page unconditionally pointed at sign-in/sign-up. Now
@@ -74,7 +90,7 @@ export default function LandingPage() {
           {isAuthed ? (
             <Link
               href="/"
-              className="text-sm font-medium bg-accent text-on-accent px-4 py-2 rounded-md hover:bg-accent-strong transition-colors"
+              className="text-sm font-medium bg-accent text-on-accent px-4 py-2 rounded-full hover:bg-accent-strong transition-colors"
             >
               Go to your library
             </Link>
@@ -88,7 +104,7 @@ export default function LandingPage() {
               </Link>
               <Link
                 href="/setup"
-                className="text-sm font-medium bg-accent text-on-accent px-4 py-2 rounded-md hover:bg-accent-strong transition-colors"
+                className="text-sm font-medium bg-accent text-on-accent px-4 py-2 rounded-full hover:bg-accent-strong transition-colors"
               >
                 Get started
               </Link>
@@ -102,17 +118,48 @@ export default function LandingPage() {
           shadow), using the real canonical brand asset instead of a stock
           photo or an illustration. This is the "push the same visual
           direction into the landing page" pass. */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-[#1a1a1a] to-[#050505]">
+      <section
+        onMouseMove={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          heroParallaxX.set(((e.clientX - r.left) / r.width - 0.5) * 2);
+          heroParallaxY.set(((e.clientY - r.top) / r.height - 0.5) * 2);
+        }}
+        onMouseLeave={() => { heroParallaxX.set(0); heroParallaxY.set(0); }}
+        className="relative overflow-hidden bg-gradient-to-b from-[#1a1a1a] to-[#050505]"
+      >
         <div className="max-w-3xl mx-auto px-6 pt-16 sm:pt-20 pb-20 sm:pb-28 text-center relative">
           <motion.div
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="relative w-48 h-48 sm:w-60 sm:h-60 mx-auto mb-10"
+            className="relative w-56 h-56 sm:w-72 sm:h-72 mx-auto mb-10"
           >
-            {/* Ambient glow behind the disc — soft, not a hard-edged circle */}
+            {/* Ambient glow behind the discs — soft, not a hard-edged circle */}
             <div className="absolute inset-0 rounded-full bg-accent/25 blur-3xl scale-90" />
+
+            {/* Three-disc fan, cursor-reactive parallax (not scroll-triggered
+                -- this stack lives in one place, drifting subtly toward the
+                cursor rather than firing on scroll position). Each disc gets
+                its own depth multiplier so the back two feel like they're
+                genuinely behind the front one, not just smaller. */}
             <motion.div
+              style={{ x: orangeX, y: orangeY }}
+              animate={{ rotate: 360 }}
+              transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
+              className="absolute inset-0 -translate-x-8 translate-y-4 -rotate-12 opacity-70 scale-[0.82]"
+            >
+              <Image src="/brand/vinyl-orange.png" alt="" fill sizes="200px" className="object-contain drop-shadow-[0_16px_30px_rgba(0,0,0,0.45)]" />
+            </motion.div>
+            <motion.div
+              style={{ x: whiteX, y: whiteY }}
+              animate={{ rotate: -360 }}
+              transition={{ duration: 26, repeat: Infinity, ease: "linear" }}
+              className="absolute inset-0 translate-x-8 translate-y-6 rotate-12 opacity-80 scale-[0.88]"
+            >
+              <Image src="/brand/vinyl-white.png" alt="" fill sizes="220px" className="object-contain drop-shadow-[0_16px_30px_rgba(0,0,0,0.45)]" />
+            </motion.div>
+            <motion.div
+              style={{ x: blackX, y: blackY }}
               animate={{ rotate: 360 }}
               transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
               className="relative w-full h-full"
@@ -121,7 +168,7 @@ export default function LandingPage() {
                 src="/brand/vinyl-black.png"
                 alt=""
                 fill
-                sizes="240px"
+                sizes="288px"
                 className="object-contain drop-shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
                 priority
               />
@@ -150,7 +197,7 @@ export default function LandingPage() {
               {isAuthed ? (
                 <Link
                   href="/"
-                  className="text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
+                  className="text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-full hover:bg-accent-strong transition-colors"
                 >
                   Go to your library
                 </Link>
@@ -158,7 +205,7 @@ export default function LandingPage() {
                 <>
                   <Link
                     href="/setup"
-                    className="text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
+                    className="text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-full hover:bg-accent-strong transition-colors"
                   >
                     Create your library
                   </Link>
@@ -279,7 +326,7 @@ export default function LandingPage() {
         </h2>
         <Link
           href={isAuthed ? "/" : "/setup"}
-          className="inline-block mt-8 text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-md hover:bg-accent-strong transition-colors"
+          className="inline-block mt-8 text-sm font-medium bg-accent text-on-accent px-6 py-3 rounded-full hover:bg-accent-strong transition-colors"
         >
           {isAuthed ? "Go to your library" : "Create your library"}
         </Link>

@@ -26,7 +26,7 @@ export default function DuplicateChoiceModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
           transition={MODAL_SPRING}
-          className="bg-elevated border border-border rounded-lg w-full max-w-sm p-6"
+          className="bg-elevated border border-border rounded-2xl w-full max-w-sm p-6"
           onClick={(e) => e.stopPropagation()}
         >
           <h3 className="text-md font-medium text-primary mb-2">Same name found</h3>
@@ -37,7 +37,7 @@ export default function DuplicateChoiceModal({
           <div className="space-y-2">
             <button
               onClick={() => onChoose("version")}
-              className="w-full text-left bg-accent text-on-accent text-sm font-medium px-4 py-3 rounded-md hover:bg-accent-strong transition-colors"
+              className="w-full text-left bg-accent text-on-accent text-sm font-medium px-4 py-3 rounded-full hover:bg-accent-strong transition-colors"
             >
               New version — group with the existing track
             </button>

@@ -96,7 +96,7 @@ export default function ContactPage() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full bg-accent text-on-accent text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
+              className="w-full bg-accent text-on-accent text-sm font-medium py-3 rounded-full hover:bg-accent-strong transition-colors disabled:opacity-50"
             >
               {busy ? "Sending..." : "Send message"}
             </button>

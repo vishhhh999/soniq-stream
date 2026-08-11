@@ -233,7 +233,7 @@ export default function LyricsEditor({
         <div className="flex items-center gap-3">
           <button
             onClick={tapLine}
-            className="flex-1 bg-accent text-on-accent text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors"
+            className="flex-1 bg-accent text-on-accent text-sm font-medium py-3 rounded-full hover:bg-accent-strong transition-colors"
           >
             Tap when this line starts
           </button>
@@ -335,7 +335,7 @@ export default function LyricsEditor({
             <button
               onClick={saveReview}
               disabled={saving}
-              className="bg-accent text-on-accent text-sm font-medium px-5 py-2.5 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
+              className="bg-accent text-on-accent text-sm font-medium px-5 py-2.5 rounded-full hover:bg-accent-strong transition-colors disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save timing"}
             </button>
@@ -387,7 +387,7 @@ export default function LyricsEditor({
         <button
           onClick={startSync}
           disabled={!text.trim()}
-          className="flex items-center gap-2 text-sm bg-accent text-on-accent rounded-md px-4 py-2 hover:bg-accent-strong transition-colors disabled:opacity-40"
+          className="flex items-center gap-2 text-sm bg-accent text-on-accent rounded-full px-4 py-2 hover:bg-accent-strong transition-colors disabled:opacity-40"
         >
           <Play size={13} strokeWidth={2} />
           {isSynced ? "Re-sync from scratch" : "Sync timing"}

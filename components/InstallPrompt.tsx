@@ -89,7 +89,7 @@ export default function InstallPrompt() {
                   <p className="text-xs text-secondary mt-1 mb-3">Get quick access, full screen, no browser bar.</p>
                   <button
                     onClick={install}
-                    className="flex items-center gap-1.5 text-xs bg-accent text-on-accent rounded-md px-3 py-1.5 hover:bg-accent-strong transition-colors"
+                    className="flex items-center gap-1.5 text-xs bg-accent text-on-accent rounded-full px-3 py-1.5 hover:bg-accent-strong transition-colors"
                   >
                     <Download size={12} strokeWidth={2} />
                     Install

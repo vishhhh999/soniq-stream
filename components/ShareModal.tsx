@@ -69,7 +69,7 @@ export default function ShareModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
           transition={MODAL_SPRING}
-          className="bg-elevated border border-border rounded-lg w-full max-w-sm p-6"
+          className="bg-elevated border border-border rounded-2xl w-full max-w-sm p-6"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-6">
@@ -110,7 +110,7 @@ export default function ShareModal({
               <button
                 onClick={createShare}
                 disabled={busy}
-                className="w-full flex items-center justify-center gap-2 text-sm bg-accent text-on-accent rounded-md px-4 py-2.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 text-sm bg-accent text-on-accent rounded-full px-4 py-2.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
               >
                 <Link2 size={14} strokeWidth={1.5} />
                 {busy ? "Generating..." : "Generate share link"}

@@ -394,7 +394,7 @@ export default function InvitePage({ params }: { params: { token: string } }) {
                 {status === "unauthenticated" ? (
                   <button
                     onClick={accept}
-                    className="w-full flex items-center justify-center gap-2 bg-accent text-on-accent text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors"
+                    className="w-full flex items-center justify-center gap-2 bg-accent text-on-accent text-sm font-medium py-3 rounded-full hover:bg-accent-strong transition-colors"
                   >
                     <LogIn size={15} strokeWidth={1.5} />
                     Sign in to add to your library
@@ -403,7 +403,7 @@ export default function InvitePage({ params }: { params: { token: string } }) {
                   <button
                     onClick={accept}
                     disabled={joining}
-                    className="w-full bg-accent text-on-accent text-sm font-medium py-3 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
+                    className="w-full bg-accent text-on-accent text-sm font-medium py-3 rounded-full hover:bg-accent-strong transition-colors disabled:opacity-50"
                   >
                     {joining ? "Adding to library..." : "Accept invite"}
                   </button>

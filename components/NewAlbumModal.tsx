@@ -92,7 +92,7 @@ export default function NewAlbumModal({ onClose, onCreated }: { onClose: () => v
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
           transition={MODAL_SPRING}
-          className="bg-elevated border border-border rounded-lg w-full max-w-sm p-6"
+          className="bg-elevated border border-border rounded-2xl w-full max-w-sm p-6"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-6">
@@ -142,7 +142,7 @@ export default function NewAlbumModal({ onClose, onCreated }: { onClose: () => v
           <button
             onClick={error ? (albumCreated ? onCreated : submit) : submit}
             disabled={!name.trim() || busy}
-            className="w-full bg-accent text-on-accent text-sm font-medium py-2.5 rounded-md hover:bg-accent-strong transition-colors disabled:opacity-50"
+            className="w-full bg-accent text-on-accent text-sm font-medium py-2.5 rounded-full hover:bg-accent-strong transition-colors disabled:opacity-50"
           >
             {busy ? "Creating..." : error ? (albumCreated ? "Continue without cover" : "Try again") : "Create album"}
           </button>

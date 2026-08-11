@@ -285,7 +285,7 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
           transition={MODAL_SPRING}
-          className="bg-elevated border border-border rounded-lg w-full max-w-xl max-h-[85vh] overflow-y-auto no-scrollbar"
+          className="bg-elevated border border-border rounded-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto no-scrollbar"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-6 py-5 border-b border-border">
@@ -435,7 +435,7 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
                   <button
                     onClick={startUpgrade}
                     disabled={upgrading}
-                    className="text-xs font-medium text-on-accent bg-accent rounded-md px-3 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
+                    className="text-xs font-medium text-on-accent bg-accent rounded-full px-3 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
                   >
                     {upgrading ? "Opening checkout..." : "Upgrade to Pro"}
                   </button>
@@ -470,7 +470,7 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
                         <button
                           onClick={saveUsername}
                           disabled={saving || usernameDraft.length < 3}
-                          className="text-xs bg-accent text-on-accent rounded-md px-3 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
+                          className="text-xs bg-accent text-on-accent rounded-full px-3 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
                         >
                           {saving ? "Saving..." : "Save"}
                         </button>
@@ -519,7 +519,7 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
                         <button
                           onClick={savePassword}
                           disabled={savingPassword || newPasswordDraft.length < 8}
-                          className="text-xs bg-accent text-on-accent rounded-md px-3 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
+                          className="text-xs bg-accent text-on-accent rounded-full px-3 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
                         >
                           {savingPassword ? "Saving..." : "Save"}
                         </button>
