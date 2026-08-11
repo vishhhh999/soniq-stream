@@ -136,9 +136,9 @@ export default function LandingPage() {
           heroParallaxY.set(((e.clientY - r.top) / r.height - 0.5) * 2);
         }}
         onMouseLeave={() => { heroParallaxX.set(0); heroParallaxY.set(0); }}
-        className="relative overflow-hidden bg-gradient-to-b from-[#1a1a1a] to-[#050505]"
+        className="relative overflow-hidden bg-gradient-to-b from-[#1a1a1a] to-[#050505] min-h-[calc(100vh-76px)] flex items-center"
       >
-        <div className="max-w-5xl mx-auto px-6 pt-14 sm:pt-20 pb-20 sm:pb-28 text-center relative">
+        <div className="max-w-5xl mx-auto px-6 py-14 sm:py-16 text-center relative w-full">
           {/* Three discs, side by side, all equally visible -- no fanning,
               no one hiding the other two. Each spins at its own speed and
               drifts toward the cursor at its own depth, so there's still
@@ -158,7 +158,7 @@ export default function LandingPage() {
               style={{ x: orangeX, y: orangeY }}
               animate={{ rotate: 360 }}
               transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-              className="relative w-24 h-24 sm:w-40 sm:h-40 md:w-48 md:h-48 shrink-0"
+              className="relative w-28 h-28 sm:w-48 sm:h-48 md:w-60 md:h-60 lg:w-64 lg:h-64 shrink-0"
             >
               <Image src="/brand/vinyl-orange.png" alt="" fill sizes="192px" className="object-contain drop-shadow-[0_16px_30px_rgba(0,0,0,0.45)]" />
             </motion.div>
@@ -166,7 +166,7 @@ export default function LandingPage() {
               style={{ x: blackX, y: blackY }}
               animate={{ rotate: 360 }}
               transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
-              className="relative w-28 h-28 sm:w-48 sm:h-48 md:w-56 md:h-56 shrink-0 z-10"
+              className="relative w-32 h-32 sm:w-56 sm:h-56 md:w-72 md:h-72 lg:w-80 lg:h-80 shrink-0 z-10"
             >
               <Image
                 src="/brand/vinyl-black.png"
@@ -181,7 +181,7 @@ export default function LandingPage() {
               style={{ x: whiteX, y: whiteY }}
               animate={{ rotate: -360 }}
               transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
-              className="relative w-24 h-24 sm:w-40 sm:h-40 md:w-48 md:h-48 shrink-0"
+              className="relative w-28 h-28 sm:w-48 sm:h-48 md:w-60 md:h-60 lg:w-64 lg:h-64 shrink-0"
             >
               <Image src="/brand/vinyl-white.png" alt="" fill sizes="192px" className="object-contain drop-shadow-[0_16px_30px_rgba(0,0,0,0.45)]" />
             </motion.div>
@@ -199,8 +199,8 @@ export default function LandingPage() {
                 what keeps a single-word-per-line moment from feeling
                 bloated rather than confident. */}
             <h1
-              className="font-display font-medium text-white tracking-[-0.03em] leading-[0.95]"
-              style={{ fontSize: "clamp(2.75rem, 9vw, 6.5rem)" }}
+              className="font-display font-bold text-white tracking-[-0.03em] leading-[0.95]"
+              style={{ fontSize: "clamp(3.25rem, 11vw, 8.5rem)" }}
             >
               SONIQ
             </h1>

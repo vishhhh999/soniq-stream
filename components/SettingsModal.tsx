@@ -295,9 +295,9 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
             </button>
           </div>
 
-          <div className="p-6 space-y-8">
+          <div className="p-6 space-y-5">
             {/* Profile picture */}
-            <div>
+            <div className="bg-surface border border-border rounded-xl p-5">
               <label className="text-xs uppercase tracking-wide text-tertiary mb-3 block">Profile</label>
               <div className="flex items-center gap-4">
                 <div className="relative group">
@@ -346,36 +346,58 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
               </div>
             </div>
 
-            {/* Plan / storage — free tier is a storage cap only, no track
-                or feature gating. Checkout opens Razorpay's own hosted
-                checkout.js modal (no redirect page — see startUpgrade);
-                cancellation is a direct API call since Razorpay has no
-                self-serve billing portal for standard accounts. */}
-            <div ref={billingRef} className="px-6 py-5 border-t border-border">
-              <div className="flex items-center justify-between mb-2">
+            {/* Plan / storage — this used to be a plain divider-separated
+                row with a tiny xs "Upgrade to Pro" button, easy to miss
+                entirely and no different in visual weight from any other
+                settings row. Free-tier now gets a genuinely distinct
+                card treatment (accent gradient wash, border, larger
+                heading, real benefit list) so it reads as the one thing
+                in this modal actively worth a second look, not just
+                another option next to "change password". Paid users get
+                a calmer version of the same card shape — confirmed status,
+                not a pitch. */}
+            <div
+              ref={billingRef}
+              className={`rounded-xl p-5 border ${
+                plan?.isPaid
+                  ? "bg-surface border-border"
+                  : "border-accent/30 relative overflow-hidden"
+              }`}
+              style={!plan?.isPaid ? { background: "linear-gradient(135deg, rgba(232,101,10,0.14), rgba(232,101,10,0.03))" } : undefined}
+            >
+              <div className="flex items-center justify-between mb-1">
                 <span className="text-xs uppercase tracking-wide text-tertiary">Plan</span>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${plan?.isPaid ? "bg-accent/15 text-accent" : "bg-surface text-secondary"}`}>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${plan?.isPaid ? "bg-accent/15 text-accent" : "bg-canvas text-secondary"}`}>
                   {plan?.isPaid ? "SONIQ Pro" : "Free"}
                 </span>
               </div>
 
-              {plan && !plan.isPaid && plan.storageCapBytes && (
-                <div className="mb-3">
-                  <div className="h-1.5 rounded-full bg-surface overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${plan.storageUsedBytes / plan.storageCapBytes > 0.9 ? "bg-error" : "bg-accent"}`}
-                      style={{ width: `${Math.min(100, (plan.storageUsedBytes / plan.storageCapBytes) * 100)}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-tertiary mt-1.5">
-                    {(plan.storageUsedBytes / (1024 * 1024)).toFixed(0)}MB of {(plan.storageCapBytes / (1024 * 1024)).toFixed(0)}MB used
+              {plan && !plan.isPaid && (
+                <>
+                  <h3 className="text-primary font-display font-semibold text-lg mt-1 mb-1">Go unlimited with Pro</h3>
+                  <p className="text-secondary text-xs leading-relaxed mb-3">
+                    Unlimited storage and all 6 snippet export templates — $5/mo or $40/yr (4 months free).
                   </p>
-                </div>
+
+                  {plan.storageCapBytes && (
+                    <div className="mb-4">
+                      <div className="h-1.5 rounded-full bg-canvas overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${plan.storageUsedBytes / plan.storageCapBytes > 0.9 ? "bg-error" : "bg-accent"}`}
+                          style={{ width: `${Math.min(100, (plan.storageUsedBytes / plan.storageCapBytes) * 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-tertiary mt-1.5">
+                        {(plan.storageUsedBytes / (1024 * 1024)).toFixed(0)}MB of {(plan.storageCapBytes / (1024 * 1024)).toFixed(0)}MB used
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               {plan?.isPaid && (
-                <p className="text-xs text-tertiary mb-3">
-                  Unlimited storage.
+                <p className="text-xs text-tertiary mb-3 mt-1">
+                  Unlimited storage, all 6 export templates.
                   {plan.status === "past_due" && " Your last payment didn't go through — update your card to avoid losing access."}
                   {plan.periodEnd && plan.status === "active" && ` Renews ${new Date(plan.periodEnd).toLocaleDateString()}.`}
                 </p>
@@ -412,21 +434,21 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
                   </button>
                 )
               ) : (
-                <div className="space-y-2.5">
+                <div className="space-y-3">
                   {/* Monthly/yearly — actual prices live on the Razorpay
                       Plans (RAZORPAY_PLAN_ID_MONTHLY / _YEARLY), these
                       labels are just the marketing framing kept in sync
                       manually. Update both together if pricing changes. */}
-                  <div className="flex flex-wrap gap-1.5 p-0.5 bg-surface rounded-md w-fit">
+                  <div className="flex flex-wrap gap-1.5 p-0.5 bg-canvas rounded-full w-fit">
                     <button
                       onClick={() => setBillingInterval("monthly")}
-                      className={`text-xs px-3 py-1.5 rounded transition-colors ${billingInterval === "monthly" ? "bg-canvas text-primary" : "text-secondary hover:text-primary"}`}
+                      className={`text-xs px-3 py-1.5 rounded-full transition-colors ${billingInterval === "monthly" ? "bg-elevated text-primary" : "text-secondary hover:text-primary"}`}
                     >
                       Monthly — $5/mo
                     </button>
                     <button
                       onClick={() => setBillingInterval("yearly")}
-                      className={`text-xs px-3 py-1.5 rounded transition-colors ${billingInterval === "yearly" ? "bg-canvas text-primary" : "text-secondary hover:text-primary"}`}
+                      className={`text-xs px-3 py-1.5 rounded-full transition-colors ${billingInterval === "yearly" ? "bg-elevated text-primary" : "text-secondary hover:text-primary"}`}
                     >
                       Yearly — $40/yr
                       <span className="ml-1.5 text-[10px] text-accent-text">4 months free</span>
@@ -435,7 +457,7 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
                   <button
                     onClick={startUpgrade}
                     disabled={upgrading}
-                    className="text-xs font-medium text-on-accent bg-accent rounded-full px-3 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
+                    className="w-full text-sm font-semibold text-on-accent bg-accent rounded-full px-4 py-2.5 hover:bg-accent-strong transition-colors disabled:opacity-50 shadow-[0_4px_20px_-4px_rgba(232,101,10,0.5)]"
                   >
                     {upgrading ? "Opening checkout..." : "Upgrade to Pro"}
                   </button>
@@ -444,7 +466,7 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
             </div>
 
             {/* Account */}
-            <div>
+            <div className="bg-surface border border-border rounded-xl p-5">
               <label className="text-xs uppercase tracking-wide text-tertiary mb-3 block">Account</label>
               <div className="space-y-3">
                 <div>
@@ -547,7 +569,7 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
             </div>
 
             {/* Playback */}
-            <div>
+            <div className="bg-surface border border-border rounded-xl p-5">
               <label className="text-xs uppercase tracking-wide text-tertiary mb-3 block">Playback</label>
               <div className="space-y-1">
                 <div className="flex items-center justify-between py-2">
@@ -588,7 +610,7 @@ export default function SettingsModal({ onClose, initialSection }: { onClose: ()
             </div>
 
             {/* Appearance */}
-            <div>
+            <div className="bg-surface border border-border rounded-xl p-5">
               <label className="text-xs uppercase tracking-wide text-tertiary mb-3 block">Appearance</label>
               <div className="space-y-1">
                 <button

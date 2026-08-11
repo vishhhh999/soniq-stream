@@ -114,11 +114,16 @@ export default function AlbumInsightsModal({
                 </div>
 
                 {tab === "tracks" ? (
-                  data.byTrack.length === 0 ? (
-                    <p className="text-sm text-tertiary text-center py-4">No tracks yet.</p>
+                  // Tracks with 0 plays add nothing here -- an empty bar
+                  // and a "0" next to a title tells you nothing you didn't
+                  // already know. Filtered out rather than shown at
+                  // zero-width, this view is specifically "what's landing",
+                  // not a full track roster.
+                  data.byTrack.filter((t) => t.plays > 0).length === 0 ? (
+                    <p className="text-sm text-tertiary text-center py-4">No plays recorded yet.</p>
                   ) : (
                     <div className="space-y-3">
-                      {data.byTrack.map((t) => (
+                      {data.byTrack.filter((t) => t.plays > 0).map((t) => (
                         <div key={t.trackId}>
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm text-primary truncate mr-2">{t.title}</span>

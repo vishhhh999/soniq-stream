@@ -8,7 +8,7 @@ import { Bell, Play, GitBranch } from "lucide-react";
 export function OrganizeIllustration() {
   return (
     <div className="relative h-32 flex items-center justify-center">
-      <div className="absolute w-24 h-16 rounded-xl bg-white/[0.04] border border-border rotate-[-6deg] translate-x-3" />
+      <div className="absolute w-24 h-16 rounded-xl bg-accent/10 border border-accent/30 rotate-[-6deg] translate-x-3" />
       <div className="absolute w-24 h-16 rounded-xl bg-white/[0.06] border border-border rotate-[3deg] -translate-x-2" />
       <div className="relative w-24 h-16 rounded-xl bg-elevated border border-border-strong flex flex-col justify-center px-3 gap-1.5">
         <div className="h-1.5 w-14 rounded-full bg-accent/70" />
@@ -33,21 +33,32 @@ export function NotificationsIllustration() {
   );
 }
 
+// Rebuilt -- the play glyph previously floated disconnected above the bars
+// with no relationship to anything, an orphaned icon rather than a
+// deliberate mark. Now it sits as a small badge directly on the loudest
+// (accent) bar, so it reads as "this is the one getting played" instead of
+// a stray triangle.
 export function AnalyticsIllustration() {
   const bars = [0.3, 0.55, 0.4, 0.85, 0.6];
+  const loudIndex = 3;
   return (
     <div className="relative h-32 flex items-end justify-center gap-2 pb-4">
       {bars.map((h, i) => (
-        <div
-          key={i}
-          className="w-4 rounded-full"
-          style={{
-            height: `${h * 64}px`,
-            background: i === 3 ? "var(--accent)" : "rgba(255,255,255,0.1)",
-          }}
-        />
+        <div key={i} className="relative flex flex-col items-center justify-end" style={{ height: "64px" }}>
+          {i === loudIndex && (
+            <div className="absolute -top-6 w-5 h-5 rounded-full bg-accent flex items-center justify-center">
+              <Play size={9} strokeWidth={2.5} className="text-on-accent ml-[1px]" fill="currentColor" />
+            </div>
+          )}
+          <div
+            className="w-4 rounded-full"
+            style={{
+              height: `${h * 64}px`,
+              background: i === loudIndex ? "var(--accent)" : "rgba(255,255,255,0.1)",
+            }}
+          />
+        </div>
       ))}
-      <Play size={12} strokeWidth={2} className="absolute -top-1 right-[calc(50%-38px)] text-accent-text" />
     </div>
   );
 }

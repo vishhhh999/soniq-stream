@@ -5,7 +5,7 @@ import { usePlayer, Track } from "../PlayerProvider";
 import SyncedLyricsList from "../SyncedLyricsList";
 import type { SyncedLine } from "@/lib/lyricsSync";
 
-export default function LyricsPanel({ track }: { track: Track }) {
+export default function LyricsPanel({ track, showHeading = true }: { track: Track; showHeading?: boolean }) {
   const { currentTime } = usePlayer();
   const [lines, setLines] = useState<SyncedLine[] | null>(null);
   const [rawText, setRawText] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export default function LyricsPanel({ track }: { track: Track }) {
 
   return (
     <div className="flex flex-col h-full">
-      <h3 className="text-sm font-medium text-primary px-1 pb-4">Lyrics</h3>
+      {showHeading && <h3 className="text-sm font-medium text-primary px-1 pb-4">Lyrics</h3>}
       <div className="flex-1 min-h-0">
         {loading ? (
           <p className="text-secondary text-sm text-center mt-8">Loading...</p>
