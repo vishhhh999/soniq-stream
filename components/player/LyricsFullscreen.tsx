@@ -35,7 +35,7 @@ export default function LyricsFullscreen({ track, onClose }: { track: Track; onC
       </div>
 
       <div className="flex items-center justify-between px-6 pt-6 pb-4 shrink-0 relative z-10">
-        <button onClick={onClose} className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-secondary hover:text-primary transition-colors">
+        <button onClick={onClose} aria-label="Close lyrics" className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-secondary hover:text-primary transition-colors">
           <X size={16} strokeWidth={1.5} />
         </button>
         <span className="text-sm font-medium text-primary truncate max-w-[60%]">{track.title}</span>

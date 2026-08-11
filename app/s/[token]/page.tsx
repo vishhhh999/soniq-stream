@@ -96,9 +96,13 @@ function CellophaneOverlay({ size, onClick }: { size: number; onClick: () => voi
       initial={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 1.08 }}
       transition={{ duration: 0.35, ease: "easeIn" }}
-      className="absolute inset-0 rounded-full flex items-center justify-center"
+      className="absolute inset-0 rounded-full flex items-center justify-center cursor-pointer"
       style={{ zIndex: 10 }}
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      aria-label="Unwrap"
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
     >
       {/* Cellophane streaks */}
       <div

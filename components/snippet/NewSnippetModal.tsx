@@ -246,7 +246,7 @@ export default function NewSnippetModal({ track, onClose }: { track: Track; onCl
       className="fixed inset-0 z-[90] bg-canvas flex flex-col"
     >
       <div className="flex items-center justify-between px-6 pt-6 pb-4 shrink-0">
-        <button onClick={onClose} className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-secondary hover:text-primary transition-colors">
+        <button onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-secondary hover:text-primary transition-colors">
           <X size={16} strokeWidth={1.5} />
         </button>
         <span className="text-sm font-medium text-primary">New Snippet</span>

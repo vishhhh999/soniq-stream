@@ -144,21 +144,21 @@ export default function MobilePlayerBar() {
         </div>
 
         <div className="flex items-center justify-between mb-6">
-          <button onClick={toggleShuffle} className="p-3 -m-3">
+          <button onClick={toggleShuffle} aria-label="Toggle shuffle" className="p-3 -m-3">
             <Shuffle size={19} strokeWidth={1.5} className={shuffleOn ? "text-accent" : "text-secondary"} />
           </button>
           <div className="flex items-center gap-6">
-            <button onClick={previous} className="p-2 -m-2">
+            <button onClick={previous} aria-label="Previous track" className="p-2 -m-2">
               <SkipBack size={26} strokeWidth={1.5} className={queue.length > 1 || currentTime > 3 ? "text-primary" : "text-tertiary"} />
             </button>
-            <button ref={expandedPlayButtonRef} onClick={toggle} className="w-16 h-16 rounded-full bg-accent text-on-accent flex items-center justify-center shrink-0">
+            <button ref={expandedPlayButtonRef} onClick={toggle} aria-label="Play or pause" className="w-16 h-16 rounded-full bg-accent text-on-accent flex items-center justify-center shrink-0">
               {isPlaying ? <Pause size={24} strokeWidth={2} /> : <Play size={24} strokeWidth={2} className="ml-1" />}
             </button>
-            <button onClick={next} className="p-2 -m-2">
+            <button onClick={next} aria-label="Next track" className="p-2 -m-2">
               <SkipForward size={26} strokeWidth={1.5} className={queueIndex < queue.length - 1 ? "text-primary" : "text-tertiary"} />
             </button>
           </div>
-          <button onClick={cycleRepeatMode} className="p-3 -m-3">
+          <button onClick={cycleRepeatMode} aria-label="Cycle repeat mode" className="p-3 -m-3">
             {repeatMode === "one" ? (
               <Repeat1 size={19} strokeWidth={1.5} className="text-accent" />
             ) : (

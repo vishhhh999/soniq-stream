@@ -149,18 +149,27 @@ export default function PlayerBar() {
             size={14}
             strokeWidth={1.5}
             onClick={toggleShuffle}
+            role="button"
+            tabIndex={0}
+            aria-label="Toggle shuffle"
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleShuffle(); } }}
             className={`cursor-pointer transition-colors ${shuffleOn ? "text-primary" : "hover:text-primary"}`}
           />
           <SkipBack
             size={16}
             strokeWidth={1.5}
             onClick={previous}
+            role="button"
+            tabIndex={0}
+            aria-label="Previous track"
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); previous(); } }}
             className={`transition-colors ${hasQueueContext || currentTime > 3 ? "cursor-pointer hover:text-primary" : "opacity-30"}`}
           />
           <button
             ref={playButtonRef}
             onClick={toggle}
             disabled={!current}
+            aria-label={isPlaying ? "Pause" : "Play"}
             className="w-8 h-8 rounded-full bg-accent text-on-accent flex items-center justify-center disabled:opacity-30 hover:bg-accent-strong transition-colors shrink-0"
           >
             {isPlaying ? <Pause size={14} strokeWidth={2} /> : <Play size={14} strokeWidth={2} className="ml-0.5" />}
@@ -169,6 +178,10 @@ export default function PlayerBar() {
             size={16}
             strokeWidth={1.5}
             onClick={next}
+            role="button"
+            tabIndex={0}
+            aria-label="Next track"
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); next(); } }}
             className={`transition-colors ${queueIndex < queue.length - 1 ? "cursor-pointer hover:text-primary" : "opacity-30"}`}
           />
           {repeatMode === "one" ? (
@@ -176,6 +189,10 @@ export default function PlayerBar() {
               size={14}
               strokeWidth={1.5}
               onClick={cycleRepeatMode}
+              role="button"
+              tabIndex={0}
+              aria-label="Repeat: one track. Click to change."
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cycleRepeatMode(); } }}
               className="cursor-pointer text-primary transition-colors"
             />
           ) : (
@@ -183,6 +200,10 @@ export default function PlayerBar() {
               size={14}
               strokeWidth={1.5}
               onClick={cycleRepeatMode}
+              role="button"
+              tabIndex={0}
+              aria-label={`Repeat: ${repeatMode === "all" ? "all" : "off"}. Click to change.`}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cycleRepeatMode(); } }}
               className={`cursor-pointer transition-colors ${repeatMode === "all" ? "text-primary" : "hover:text-primary"}`}
             />
           )}
